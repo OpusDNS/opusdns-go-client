@@ -146,6 +146,10 @@ type Pagination struct {
 }
 
 // APIError represents an error response from the OpusDNS API.
+//
+// WARNING: The Body field may contain sensitive data from the API response,
+// including API keys or tokens if they were echoed back. Avoid logging or
+// exposing this field in production environments without sanitization.
 type APIError struct {
 	StatusCode int
 	Message    string
@@ -160,33 +164,46 @@ func (e *APIError) Error() string {
 }
 
 // NewClient creates a new OpusDNS API client with the given configuration.
+// If config is nil, a default configuration is used.
+// The provided config is copied internally to prevent mutation of the caller's struct.
 func NewClient(config *Config) *Client {
-	if config.APIEndpoint == "" {
-		config.APIEndpoint = DefaultAPIEndpoint
+	// Create a copy to avoid mutating the caller's config
+	cfg := &Config{}
+	if config != nil {
+		*cfg = *config
+		// Deep copy the DNSResolvers slice to avoid shared state
+		if config.DNSResolvers != nil {
+			cfg.DNSResolvers = make([]string, len(config.DNSResolvers))
+			copy(cfg.DNSResolvers, config.DNSResolvers)
+		}
 	}
-	if config.TTL == 0 {
-		config.TTL = DefaultTTL
+
+	if cfg.APIEndpoint == "" {
+		cfg.APIEndpoint = DefaultAPIEndpoint
 	}
-	if config.HTTPTimeout == 0 {
-		config.HTTPTimeout = DefaultTimeout
+	if cfg.TTL == 0 {
+		cfg.TTL = DefaultTTL
 	}
-	if config.MaxRetries == 0 {
-		config.MaxRetries = DefaultMaxRetries
+	if cfg.HTTPTimeout == 0 {
+		cfg.HTTPTimeout = DefaultTimeout
 	}
-	if config.PollingInterval == 0 {
-		config.PollingInterval = DefaultPollingInterval
+	if cfg.MaxRetries == 0 {
+		cfg.MaxRetries = DefaultMaxRetries
 	}
-	if config.PollingTimeout == 0 {
-		config.PollingTimeout = DefaultPollingTimeout
+	if cfg.PollingInterval == 0 {
+		cfg.PollingInterval = DefaultPollingInterval
 	}
-	if len(config.DNSResolvers) == 0 {
-		config.DNSResolvers = []string{"8.8.8.8:53", "1.1.1.1:53"}
+	if cfg.PollingTimeout == 0 {
+		cfg.PollingTimeout = DefaultPollingTimeout
+	}
+	if len(cfg.DNSResolvers) == 0 {
+		cfg.DNSResolvers = []string{"8.8.8.8:53", "1.1.1.1:53"}
 	}
 
 	return &Client{
-		config: config,
+		config: cfg,
 		httpClient: &http.Client{
-			Timeout: config.HTTPTimeout,
+			Timeout: cfg.HTTPTimeout,
 		},
 		zoneCacheTTL: 5 * time.Minute,
 	}
