@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -142,71 +143,53 @@ func TestListZones(t *testing.T) {
 
 func TestFindZoneForFQDN(t *testing.T) {
 	tests := []struct {
-		name      string
-		fqdn      string
-		zones     []Zone
-		wantZone  string
-		wantErr   bool
+		name       string
+		fqdn       string
+		validZones map[string]bool // zones that exist
+		wantZone   string
+		wantErr    bool
 	}{
 		{
-			name: "exact match",
-			fqdn: "example.com",
-			zones: []Zone{
-				{Name: "example.com"},
-			},
-			wantZone: "example.com",
-			wantErr:  false,
+			name:       "subdomain match",
+			fqdn:       "_acme-challenge.www.example.com",
+			validZones: map[string]bool{"example.com": true},
+			wantZone:   "example.com",
+			wantErr:    false,
 		},
 		{
-			name: "subdomain match",
-			fqdn: "_acme-challenge.www.example.com",
-			zones: []Zone{
-				{Name: "example.com"},
-			},
-			wantZone: "example.com",
-			wantErr:  false,
+			name:       "longer zone match first",
+			fqdn:       "_acme-challenge.sub.example.com",
+			validZones: map[string]bool{"sub.example.com": true, "example.com": true},
+			wantZone:   "sub.example.com",
+			wantErr:    false,
 		},
 		{
-			name: "longest match",
-			fqdn: "_acme-challenge.sub.example.com",
-			zones: []Zone{
-				{Name: "example.com"},
-				{Name: "sub.example.com"},
-			},
-			wantZone: "sub.example.com",
-			wantErr:  false,
-		},
-		{
-			name: "no match",
-			fqdn: "notfound.com",
-			zones: []Zone{
-				{Name: "example.com"},
-			},
-			wantZone: "",
-			wantErr:  true,
-		},
-		{
-			name:     "no zones",
-			fqdn:     "example.com",
-			zones:    []Zone{},
-			wantZone: "",
-			wantErr:  true,
+			name:       "no match",
+			fqdn:       "_acme-challenge.notfound.com",
+			validZones: map[string]bool{"example.com": true},
+			wantZone:   "",
+			wantErr:    true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				resp := ZoneListResponse{
-					Results: tt.zones,
-					Pagination: Pagination{
-						TotalPages:  1,
-						CurrentPage: 1,
-						HasNextPage: false,
-					},
+				// Extract zone from path: /v1/dns/{zone}
+				path := strings.TrimPrefix(r.URL.Path, "/v1/dns/")
+				if tt.validZones[path] {
+					// Valid zone response with dnssec_status
+					resp := map[string]interface{}{
+						"name":          path + ".",
+						"dnssec_status": "disabled",
+					}
+					w.WriteHeader(http.StatusOK)
+					json.NewEncoder(w).Encode(resp)
+				} else {
+					// Zone not found
+					w.WriteHeader(http.StatusNotFound)
+					json.NewEncoder(w).Encode(map[string]string{"error": "not found"})
 				}
-				w.WriteHeader(http.StatusOK)
-				json.NewEncoder(w).Encode(resp)
 			}))
 			defer server.Close()
 

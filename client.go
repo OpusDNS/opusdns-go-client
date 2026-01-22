@@ -332,43 +332,41 @@ func (c *Client) ListZones() ([]Zone, error) {
 }
 
 // FindZoneForFQDN finds the appropriate zone for a given FQDN.
-// It lists all zones and matches the longest matching zone name.
+// It iterates through domain parts and checks each against the API.
 func (c *Client) FindZoneForFQDN(fqdn string) (string, error) {
-	// Ensure FQDN ends with a dot
-	if !strings.HasSuffix(fqdn, ".") {
-		fqdn = fqdn + "."
-	}
+	// Normalize FQDN (remove trailing dot)
+	fqdn = strings.TrimSuffix(fqdn, ".")
+	parts := strings.Split(fqdn, ".")
 
-	zones, err := c.ListZones()
-	if err != nil {
-		return "", fmt.Errorf("failed to list zones: %w", err)
-	}
+	// Start from second part (skip first like _acme-challenge)
+	for i := 1; i < len(parts); i++ {
+		candidate := strings.Join(parts[i:], ".")
 
-	if len(zones) == 0 {
-		return "", fmt.Errorf("no zones found in OpusDNS account")
-	}
+		// Check if this zone exists via API
+		resp, err := c.doRequest("GET", "/v1/dns/"+candidate, nil)
+		if err != nil {
+			// API error (not found, etc.) - try next candidate
+			continue
+		}
+		defer resp.Body.Close()
 
-	// Find the longest matching zone
-	var matchedZone string
-	for _, zone := range zones {
-		zoneName := zone.Name
-		if !strings.HasSuffix(zoneName, ".") {
-			zoneName = zoneName + "."
+		bodyBytes, err := io.ReadAll(resp.Body)
+		if err != nil {
+			continue
 		}
 
-		if strings.HasSuffix(fqdn, zoneName) {
-			if len(zoneName) > len(matchedZone) {
-				matchedZone = zoneName
-			}
+		// Valid zone response contains dnssec_status
+		var zoneResp map[string]interface{}
+		if err := json.Unmarshal(bodyBytes, &zoneResp); err != nil {
+			continue
+		}
+
+		if _, ok := zoneResp["dnssec_status"]; ok {
+			return candidate, nil
 		}
 	}
 
-	if matchedZone == "" {
-		return "", fmt.Errorf("no zone found for FQDN %s (available zones: %d)", fqdn, len(zones))
-	}
-
-	// Return without trailing dot for API usage
-	return strings.TrimSuffix(matchedZone, "."), nil
+	return "", fmt.Errorf("no zone found for FQDN %s", fqdn)
 }
 
 // RRSetListResponse represents the response from GET /v1/dns/{zone}/records.
