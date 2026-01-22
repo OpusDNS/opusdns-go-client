@@ -359,6 +359,35 @@ func (c *Client) FindZoneForFQDN(fqdn string) (string, error) {
 	return strings.TrimSuffix(matchedZone, "."), nil
 }
 
+// RRSetListResponse represents the response from GET /v1/dns/{zone}/rrsets.
+type RRSetListResponse struct {
+	RRSets []RRSet `json:"rrsets"`
+}
+
+// ListRRSets retrieves all RRSets for a given zone.
+func (c *Client) ListRRSets(zone string) ([]RRSet, error) {
+	zone = strings.TrimSuffix(zone, ".")
+	path := fmt.Sprintf("/v1/dns/%s/rrsets", zone)
+
+	resp, err := c.doRequest("GET", path, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list RRSets for zone %s: %w", zone, err)
+	}
+	defer resp.Body.Close()
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	var rrsetResp RRSetListResponse
+	if err := json.Unmarshal(bodyBytes, &rrsetResp); err != nil {
+		return nil, fmt.Errorf("failed to parse RRSet list response: %w", err)
+	}
+
+	return rrsetResp.RRSets, nil
+}
+
 // PatchRRSets applies a patch operation to RRSets in a zone.
 func (c *Client) PatchRRSets(zone string, ops []RRSetOperation) error {
 	zone = strings.TrimSuffix(zone, ".")
