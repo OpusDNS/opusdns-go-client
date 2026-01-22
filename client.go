@@ -26,7 +26,7 @@
 //	}
 //
 //	// Clean up
-//	err = client.RemoveTXTRecord("_acme-challenge.example.com", "TXT")
+//	err = client.RemoveTXTRecord("_acme-challenge.example.com", "challenge-value")
 //	if err != nil {
 //	    log.Printf("cleanup error: %v", err)
 //	}
@@ -87,7 +87,7 @@ type Config struct {
 	PollingTimeout time.Duration
 
 	// DNSResolvers is the list of DNS servers to query for propagation checks
-	// (default: ["8.8.8.8:53", "1.1.1.1:53"])
+	// (default: ["ns1.opusdns.com:53", "ns2.opusdns.net:53"])
 	DNSResolvers []string
 }
 
@@ -110,24 +110,19 @@ type Zone struct {
 
 // RRSet represents a resource record set.
 type RRSet struct {
-	Name    string   `json:"name"`
-	Type    string   `json:"type"`
-	TTL     int      `json:"ttl"`
-	Records []Record `json:"records"`
-}
-
-// Record represents a DNS record within an RRSet.
-type Record struct {
+	Name  string `json:"name"`
+	Type  string `json:"type"`
+	TTL   int    `json:"ttl"`
 	RData string `json:"rdata"`
 }
 
-// RRSetOperation represents an operation on an RRSet.
+// RRSetOperation represents an operation on a Record.
 type RRSetOperation struct {
-	Op    string `json:"op"` // "upsert" or "remove"
-	RRSet RRSet  `json:"rrset"`
+	Op     string `json:"op"` // "upsert" or "remove"
+	Record RRSet  `json:"record"`
 }
 
-// RRSetPatchRequest represents a PATCH request to /v1/dns/{zone}/rrsets.
+// RRSetPatchRequest represents a PATCH request to /v1/dns/{zone}/records.
 type RRSetPatchRequest struct {
 	Ops []RRSetOperation `json:"ops"`
 }
@@ -197,7 +192,7 @@ func NewClient(config *Config) *Client {
 		cfg.PollingTimeout = DefaultPollingTimeout
 	}
 	if len(cfg.DNSResolvers) == 0 {
-		cfg.DNSResolvers = []string{"8.8.8.8:53", "1.1.1.1:53"}
+		cfg.DNSResolvers = []string{"ns1.opusdns.com:53", "ns2.opusdns.net:53"}
 	}
 
 	return &Client{
@@ -376,7 +371,7 @@ func (c *Client) FindZoneForFQDN(fqdn string) (string, error) {
 	return strings.TrimSuffix(matchedZone, "."), nil
 }
 
-// RRSetListResponse represents the response from GET /v1/dns/{zone}/rrsets.
+// RRSetListResponse represents the response from GET /v1/dns/{zone}/records.
 type RRSetListResponse struct {
 	RRSets []RRSet `json:"rrsets"`
 }
@@ -384,7 +379,7 @@ type RRSetListResponse struct {
 // ListRRSets retrieves all RRSets for a given zone.
 func (c *Client) ListRRSets(zone string) ([]RRSet, error) {
 	zone = strings.TrimSuffix(zone, ".")
-	path := fmt.Sprintf("/v1/dns/%s/rrsets", zone)
+	path := fmt.Sprintf("/v1/dns/%s/records", zone)
 
 	resp, err := c.doRequest("GET", path, nil)
 	if err != nil {
@@ -408,7 +403,7 @@ func (c *Client) ListRRSets(zone string) ([]RRSet, error) {
 // PatchRRSets applies a patch operation to RRSets in a zone.
 func (c *Client) PatchRRSets(zone string, ops []RRSetOperation) error {
 	zone = strings.TrimSuffix(zone, ".")
-	path := fmt.Sprintf("/v1/dns/%s/rrsets", zone)
+	path := fmt.Sprintf("/v1/dns/%s/records", zone)
 
 	req := RRSetPatchRequest{Ops: ops}
 
@@ -449,13 +444,11 @@ func (c *Client) UpsertTXTRecord(fqdn, value string) error {
 
 	op := RRSetOperation{
 		Op: "upsert",
-		RRSet: RRSet{
-			Name: recordName,
-			Type: "TXT",
-			TTL:  c.config.TTL,
-			Records: []Record{
-				{RData: value},
-			},
+		Record: RRSet{
+			Name:  recordName,
+			Type:  "TXT",
+			TTL:   c.config.TTL,
+			RData: value,
 		},
 	}
 
@@ -464,7 +457,8 @@ func (c *Client) UpsertTXTRecord(fqdn, value string) error {
 
 // RemoveTXTRecord removes a TXT record for the given FQDN.
 // It automatically detects the appropriate zone.
-func (c *Client) RemoveTXTRecord(fqdn, recordType string) error {
+// The value parameter is required to specify the complete record for removal.
+func (c *Client) RemoveTXTRecord(fqdn, value string) error {
 	zone, err := c.FindZoneForFQDN(fqdn)
 	if err != nil {
 		return err
@@ -477,11 +471,18 @@ func (c *Client) RemoveTXTRecord(fqdn, recordType string) error {
 		recordName = strings.TrimSuffix(recordName, "."+zone)
 	}
 
+	// Ensure value is quoted for TXT records
+	if !strings.HasPrefix(value, "\"") {
+		value = "\"" + value + "\""
+	}
+
 	op := RRSetOperation{
 		Op: "remove",
-		RRSet: RRSet{
-			Name: recordName,
-			Type: recordType,
+		Record: RRSet{
+			Name:  recordName,
+			Type:  "TXT",
+			TTL:   c.config.TTL,
+			RData: value,
 		},
 	}
 

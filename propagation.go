@@ -9,9 +9,9 @@ import (
 	"github.com/miekg/dns"
 )
 
-// WaitForPropagation polls DNS servers to verify that a TXT record has propagated.
-// It returns nil when the record is found with the expected value, or an error if
-// the timeout is reached or an error occurs.
+// WaitForPropagation polls OpusDNS authoritative nameservers to verify that a TXT record has propagated.
+// It returns nil when the record is found with the expected value on ALL authoritative nameservers,
+// or an error if the timeout is reached or an error occurs.
 func (c *Client) WaitForPropagation(fqdn, expectedValue string) error {
 	// Ensure FQDN ends with a dot for DNS queries
 	if !strings.HasSuffix(fqdn, ".") {
@@ -33,33 +33,42 @@ func (c *Client) WaitForPropagation(fqdn, expectedValue string) error {
 	for {
 		attempt++
 
-		// Try all configured DNS resolvers
+		// Check if record exists on ALL authoritative nameservers
+		allFound := true
+		var notFoundResolvers []string
+
 		for _, resolver := range c.config.DNSResolvers {
 			found, err := c.checkDNSRecord(fqdn, expectedValue, resolver)
-			if err == nil && found {
-				return nil
+			if err != nil || !found {
+				allFound = false
+				notFoundResolvers = append(notFoundResolvers, resolver)
 			}
+		}
+
+		// Only return success if record is found on ALL nameservers
+		if allFound && len(c.config.DNSResolvers) > 0 {
+			return nil
 		}
 
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("DNS propagation timeout after %d attempts (%v): record not found for %s",
-				attempt, c.config.PollingTimeout, fqdn)
+			return fmt.Errorf("DNS propagation timeout after %d attempts (%v): record not found on all nameservers for %s (missing on: %v)",
+				attempt, c.config.PollingTimeout, fqdn, notFoundResolvers)
 		case <-ticker.C:
 			if attempt >= maxAttempts {
-				return fmt.Errorf("DNS propagation timeout after %d attempts: record not found for %s",
-					attempt, fqdn)
+				return fmt.Errorf("DNS propagation timeout after %d attempts: record not found on all nameservers for %s (missing on: %v)",
+					attempt, fqdn, notFoundResolvers)
 			}
 			// Continue to next iteration
 		}
 	}
 }
 
-// checkDNSRecord queries a specific DNS resolver for a TXT record and checks if it matches the expected value.
+// checkDNSRecord queries a specific authoritative DNS resolver for a TXT record and checks if it matches the expected value.
 func (c *Client) checkDNSRecord(fqdn, expectedValue, resolver string) (bool, error) {
 	m := new(dns.Msg)
 	m.SetQuestion(fqdn, dns.TypeTXT)
-	m.RecursionDesired = true
+	m.RecursionDesired = false
 
 	dnsClient := &dns.Client{
 		Timeout: 5 * time.Second,

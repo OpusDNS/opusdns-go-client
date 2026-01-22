@@ -30,7 +30,7 @@ func TestNewClient(t *testing.T) {
 				MaxRetries:      DefaultMaxRetries,
 				PollingInterval: DefaultPollingInterval,
 				PollingTimeout:  DefaultPollingTimeout,
-				DNSResolvers:    []string{"8.8.8.8:53", "1.1.1.1:53"},
+				DNSResolvers:    []string{"ns1.opusdns.com:53", "ns2.opusdns.net:53"},
 			},
 		},
 		{
@@ -323,11 +323,10 @@ func TestUpsertTXTRecord(t *testing.T) {
 				assert.NoError(t, err)
 				require.Len(t, receivedReq.Ops, 1)
 				assert.Equal(t, tt.wantOp, receivedReq.Ops[0].Op)
-				assert.Equal(t, tt.wantName, receivedReq.Ops[0].RRSet.Name)
-				assert.Equal(t, tt.wantType, receivedReq.Ops[0].RRSet.Type)
-				assert.Equal(t, 60, receivedReq.Ops[0].RRSet.TTL)
-				require.Len(t, receivedReq.Ops[0].RRSet.Records, 1)
-				assert.Equal(t, tt.wantRData, receivedReq.Ops[0].RRSet.Records[0].RData)
+				assert.Equal(t, tt.wantName, receivedReq.Ops[0].Record.Name)
+				assert.Equal(t, tt.wantType, receivedReq.Ops[0].Record.Type)
+				assert.Equal(t, 60, receivedReq.Ops[0].Record.TTL)
+				assert.Equal(t, tt.wantRData, receivedReq.Ops[0].Record.RData)
 			}
 		})
 	}
@@ -337,24 +336,28 @@ func TestRemoveTXTRecord(t *testing.T) {
 	tests := []struct {
 		name       string
 		fqdn       string
-		recordType string
+		value      string
 		zones      []Zone
 		wantErr    bool
 		wantOp     string
 		wantName   string
 		wantType   string
+		wantTTL    int
+		wantRData  string
 	}{
 		{
 			name:       "successful remove",
 			fqdn:       "_acme-challenge.example.com",
-			recordType: "TXT",
+			value:      "test-value",
 			zones: []Zone{
 				{Name: "example.com"},
 			},
-			wantErr:  false,
-			wantOp:   "remove",
-			wantName: "_acme-challenge",
-			wantType: "TXT",
+			wantErr:   false,
+			wantOp:    "remove",
+			wantName:  "_acme-challenge",
+			wantType:  "TXT",
+			wantTTL:   DefaultTTL,
+			wantRData: "\"test-value\"",
 		},
 	}
 
@@ -390,7 +393,7 @@ func TestRemoveTXTRecord(t *testing.T) {
 				APIEndpoint: server.URL,
 			})
 
-			err := client.RemoveTXTRecord(tt.fqdn, tt.recordType)
+			err := client.RemoveTXTRecord(tt.fqdn, tt.value)
 
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -398,8 +401,10 @@ func TestRemoveTXTRecord(t *testing.T) {
 				assert.NoError(t, err)
 				require.Len(t, receivedReq.Ops, 1)
 				assert.Equal(t, tt.wantOp, receivedReq.Ops[0].Op)
-				assert.Equal(t, tt.wantName, receivedReq.Ops[0].RRSet.Name)
-				assert.Equal(t, tt.wantType, receivedReq.Ops[0].RRSet.Type)
+				assert.Equal(t, tt.wantName, receivedReq.Ops[0].Record.Name)
+				assert.Equal(t, tt.wantType, receivedReq.Ops[0].Record.Type)
+				assert.Equal(t, tt.wantTTL, receivedReq.Ops[0].Record.TTL)
+				assert.Equal(t, tt.wantRData, receivedReq.Ops[0].Record.RData)
 			}
 		})
 	}

@@ -80,7 +80,7 @@ func main() {
 
 		// Step 3: Clean up
 		fmt.Println("\n[3/3] Cleaning up TXT record...")
-		if err := client.RemoveTXTRecord(fqdn, "TXT"); err != nil {
+		if err := client.RemoveTXTRecord(fqdn, challengeValue); err != nil {
 			log.Printf("⚠ Warning: Failed to remove TXT record: %v", err)
 		} else {
 			fmt.Println("✓ TXT record removed successfully")
