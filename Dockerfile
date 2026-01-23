@@ -21,14 +21,17 @@ RUN go test -v ./...
 # Build the library (optional - create example binary for validation)
 RUN go build -o /dev/null ./...
 
-# Final stage - minimal runtime
-FROM alpine:latest
+# Final stage - Go runtime for tests
+FROM golang:1.25-alpine
 
-RUN apk --no-cache add ca-certificates
+RUN apk --no-cache add ca-certificates git
 
-WORKDIR /root/
+WORKDIR /app
 
-# Copy test results or built artifacts if needed
+# Copy source code for running tests
 COPY --from=builder /app /app
 
-CMD ["echo", "OpusDNS Go client library built and tested successfully"]
+# Re-download dependencies (go mod cache not copied)
+RUN go mod download
+
+CMD ["go", "test", "-v", "./..."]

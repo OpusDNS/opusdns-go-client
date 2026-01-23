@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Build and test the Go client library
   opusdns-go-client:
@@ -10,20 +8,11 @@ services:
       # Optional: Configure for integration tests
       - OPUSDNS_API_KEY=${OPUSDNS_API_KEY:-}
       - OPUSDNS_API_ENDPOINT=${OPUSDNS_API_ENDPOINT:-https://sandbox.opusdns.com}
-    volumes:
-      - .:/app
-    command: >
-      sh -c "
-        cd /app &&
-        echo '=== Running unit tests ===' &&
-        go test -v -race -coverprofile=coverage.out ./... &&
-        echo '=== Coverage report ===' &&
-        go tool cover -func=coverage.out
-      "
+    command: ["go", "test", "-v", "-race", "-coverprofile=/tmp/coverage.out", "./..."]
 
   # Development environment with live reload
   dev:
-    image: golang:1.21-alpine
+    image: golang:1.25-alpine
     working_dir: /app
     volumes:
       - .:/app
@@ -39,7 +28,7 @@ services:
 
   # Integration test runner
   integration-test:
-    image: golang:1.21-alpine
+    image: golang:1.25-alpine
     working_dir: /app
     volumes:
       - .:/app
