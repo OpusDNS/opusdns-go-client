@@ -291,7 +291,7 @@ var contactsDeleteCmd = &cobra.Command{
 			fmt.Printf("Are you sure you want to delete contact '%s'? This action cannot be undone.\n", contactID)
 			fmt.Print("Type 'yes' to confirm: ")
 			var confirm string
-			fmt.Scanln(&confirm)
+			_, _ = fmt.Scanln(&confirm)
 			if confirm != "yes" {
 				fmt.Println("Aborted.")
 				return nil
