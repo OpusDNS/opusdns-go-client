@@ -1,0 +1,48 @@
+services:
+  # Build and test the Go client library
+  opusdns-go-client:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      # Optional: Configure for integration tests
+      - OPUSDNS_API_KEY=${OPUSDNS_API_KEY:-}
+      - OPUSDNS_API_ENDPOINT=${OPUSDNS_API_ENDPOINT:-https://sandbox.opusdns.com}
+    command: ["go", "test", "-v", "-coverprofile=/tmp/coverage.out", "./..."]
+
+  # Development environment with live reload
+  dev:
+    image: golang:1.25-alpine
+    working_dir: /app
+    volumes:
+      - .:/app
+    environment:
+      - OPUSDNS_API_KEY=${OPUSDNS_API_KEY:-}
+      - OPUSDNS_API_ENDPOINT=${OPUSDNS_API_ENDPOINT:-https://sandbox.opusdns.com}
+    command: >
+      sh -c "
+        apk add --no-cache git ca-certificates &&
+        go mod download &&
+        watch -n 2 'go test -v ./...'
+      "
+
+  # Integration test runner
+  integration-test:
+    image: golang:1.25-alpine
+    working_dir: /app
+    volumes:
+      - .:/app
+    environment:
+      - OPUSDNS_API_KEY=${OPUSDNS_API_KEY}
+      - OPUSDNS_API_ENDPOINT=${OPUSDNS_API_ENDPOINT:-https://sandbox.opusdns.com}
+    command: >
+      sh -c "
+        if [ -z \"$$OPUSDNS_API_KEY\" ]; then
+          echo 'ERROR: OPUSDNS_API_KEY environment variable is required for integration tests'
+          exit 1
+        fi &&
+        apk add --no-cache git ca-certificates &&
+        go mod download &&
+        echo '=== Running integration tests ===' &&
+        go test -v -tags=integration ./...
+      "
