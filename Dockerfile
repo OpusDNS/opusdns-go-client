@@ -3,8 +3,8 @@ FROM golang:1.25-alpine AS builder
 
 WORKDIR /app
 
-# Install build dependencies
-RUN apk add --no-cache git ca-certificates
+# Install build dependencies (ca-certificates for HTTPS)
+RUN apk add --no-cache ca-certificates
 
 # Copy go mod files
 COPY go.mod go.sum ./

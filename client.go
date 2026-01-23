@@ -250,7 +250,7 @@ func (c *Client) doRequest(method, path string, body interface{}) (*http.Respons
 
 		// Read response body for error details
 		bodyBytes, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
+		_ = resp.Body.Close()
 
 		// Retry on rate limiting and server errors
 		if resp.StatusCode == 429 || resp.StatusCode >= 500 {
@@ -296,7 +296,7 @@ func (c *Client) ListZones() ([]Zone, error) {
 		}
 
 		bodyBytes, err := io.ReadAll(resp.Body)
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		if err != nil {
 			return nil, fmt.Errorf("failed to read response body: %w", err)
 		}
@@ -334,7 +334,7 @@ func (c *Client) FindZoneForFQDN(fqdn string) (string, error) {
 			// API error (not found, etc.) - try next candidate
 			continue
 		}
-		defer resp.Body.Close()
+		defer resp.Body.Close() //nolint:errcheck
 
 		bodyBytes, err := io.ReadAll(resp.Body)
 		if err != nil {

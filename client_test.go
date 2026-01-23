@@ -108,7 +108,7 @@ func TestListZones(t *testing.T) {
 				assert.Equal(t, "opk_test123", r.Header.Get("X-Api-Key"))
 
 				w.WriteHeader(tt.statusCode)
-				json.NewEncoder(w).Encode(tt.response)
+				_ = json.NewEncoder(w).Encode(tt.response)
 			}))
 			defer server.Close()
 
@@ -172,11 +172,11 @@ func TestFindZoneForFQDN(t *testing.T) {
 						"dnssec_status": "disabled",
 					}
 					w.WriteHeader(http.StatusOK)
-					json.NewEncoder(w).Encode(resp)
+					_ = json.NewEncoder(w).Encode(resp)
 				} else {
 					// Zone not found
 					w.WriteHeader(http.StatusNotFound)
-					json.NewEncoder(w).Encode(map[string]string{"error": "not found"})
+					_ = json.NewEncoder(w).Encode(map[string]string{"error": "not found"})
 				}
 			}))
 			defer server.Close()
