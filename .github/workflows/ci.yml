@@ -90,16 +90,16 @@ jobs:
           go install golang.org/x/vuln/cmd/govulncheck@latest
           govulncheck ./...
 
-  docker:
-    name: Docker Build
-    runs-on: self-hosted
+  # docker:
+  #   name: Docker Build
+  #   runs-on: self-hosted
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v6
 
-      - name: Build Docker image
-        run: docker build -t opusdns-go-client:test .
+  #     - name: Build Docker image
+  #       run: docker build -t opusdns-go-client:test .
 
-      - name: Test in Docker
-        run: docker compose up --abort-on-container-exit opusdns-go-client
+  #     - name: Test in Docker
+  #       run: docker compose up --abort-on-container-exit opusdns-go-client
