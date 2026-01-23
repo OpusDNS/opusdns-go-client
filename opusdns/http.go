@@ -10,6 +10,7 @@ import (
 	"math"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -254,6 +255,14 @@ func (c *HTTPClient) Delete(ctx context.Context, path string) (*Response, error)
 	})
 }
 
+// timestampRegex matches ISO 8601 timestamps without timezone info (e.g., "2026-01-23T08:26:55")
+var timestampRegex = regexp.MustCompile(`"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})"`)
+
+// fixTimestamps adds UTC timezone suffix to timestamps that lack timezone information.
+func fixTimestamps(data []byte) []byte {
+	return timestampRegex.ReplaceAll(data, []byte(`"${1}Z"`))
+}
+
 // DecodeResponse decodes the response body into the given target.
 // Returns an APIError if the response indicates an error (status >= 400).
 func (c *HTTPClient) DecodeResponse(resp *Response, target interface{}) error {
@@ -270,8 +279,11 @@ func (c *HTTPClient) DecodeResponse(resp *Response, target interface{}) error {
 		return nil
 	}
 
+	// Fix timestamps without timezone info before decoding
+	body := fixTimestamps(resp.Body)
+
 	// Decode JSON response
-	if err := json.Unmarshal(resp.Body, target); err != nil {
+	if err := json.Unmarshal(body, target); err != nil {
 		return fmt.Errorf("opusdns: failed to decode response: %w", err)
 	}
 
