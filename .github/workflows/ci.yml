@@ -9,19 +9,14 @@ on:
 jobs:
   test:
     name: Test
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        go-version: ["1.21", "1.22", "1.23"]
+    runs-on: self-hosted
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ matrix.go-version }}
+        uses: actions/setup-go@v6
 
       - name: Download dependencies
         run: go mod download
@@ -33,42 +28,35 @@ jobs:
         run: go tool cover -func=coverage.out
 
       - name: Upload coverage to Codecov
-        if: matrix.go-version == '1.23'
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           files: ./coverage.out
           fail_ci_if_error: false
 
   lint:
     name: Lint
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: "1.23"
+        uses: actions/setup-go@v6
 
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v6
-        with:
-          version: latest
+        uses: golangci/golangci-lint-action@v9
 
   build:
     name: Build
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: "1.23"
+        uses: actions/setup-go@v6
 
       - name: Build
         run: go build -v ./...
@@ -80,16 +68,14 @@ jobs:
 
   security:
     name: Security Scan
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: "1.23"
+        uses: actions/setup-go@v6
 
       - name: Run govulncheck
         run: |
@@ -98,20 +84,14 @@ jobs:
 
   docker:
     name: Docker Build
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: actions/checkout@v6
 
       - name: Build Docker image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          push: false
-          tags: opusdns-go-client:test
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+        run: docker build -t opusdns-go-client:test .
+
+      - name: Test in Docker
+        run: docker compose up --abort-on-container-exit opusdns-go-client
