@@ -90,7 +90,7 @@ func (t Timestamp) MarshalJSON() ([]byte, error) {
 	if t.IsZero() {
 		return []byte("null"), nil
 	}
-	return json.Marshal(t.Time.Format(time.RFC3339))
+	return json.Marshal(t.Format(time.RFC3339))
 }
 
 // UnmarshalJSON implements the json.Unmarshaler interface.

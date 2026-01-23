@@ -193,7 +193,7 @@ func (c *HTTPClient) doRequest(ctx context.Context, req *Request) (*Response, er
 	if err != nil {
 		return nil, &RequestError{Op: "execute", URL: reqURL.String(), Err: err}
 	}
-	defer httpResp.Body.Close()
+	defer httpResp.Body.Close() //nolint:errcheck
 
 	// Read response body
 	body, err := io.ReadAll(httpResp.Body)
