@@ -47,7 +47,7 @@ func main() {
 	}
 
 	// Print result
-	fmt.Println("Zone created successfully!\n")
+	fmt.Println("Zone created successfully!")
 	data, err := json.MarshalIndent(zone, "", "  ")
 	if err != nil {
 		log.Fatalf("Failed to marshal zone: %v", err)
