@@ -1,4 +1,4 @@
-module github.com/opusdns/opusdns-go-client/examples/basic
+module github.com/opusdns/opusdns-go-client/examples/domains
 
 go 1.21
 

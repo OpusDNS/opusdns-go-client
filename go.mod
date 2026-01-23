@@ -1,6 +1,6 @@
 module github.com/opusdns/opusdns-go-client
 
-go 1.25
+go 1.21
 
 require github.com/stretchr/testify v1.8.4
 
