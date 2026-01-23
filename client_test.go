@@ -259,10 +259,10 @@ func TestUpsertTXTRecord(t *testing.T) {
 							"dnssec_status": "disabled",
 						}
 						w.WriteHeader(http.StatusOK)
-						json.NewEncoder(w).Encode(resp)
+						_ = json.NewEncoder(w).Encode(resp)
 					} else {
 						w.WriteHeader(http.StatusNotFound)
-						json.NewEncoder(w).Encode(map[string]string{"error": "not found"})
+						_ = json.NewEncoder(w).Encode(map[string]string{"error": "not found"})
 					}
 					return
 				}
@@ -342,10 +342,10 @@ func TestRemoveTXTRecord(t *testing.T) {
 							"dnssec_status": "disabled",
 						}
 						w.WriteHeader(http.StatusOK)
-						json.NewEncoder(w).Encode(resp)
+						_ = json.NewEncoder(w).Encode(resp)
 					} else {
 						w.WriteHeader(http.StatusNotFound)
-						json.NewEncoder(w).Encode(map[string]string{"error": "not found"})
+						_ = json.NewEncoder(w).Encode(map[string]string{"error": "not found"})
 					}
 					return
 				}
@@ -387,7 +387,7 @@ func TestRetryLogic(t *testing.T) {
 		attempts++
 		if attempts < 3 {
 			w.WriteHeader(http.StatusTooManyRequests)
-			json.NewEncoder(w).Encode(map[string]string{"error": "rate limited"})
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": "rate limited"})
 			return
 		}
 		resp := ZoneListResponse{
@@ -401,7 +401,7 @@ func TestRetryLogic(t *testing.T) {
 			},
 		}
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 	}))
 	defer server.Close()
 
@@ -433,7 +433,7 @@ func TestZoneOperations(t *testing.T) {
 			},
 		}
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 	}))
 	defer server.Close()
 
@@ -487,7 +487,7 @@ func TestPagination(t *testing.T) {
 		}
 		
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 	}))
 	defer server.Close()
 

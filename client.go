@@ -369,7 +369,7 @@ func (c *Client) ListRRSets(zone string) ([]RRSet, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to list RRSets for zone %s: %w", zone, err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -395,7 +395,7 @@ func (c *Client) PatchRRSets(zone string, ops []RRSetOperation) error {
 	if err != nil {
 		return fmt.Errorf("failed to patch RRSets in zone %s: %w", zone, err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	// 204 No Content is expected for successful PATCH
 	if resp.StatusCode != http.StatusNoContent {
@@ -482,7 +482,7 @@ func (c *Client) GetZone(zoneName string) (*Zone, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get zone %s: %w", zoneName, err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -511,7 +511,7 @@ func (c *Client) CreateZone(zoneName string, rrsets []RRSetCreateRequest) (*Zone
 	if err != nil {
 		return nil, fmt.Errorf("failed to create zone %s: %w", zoneName, err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -535,7 +535,7 @@ func (c *Client) DeleteZone(zoneName string) error {
 	if err != nil {
 		return fmt.Errorf("failed to delete zone %s: %w", zoneName, err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	return nil
 }
@@ -549,7 +549,7 @@ func (c *Client) EnableDNSSEC(zoneName string) (*DNSChangesResponse, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to enable DNSSEC for zone %s: %w", zoneName, err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -573,7 +573,7 @@ func (c *Client) DisableDNSSEC(zoneName string) (*DNSChangesResponse, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to disable DNSSEC for zone %s: %w", zoneName, err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -597,7 +597,7 @@ func (c *Client) GetRRSets(zoneName string) ([]RRSetResponse, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get RRSets for zone %s: %w", zoneName, err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
