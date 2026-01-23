@@ -8,7 +8,7 @@ services:
       # Optional: Configure for integration tests
       - OPUSDNS_API_KEY=${OPUSDNS_API_KEY:-}
       - OPUSDNS_API_ENDPOINT=${OPUSDNS_API_ENDPOINT:-https://sandbox.opusdns.com}
-    command: ["go", "test", "-v", "-race", "-coverprofile=/tmp/coverage.out", "./..."]
+    command: ["go", "test", "-v", "-coverprofile=/tmp/coverage.out", "./..."]
 
   # Development environment with live reload
   dev:

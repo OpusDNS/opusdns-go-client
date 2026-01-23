@@ -24,7 +24,7 @@ RUN go build -o /dev/null ./...
 # Final stage - Go runtime for tests
 FROM golang:1.25-alpine
 
-RUN apk --no-cache add ca-certificates git
+RUN apk --no-cache add ca-certificates
 
 WORKDIR /app
 
