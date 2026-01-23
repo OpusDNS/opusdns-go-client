@@ -119,7 +119,7 @@ var zonesDeleteCmd = &cobra.Command{
 			fmt.Printf("Are you sure you want to delete zone '%s'? This action cannot be undone.\n", zoneName)
 			fmt.Print("Type 'yes' to confirm: ")
 			var confirm string
-			fmt.Scanln(&confirm)
+			_, _ = fmt.Scanln(&confirm)
 			if confirm != "yes" {
 				fmt.Println("Aborted.")
 				return nil

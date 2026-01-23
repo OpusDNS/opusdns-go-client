@@ -140,7 +140,7 @@ var domainsRenewCmd = &cobra.Command{
 			fmt.Printf("Are you sure you want to renew '%s' for %d year(s)?\n", domainName, period)
 			fmt.Print("Type 'yes' to confirm: ")
 			var confirm string
-			fmt.Scanln(&confirm)
+			_, _ = fmt.Scanln(&confirm)
 			if confirm != "yes" {
 				fmt.Println("Aborted.")
 				return nil

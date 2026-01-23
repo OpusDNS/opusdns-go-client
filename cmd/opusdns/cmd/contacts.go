@@ -256,7 +256,7 @@ Examples:
 		}
 
 		if !hasChanges {
-			return fmt.Errorf("no changes specified. Use flags like --email, --phone, etc.")
+			return fmt.Errorf("no changes specified, use flags like --email, --phone, etc")
 		}
 
 		contact, err := getClient().Contacts.UpdateContact(ctx, contactID, req)
@@ -414,14 +414,14 @@ func init() {
 	contactsCreateCmd.Flags().String("postal-code", "", "Postal/ZIP code (required)")
 	contactsCreateCmd.Flags().String("country", "", "Two-letter country code (required)")
 	contactsCreateCmd.Flags().Bool("disclose", false, "Publicly disclose contact information")
-	contactsCreateCmd.MarkFlagRequired("first-name")
-	contactsCreateCmd.MarkFlagRequired("last-name")
-	contactsCreateCmd.MarkFlagRequired("email")
-	contactsCreateCmd.MarkFlagRequired("phone")
-	contactsCreateCmd.MarkFlagRequired("street")
-	contactsCreateCmd.MarkFlagRequired("city")
-	contactsCreateCmd.MarkFlagRequired("postal-code")
-	contactsCreateCmd.MarkFlagRequired("country")
+	_ = contactsCreateCmd.MarkFlagRequired("first-name")
+	_ = contactsCreateCmd.MarkFlagRequired("last-name")
+	_ = contactsCreateCmd.MarkFlagRequired("email")
+	_ = contactsCreateCmd.MarkFlagRequired("phone")
+	_ = contactsCreateCmd.MarkFlagRequired("street")
+	_ = contactsCreateCmd.MarkFlagRequired("city")
+	_ = contactsCreateCmd.MarkFlagRequired("postal-code")
+	_ = contactsCreateCmd.MarkFlagRequired("country")
 
 	// Update subcommand
 	contactsCmd.AddCommand(contactsUpdateCmd)
