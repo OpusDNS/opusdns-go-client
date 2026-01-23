@@ -1,10 +1,7 @@
 // Package models contains all the data types for the OpusDNS API.
 package models
 
-import (
-	"encoding/json"
-	"time"
-)
+import "time"
 
 // SortOrder represents the sort direction.
 type SortOrder string
@@ -79,58 +76,6 @@ const (
 	CurrencyGBP Currency = "GBP"
 	CurrencyCHF Currency = "CHF"
 )
-
-// Timestamp is a custom time type for JSON parsing.
-type Timestamp struct {
-	time.Time
-}
-
-// MarshalJSON implements the json.Marshaler interface.
-func (t Timestamp) MarshalJSON() ([]byte, error) {
-	if t.IsZero() {
-		return []byte("null"), nil
-	}
-	return json.Marshal(t.Format(time.RFC3339))
-}
-
-// UnmarshalJSON implements the json.Unmarshaler interface.
-func (t *Timestamp) UnmarshalJSON(data []byte) error {
-	// Handle null values
-	if string(data) == "null" {
-		t.Time = time.Time{}
-		return nil
-	}
-
-	// Parse the time string
-	var s string
-	if err := json.Unmarshal(data, &s); err != nil {
-		return err
-	}
-
-	// Try multiple formats
-	formats := []string{
-		time.RFC3339,
-		time.RFC3339Nano,
-		"2006-01-02T15:04:05",
-		"2006-01-02",
-	}
-
-	for _, format := range formats {
-		parsed, err := time.Parse(format, s)
-		if err == nil {
-			t.Time = parsed
-			return nil
-		}
-	}
-
-	// Fall back to time.Parse with RFC3339
-	parsed, err := time.Parse(time.RFC3339, s)
-	if err != nil {
-		return err
-	}
-	t.Time = parsed
-	return nil
-}
 
 // DomainNameParts represents the parts of a domain name.
 type DomainNameParts struct {

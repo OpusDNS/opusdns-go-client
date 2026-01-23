@@ -277,7 +277,7 @@ domain, err := client.Domains.CreateDomain(ctx, &models.DomainCreateRequest{
         {Hostname: "ns2.opusdns.com"},
     },
     TransferLock: models.BoolPtr(true),
-    AutoRenew:    models.BoolPtr(true),
+    RenewMode:    models.RenewModePtr(models.RenewModeRenew),
 })
 ```
 

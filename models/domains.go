@@ -21,6 +21,27 @@ const (
 	DomainStatusDeleted          DomainStatus = "deleted"
 )
 
+// RenewMode represents the renewal mode for a domain.
+type RenewMode string
+
+const (
+	// RenewModeRenew indicates the domain will auto-renew.
+	RenewModeRenew RenewMode = "renew"
+
+	// RenewModeExpire indicates the domain will expire without renewal.
+	RenewModeExpire RenewMode = "expire"
+)
+
+// IsAutoRenew returns true if the domain is set to auto-renew.
+func (r RenewMode) IsAutoRenew() bool {
+	return r == RenewModeRenew
+}
+
+// RenewModePtr returns a pointer to the given RenewMode.
+func RenewModePtr(r RenewMode) *RenewMode {
+	return &r
+}
+
 // DomainClientStatus represents client-side domain statuses.
 type DomainClientStatus string
 
@@ -102,8 +123,8 @@ type Domain struct {
 	// AuthCodeExpiresOn is when the auth code expires.
 	AuthCodeExpiresOn *time.Time `json:"auth_code_expires_on,omitempty"`
 
-	// AutoRenew indicates if the domain will auto-renew.
-	AutoRenew bool `json:"auto_renew,omitempty"`
+	// RenewMode indicates the renewal mode (renew or expire).
+	RenewMode RenewMode `json:"renewal_mode,omitempty"`
 
 	// TransferLock indicates if transfers are prohibited.
 	TransferLock bool `json:"transfer_lock,omitempty"`
@@ -207,8 +228,8 @@ type DomainCreateRequest struct {
 	// TransferLock enables transfer lock after registration.
 	TransferLock *bool `json:"transfer_lock,omitempty"`
 
-	// AutoRenew enables auto-renewal.
-	AutoRenew *bool `json:"auto_renew,omitempty"`
+	// RenewMode sets the renewal mode (renew or expire).
+	RenewMode *RenewMode `json:"renewal_mode,omitempty"`
 }
 
 // ContactHandle represents a contact reference with optional attributes.
@@ -231,8 +252,8 @@ type DomainUpdateRequest struct {
 	// TransferLock updates the transfer lock status.
 	TransferLock *bool `json:"transfer_lock,omitempty"`
 
-	// AutoRenew updates the auto-renewal status.
-	AutoRenew *bool `json:"auto_renew,omitempty"`
+	// RenewMode updates the renewal mode (renew or expire).
+	RenewMode *RenewMode `json:"renewal_mode,omitempty"`
 
 	// AddStatuses are client statuses to add.
 	AddStatuses []DomainClientStatus `json:"add_statuses,omitempty"`
@@ -312,8 +333,8 @@ type ListDomainsOptions struct {
 	// TransferLock filters by transfer lock status.
 	TransferLock *bool
 
-	// AutoRenew filters by auto-renew status.
-	AutoRenew *bool
+	// RenewMode filters by renewal mode.
+	RenewMode *RenewMode
 
 	// ExpiresAfter filters domains expiring after this date.
 	ExpiresAfter *time.Time
