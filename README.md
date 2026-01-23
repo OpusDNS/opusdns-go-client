@@ -2,17 +2,10 @@
 
 A Go client library for the [OpusDNS](https://opusdns.com) DNS API with support for zone management, DNSSEC, and DNS record operations.
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/opusdns/opusdns-go-client.svg)](https://pkg.go.dev/github.com/opusdns/opusdns-go-client)
-[![Go Report Card](https://goreportcard.com/badge/github.com/opusdns/opusdns-go-client)](https://goreportcard.com/report/github.com/opusdns/opusdns-go-client)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-
 ## Features
 
 - ✅ **Complete API Coverage**: Zones, RRSets, DNSSEC operations
-- ✅ **Automatic Zone Detection**: Finds the correct zone for any FQDN
-- ✅ **Smart Retry Logic**: Exponential backoff for rate limiting and transient failures
 - ✅ **ACME Support**: Convenience methods for DNS-01 challenges
-- ✅ **Production-Ready**: Well-tested and documented
 
 ## Installation
 
@@ -256,15 +249,9 @@ export OPUSDNS_API_ENDPOINT="https://api.opusdns.com"  # optional
 
 ## Requirements
 
-- Go 1.21+
+- Go 1.25+
 - OpusDNS API key
 
 ## License
 
 MIT License - see [LICENSE](LICENSE) for details.
-
-## Related Projects
-
-- [certbot-dns-opusdns](https://github.com/opusdns/certbot-dns-opusdns) - Certbot plugin
-- [libdns-opusdns](https://github.com/opusdns/libdns-opusdns) - libdns provider for Caddy
-- [acme.sh](https://github.com/acmesh-official/acme.sh) - acme.sh integration (dns_opusdns.sh)
