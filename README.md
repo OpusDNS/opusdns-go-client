@@ -2,6 +2,8 @@
 
 A Go client library for the [OpusDNS](https://opusdns.com) DNS API with support for zone management, DNSSEC, and DNS record operations.
 
+📚 **Full API Documentation**: [developers.opusdns.com](https://developers.opusdns.com)
+
 ## Features
 
 - ✅ **Complete API Coverage**: Zones, RRSets, DNSSEC operations
