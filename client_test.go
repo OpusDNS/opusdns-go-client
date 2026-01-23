@@ -24,37 +24,28 @@ func TestNewClient(t *testing.T) {
 				APIKey: "opk_test123",
 			},
 			want: &Config{
-				APIKey:          "opk_test123",
-				APIEndpoint:     DefaultAPIEndpoint,
-				TTL:             DefaultTTL,
-				HTTPTimeout:     DefaultTimeout,
-				MaxRetries:      DefaultMaxRetries,
-				PollingInterval: DefaultPollingInterval,
-				PollingTimeout:  DefaultPollingTimeout,
-				DNSResolvers:    []string{"ns1.opusdns.com:53", "ns2.opusdns.net:53"},
+				APIKey:      "opk_test123",
+				APIEndpoint: DefaultAPIEndpoint,
+				TTL:         DefaultTTL,
+				HTTPTimeout: DefaultTimeout,
+				MaxRetries:  DefaultMaxRetries,
 			},
 		},
 		{
 			name: "custom values",
 			config: &Config{
-				APIKey:          "opk_custom",
-				APIEndpoint:     "https://sandbox.opusdns.com",
-				TTL:             120,
-				HTTPTimeout:     60 * time.Second,
-				MaxRetries:      5,
-				PollingInterval: 10 * time.Second,
-				PollingTimeout:  120 * time.Second,
-				DNSResolvers:    []string{"1.1.1.1:53"},
+				APIKey:      "opk_custom",
+				APIEndpoint: "https://sandbox.opusdns.com",
+				TTL:         120,
+				HTTPTimeout: 60 * time.Second,
+				MaxRetries:  5,
 			},
 			want: &Config{
-				APIKey:          "opk_custom",
-				APIEndpoint:     "https://sandbox.opusdns.com",
-				TTL:             120,
-				HTTPTimeout:     60 * time.Second,
-				MaxRetries:      5,
-				PollingInterval: 10 * time.Second,
-				PollingTimeout:  120 * time.Second,
-				DNSResolvers:    []string{"1.1.1.1:53"},
+				APIKey:      "opk_custom",
+				APIEndpoint: "https://sandbox.opusdns.com",
+				TTL:         120,
+				HTTPTimeout: 60 * time.Second,
+				MaxRetries:  5,
 			},
 		},
 	}
@@ -67,9 +58,6 @@ func TestNewClient(t *testing.T) {
 			assert.Equal(t, tt.want.TTL, client.config.TTL)
 			assert.Equal(t, tt.want.HTTPTimeout, client.config.HTTPTimeout)
 			assert.Equal(t, tt.want.MaxRetries, client.config.MaxRetries)
-			assert.Equal(t, tt.want.PollingInterval, client.config.PollingInterval)
-			assert.Equal(t, tt.want.PollingTimeout, client.config.PollingTimeout)
-			assert.Equal(t, tt.want.DNSResolvers, client.config.DNSResolvers)
 		})
 	}
 }
@@ -215,7 +203,7 @@ func TestUpsertTXTRecord(t *testing.T) {
 		name       string
 		fqdn       string
 		value      string
-		zones      []Zone
+		validZones map[string]bool
 		wantErr    bool
 		wantOp     string
 		wantName   string
@@ -223,43 +211,37 @@ func TestUpsertTXTRecord(t *testing.T) {
 		wantRData  string
 	}{
 		{
-			name:  "successful upsert",
-			fqdn:  "_acme-challenge.example.com",
-			value: "challenge-value",
-			zones: []Zone{
-				{Name: "example.com"},
-			},
-			wantErr:   false,
-			wantOp:    "upsert",
-			wantName:  "_acme-challenge",
-			wantType:  "TXT",
-			wantRData: "\"challenge-value\"",
+			name:       "successful upsert",
+			fqdn:       "_acme-challenge.example.com",
+			value:      "challenge-value",
+			validZones: map[string]bool{"example.com": true},
+			wantErr:    false,
+			wantOp:     "upsert",
+			wantName:   "_acme-challenge",
+			wantType:   "TXT",
+			wantRData:  "\"challenge-value\"",
 		},
 		{
-			name:  "value already quoted",
-			fqdn:  "_acme-challenge.example.com",
-			value: "\"challenge-value\"",
-			zones: []Zone{
-				{Name: "example.com"},
-			},
-			wantErr:   false,
-			wantOp:    "upsert",
-			wantName:  "_acme-challenge",
-			wantType:  "TXT",
-			wantRData: "\"challenge-value\"",
+			name:       "value already quoted",
+			fqdn:       "_acme-challenge.example.com",
+			value:      "\"challenge-value\"",
+			validZones: map[string]bool{"example.com": true},
+			wantErr:    false,
+			wantOp:     "upsert",
+			wantName:   "_acme-challenge",
+			wantType:   "TXT",
+			wantRData:  "\"challenge-value\"",
 		},
 		{
-			name:  "subdomain",
-			fqdn:  "_acme-challenge.sub.example.com",
-			value: "test",
-			zones: []Zone{
-				{Name: "example.com"},
-			},
-			wantErr:   false,
-			wantOp:    "upsert",
-			wantName:  "_acme-challenge.sub",
-			wantType:  "TXT",
-			wantRData: "\"test\"",
+			name:       "subdomain",
+			fqdn:       "_acme-challenge.sub.example.com",
+			value:      "test",
+			validZones: map[string]bool{"example.com": true},
+			wantErr:    false,
+			wantOp:     "upsert",
+			wantName:   "_acme-challenge.sub",
+			wantType:   "TXT",
+			wantRData:  "\"test\"",
 		},
 	}
 
@@ -268,20 +250,24 @@ func TestUpsertTXTRecord(t *testing.T) {
 			var receivedReq RRSetPatchRequest
 
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if r.URL.Path == "/v1/dns" {
-					resp := ZoneListResponse{
-						Results: tt.zones,
-						Pagination: Pagination{
-							TotalPages:  1,
-							CurrentPage: 1,
-							HasNextPage: false,
-						},
+				// Handle zone detection GET requests
+				if r.Method == "GET" && strings.HasPrefix(r.URL.Path, "/v1/dns/") {
+					zone := strings.TrimPrefix(r.URL.Path, "/v1/dns/")
+					if tt.validZones[zone] {
+						resp := map[string]interface{}{
+							"name":          zone + ".",
+							"dnssec_status": "disabled",
+						}
+						w.WriteHeader(http.StatusOK)
+						json.NewEncoder(w).Encode(resp)
+					} else {
+						w.WriteHeader(http.StatusNotFound)
+						json.NewEncoder(w).Encode(map[string]string{"error": "not found"})
 					}
-					w.WriteHeader(http.StatusOK)
-					json.NewEncoder(w).Encode(resp)
 					return
 				}
 
+				// Handle PATCH request
 				assert.Equal(t, "PATCH", r.Method)
 				assert.Equal(t, "opk_test123", r.Header.Get("X-Api-Key"))
 
@@ -320,7 +306,7 @@ func TestRemoveTXTRecord(t *testing.T) {
 		name       string
 		fqdn       string
 		value      string
-		zones      []Zone
+		validZones map[string]bool
 		wantErr    bool
 		wantOp     string
 		wantName   string
@@ -332,15 +318,13 @@ func TestRemoveTXTRecord(t *testing.T) {
 			name:       "successful remove",
 			fqdn:       "_acme-challenge.example.com",
 			value:      "test-value",
-			zones: []Zone{
-				{Name: "example.com"},
-			},
-			wantErr:   false,
-			wantOp:    "remove",
-			wantName:  "_acme-challenge",
-			wantType:  "TXT",
-			wantTTL:   DefaultTTL,
-			wantRData: "\"test-value\"",
+			validZones: map[string]bool{"example.com": true},
+			wantErr:    false,
+			wantOp:     "remove",
+			wantName:   "_acme-challenge",
+			wantType:   "TXT",
+			wantTTL:    DefaultTTL,
+			wantRData:  "\"test-value\"",
 		},
 	}
 
@@ -349,20 +333,24 @@ func TestRemoveTXTRecord(t *testing.T) {
 			var receivedReq RRSetPatchRequest
 
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if r.URL.Path == "/v1/dns" {
-					resp := ZoneListResponse{
-						Results: tt.zones,
-						Pagination: Pagination{
-							TotalPages:  1,
-							CurrentPage: 1,
-							HasNextPage: false,
-						},
+				// Handle zone detection GET requests
+				if r.Method == "GET" && strings.HasPrefix(r.URL.Path, "/v1/dns/") {
+					zone := strings.TrimPrefix(r.URL.Path, "/v1/dns/")
+					if tt.validZones[zone] {
+						resp := map[string]interface{}{
+							"name":          zone + ".",
+							"dnssec_status": "disabled",
+						}
+						w.WriteHeader(http.StatusOK)
+						json.NewEncoder(w).Encode(resp)
+					} else {
+						w.WriteHeader(http.StatusNotFound)
+						json.NewEncoder(w).Encode(map[string]string{"error": "not found"})
 					}
-					w.WriteHeader(http.StatusOK)
-					json.NewEncoder(w).Encode(resp)
 					return
 				}
 
+				// Handle PATCH request
 				assert.Equal(t, "PATCH", r.Method)
 				err := json.NewDecoder(r.Body).Decode(&receivedReq)
 				require.NoError(t, err)
@@ -429,7 +417,8 @@ func TestRetryLogic(t *testing.T) {
 	assert.Equal(t, 3, attempts)
 }
 
-func TestZoneCache(t *testing.T) {
+func TestZoneOperations(t *testing.T) {
+	// Tests for ListZones now makes multiple calls (no cache)
 	calls := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls++
@@ -459,11 +448,11 @@ func TestZoneCache(t *testing.T) {
 	assert.Len(t, zones1, 1)
 	assert.Equal(t, 1, calls)
 
-	// Second call should use cache
+	// Second call should also hit the API (no cache)
 	zones2, err := client.ListZones()
 	assert.NoError(t, err)
 	assert.Len(t, zones2, 1)
-	assert.Equal(t, 1, calls, "should still be 1 due to cache")
+	assert.Equal(t, 2, calls, "should be 2 as there is no cache")
 }
 
 func TestPagination(t *testing.T) {

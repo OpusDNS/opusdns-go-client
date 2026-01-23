@@ -1,35 +1,24 @@
 // Package opusdns provides a Go client library for the OpusDNS API.
 //
-// This library enables DNS zone and record management through the OpusDNS API,
-// with specific support for ACME DNS-01 challenge workflows.
+// This library enables DNS zone and record management through the OpusDNS API.
 //
 // Example usage:
 //
-//	config := &opusdns.Config{
-//	    APIKey:      "opk_...",
-//	    APIEndpoint: "https://api.opusdns.com",
-//	    TTL:         60,
-//	}
+//	client := opusdns.NewClient(&opusdns.Config{
+//	    APIKey: "opk_...",
+//	})
 //
-//	client := opusdns.NewClient(config)
+//	// List all zones
+//	zones, err := client.ListZones()
 //
-//	// Add ACME challenge record
+//	// Create a zone
+//	err := client.CreateZone("example.com", nil)
+//
+//	// Add a TXT record
 //	err := client.UpsertTXTRecord("_acme-challenge.example.com", "challenge-value")
-//	if err != nil {
-//	    log.Fatal(err)
-//	}
 //
-//	// Wait for DNS propagation
-//	err = client.WaitForPropagation("_acme-challenge.example.com", "challenge-value")
-//	if err != nil {
-//	    log.Fatal(err)
-//	}
-//
-//	// Clean up
-//	err = client.RemoveTXTRecord("_acme-challenge.example.com", "challenge-value")
-//	if err != nil {
-//	    log.Printf("cleanup error: %v", err)
-//	}
+//	// Remove a TXT record
+//	err := client.RemoveTXTRecord("_acme-challenge.example.com", "challenge-value")
 package opusdns
 
 import (
@@ -38,8 +27,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -47,7 +36,7 @@ const (
 	// DefaultAPIEndpoint is the production OpusDNS API endpoint
 	DefaultAPIEndpoint = "https://api.opusdns.com"
 
-	// DefaultTTL is the default TTL for DNS records (60 seconds for ACME challenges)
+	// DefaultTTL is the default TTL for DNS records (60 seconds)
 	DefaultTTL = 60
 
 	// DefaultTimeout is the default HTTP client timeout
@@ -55,17 +44,11 @@ const (
 
 	// DefaultMaxRetries is the default number of retries for transient failures
 	DefaultMaxRetries = 3
-
-	// DefaultPollingInterval is the default interval between DNS propagation checks
-	DefaultPollingInterval = 6 * time.Second
-
-	// DefaultPollingTimeout is the default maximum time to wait for DNS propagation
-	DefaultPollingTimeout = 60 * time.Second
 )
 
 // Config holds the configuration for the OpusDNS client.
 type Config struct {
-	// APIKey is the OpusDNS API key (format: opk_{typeid}_{secret}{checksum})
+	// APIKey is the OpusDNS API key (format: opk_...)
 	APIKey string
 
 	// APIEndpoint is the base URL for the OpusDNS API (default: https://api.opusdns.com)
@@ -79,36 +62,53 @@ type Config struct {
 
 	// MaxRetries is the maximum number of retries for transient failures (default: 3)
 	MaxRetries int
-
-	// PollingInterval is the interval between DNS propagation checks (default: 6s)
-	PollingInterval time.Duration
-
-	// PollingTimeout is the maximum time to wait for DNS propagation (default: 60s)
-	PollingTimeout time.Duration
-
-	// DNSResolvers is the list of DNS servers to query for propagation checks
-	// (default: ["ns1.opusdns.com:53", "ns2.opusdns.net:53"])
-	DNSResolvers []string
 }
 
 // Client is the OpusDNS API client.
 type Client struct {
 	config     *Config
 	httpClient *http.Client
-	zoneCacheMu sync.RWMutex
-	zoneCache   []Zone
-	zoneCacheTime time.Time
-	zoneCacheTTL  time.Duration
 }
 
 // Zone represents a DNS zone in OpusDNS.
 type Zone struct {
-	Name         string    `json:"name"`
-	DNSSECStatus string    `json:"dnssec_status"`
-	CreatedOn    time.Time `json:"created_on"`
+	Name         string     `json:"name"`
+	DNSSECStatus string     `json:"dnssec_status,omitempty"`
+	CreatedOn    *time.Time `json:"created_on,omitempty"`
+	UpdatedOn    *time.Time `json:"updated_on,omitempty"`
+	RRSets       []RRSetResponse `json:"rrsets,omitempty"`
 }
 
-// RRSet represents a resource record set.
+// ZoneCreateRequest represents a request to create a new zone.
+type ZoneCreateRequest struct {
+	Name         string           `json:"name"`
+	DNSSECStatus string           `json:"dnssec_status,omitempty"`
+	RRSets       []RRSetCreateRequest `json:"rrsets,omitempty"`
+}
+
+// RRSetCreateRequest represents a record set for zone creation.
+type RRSetCreateRequest struct {
+	Name    string   `json:"name"`
+	Type    string   `json:"type"`
+	TTL     int      `json:"ttl"`
+	Records []string `json:"records"`
+}
+
+// RRSetResponse represents a resource record set from the API response.
+type RRSetResponse struct {
+	Name    string          `json:"name"`
+	Type    string          `json:"type"`
+	TTL     int             `json:"ttl"`
+	Records []RecordResponse `json:"records,omitempty"`
+}
+
+// RecordResponse represents a single DNS record in an RRSet.
+type RecordResponse struct {
+	RData     string `json:"rdata"`
+	Protected bool   `json:"protected,omitempty"`
+}
+
+// RRSet represents a resource record for patch operations.
 type RRSet struct {
 	Name  string `json:"name"`
 	Type  string `json:"type"`
@@ -140,6 +140,23 @@ type Pagination struct {
 	HasNextPage bool `json:"has_next_page"`
 }
 
+// DNSChangesResponse represents the response from DNSSEC enable/disable.
+type DNSChangesResponse struct {
+	ChangesetID string       `json:"changeset_id"`
+	ZoneName    string       `json:"zone_name"`
+	NumChanges  int          `json:"num_changes"`
+	Changes     []DNSChange  `json:"changes"`
+}
+
+// DNSChange represents a single change in a changeset.
+type DNSChange struct {
+	Action     string `json:"action"`
+	RRSetName  string `json:"rrset_name,omitempty"`
+	RRSetType  string `json:"rrset_type,omitempty"`
+	RecordData string `json:"record_data,omitempty"`
+	TTL        int    `json:"ttl,omitempty"`
+}
+
 // APIError represents an error response from the OpusDNS API.
 //
 // WARNING: The Body field may contain sensitive data from the API response,
@@ -166,11 +183,6 @@ func NewClient(config *Config) *Client {
 	cfg := &Config{}
 	if config != nil {
 		*cfg = *config
-		// Deep copy the DNSResolvers slice to avoid shared state
-		if config.DNSResolvers != nil {
-			cfg.DNSResolvers = make([]string, len(config.DNSResolvers))
-			copy(cfg.DNSResolvers, config.DNSResolvers)
-		}
 	}
 
 	if cfg.APIEndpoint == "" {
@@ -185,22 +197,12 @@ func NewClient(config *Config) *Client {
 	if cfg.MaxRetries == 0 {
 		cfg.MaxRetries = DefaultMaxRetries
 	}
-	if cfg.PollingInterval == 0 {
-		cfg.PollingInterval = DefaultPollingInterval
-	}
-	if cfg.PollingTimeout == 0 {
-		cfg.PollingTimeout = DefaultPollingTimeout
-	}
-	if len(cfg.DNSResolvers) == 0 {
-		cfg.DNSResolvers = []string{"ns1.opusdns.com:53", "ns2.opusdns.net:53"}
-	}
 
 	return &Client{
 		config: cfg,
 		httpClient: &http.Client{
 			Timeout: cfg.HTTPTimeout,
 		},
-		zoneCacheTTL: 5 * time.Minute,
 	}
 }
 
@@ -282,16 +284,6 @@ func (c *Client) doRequest(method, path string, body interface{}) (*http.Respons
 
 // ListZones retrieves all DNS zones from the OpusDNS API with pagination.
 func (c *Client) ListZones() ([]Zone, error) {
-	// Check cache
-	c.zoneCacheMu.RLock()
-	if time.Since(c.zoneCacheTime) < c.zoneCacheTTL && len(c.zoneCache) > 0 {
-		zones := make([]Zone, len(c.zoneCache))
-		copy(zones, c.zoneCache)
-		c.zoneCacheMu.RUnlock()
-		return zones, nil
-	}
-	c.zoneCacheMu.RUnlock()
-
 	var allZones []Zone
 	page := 1
 	pageSize := 100
@@ -321,12 +313,6 @@ func (c *Client) ListZones() ([]Zone, error) {
 		}
 		page++
 	}
-
-	// Update cache
-	c.zoneCacheMu.Lock()
-	c.zoneCache = allZones
-	c.zoneCacheTime = time.Now()
-	c.zoneCacheMu.Unlock()
 
 	return allZones, nil
 }
@@ -485,4 +471,167 @@ func (c *Client) RemoveTXTRecord(fqdn, value string) error {
 	}
 
 	return c.PatchRRSets(zone, []RRSetOperation{op})
+}
+
+// GetZone retrieves details for a specific zone.
+func (c *Client) GetZone(zoneName string) (*Zone, error) {
+	zoneName = strings.TrimSuffix(zoneName, ".")
+	path := "/v1/dns/" + url.PathEscape(zoneName)
+
+	resp, err := c.doRequest("GET", path, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get zone %s: %w", zoneName, err)
+	}
+	defer resp.Body.Close()
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	var zone Zone
+	if err := json.Unmarshal(bodyBytes, &zone); err != nil {
+		return nil, fmt.Errorf("failed to parse zone response: %w", err)
+	}
+
+	return &zone, nil
+}
+
+// CreateZone creates a new DNS zone.
+// The rrsets parameter is optional and can be nil to create an empty zone.
+func (c *Client) CreateZone(zoneName string, rrsets []RRSetCreateRequest) (*Zone, error) {
+	zoneName = strings.TrimSuffix(zoneName, ".")
+
+	req := ZoneCreateRequest{
+		Name:   zoneName,
+		RRSets: rrsets,
+	}
+
+	resp, err := c.doRequest("POST", "/v1/dns", req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create zone %s: %w", zoneName, err)
+	}
+	defer resp.Body.Close()
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	var zone Zone
+	if err := json.Unmarshal(bodyBytes, &zone); err != nil {
+		return nil, fmt.Errorf("failed to parse zone response: %w", err)
+	}
+
+	return &zone, nil
+}
+
+// DeleteZone deletes a DNS zone.
+func (c *Client) DeleteZone(zoneName string) error {
+	zoneName = strings.TrimSuffix(zoneName, ".")
+	path := "/v1/dns/" + url.PathEscape(zoneName)
+
+	resp, err := c.doRequest("DELETE", path, nil)
+	if err != nil {
+		return fmt.Errorf("failed to delete zone %s: %w", zoneName, err)
+	}
+	defer resp.Body.Close()
+
+	return nil
+}
+
+// EnableDNSSEC enables DNSSEC for a zone.
+func (c *Client) EnableDNSSEC(zoneName string) (*DNSChangesResponse, error) {
+	zoneName = strings.TrimSuffix(zoneName, ".")
+	path := fmt.Sprintf("/v1/dns/%s/dnssec/enable", url.PathEscape(zoneName))
+
+	resp, err := c.doRequest("POST", path, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to enable DNSSEC for zone %s: %w", zoneName, err)
+	}
+	defer resp.Body.Close()
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	var changes DNSChangesResponse
+	if err := json.Unmarshal(bodyBytes, &changes); err != nil {
+		return nil, fmt.Errorf("failed to parse DNSSEC response: %w", err)
+	}
+
+	return &changes, nil
+}
+
+// DisableDNSSEC disables DNSSEC for a zone.
+func (c *Client) DisableDNSSEC(zoneName string) (*DNSChangesResponse, error) {
+	zoneName = strings.TrimSuffix(zoneName, ".")
+	path := fmt.Sprintf("/v1/dns/%s/dnssec/disable", url.PathEscape(zoneName))
+
+	resp, err := c.doRequest("POST", path, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to disable DNSSEC for zone %s: %w", zoneName, err)
+	}
+	defer resp.Body.Close()
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	var changes DNSChangesResponse
+	if err := json.Unmarshal(bodyBytes, &changes); err != nil {
+		return nil, fmt.Errorf("failed to parse DNSSEC response: %w", err)
+	}
+
+	return &changes, nil
+}
+
+// GetRRSets retrieves all resource record sets for a zone.
+func (c *Client) GetRRSets(zoneName string) ([]RRSetResponse, error) {
+	zoneName = strings.TrimSuffix(zoneName, ".")
+	path := fmt.Sprintf("/v1/dns/%s/rrsets", url.PathEscape(zoneName))
+
+	resp, err := c.doRequest("GET", path, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get RRSets for zone %s: %w", zoneName, err)
+	}
+	defer resp.Body.Close()
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	var rrsets []RRSetResponse
+	if err := json.Unmarshal(bodyBytes, &rrsets); err != nil {
+		return nil, fmt.Errorf("failed to parse RRSets response: %w", err)
+	}
+
+	return rrsets, nil
+}
+
+// UpsertRecord creates or updates a DNS record of any type.
+func (c *Client) UpsertRecord(zoneName string, record RRSet) error {
+	zoneName = strings.TrimSuffix(zoneName, ".")
+
+	op := RRSetOperation{
+		Op:     "upsert",
+		Record: record,
+	}
+
+	return c.PatchRRSets(zoneName, []RRSetOperation{op})
+}
+
+// RemoveRecord removes a DNS record.
+func (c *Client) RemoveRecord(zoneName string, record RRSet) error {
+	zoneName = strings.TrimSuffix(zoneName, ".")
+
+	op := RRSetOperation{
+		Op:     "remove",
+		Record: record,
+	}
+
+	return c.PatchRRSets(zoneName, []RRSetOperation{op})
 }
