@@ -1,5 +1,5 @@
 // Package opusdns provides a Go client library for the OpusDNS API.
-package client
+package opusdns
 
 import (
 	"bytes"

@@ -35,14 +35,14 @@ import (
     "fmt"
     "log"
 
-    "github.com/opusdns/opusdns-go-client/client"
     "github.com/opusdns/opusdns-go-client/models"
+    "github.com/opusdns/opusdns-go-client/opusdns"
 )
 
 func main() {
     // Create a client with your API key
-    c, err := client.NewClient(
-        client.WithAPIKey("opk_your_api_key_here"),
+    client, err := opusdns.NewClient(
+        opusdns.WithAPIKey("opk_your_api_key_here"),
     )
     if err != nil {
         log.Fatal(err)
@@ -51,7 +51,7 @@ func main() {
     ctx := context.Background()
 
     // List all DNS zones
-    zones, err := c.DNS.ListZones(ctx, nil)
+    zones, err := client.DNS.ListZones(ctx, nil)
     if err != nil {
         log.Fatal(err)
     }
@@ -67,13 +67,13 @@ func main() {
 ### Using Functional Options
 
 ```go
-c, err := client.NewClient(
-    client.WithAPIKey("opk_..."),
-    client.WithAPIEndpoint("https://api.opusdns.com"),
-    client.WithHTTPTimeout(60 * time.Second),
-    client.WithMaxRetries(5),
-    client.WithRetryWait(1*time.Second, 30*time.Second),
-    client.WithDebug(true),
+client, err := opusdns.NewClient(
+    opusdns.WithAPIKey("opk_..."),
+    opusdns.WithAPIEndpoint("https://api.opusdns.com"),
+    opusdns.WithHTTPTimeout(60 * time.Second),
+    opusdns.WithMaxRetries(5),
+    opusdns.WithRetryWait(1*time.Second, 30*time.Second),
+    opusdns.WithDebug(true),
 )
 ```
 
@@ -90,7 +90,7 @@ The client automatically reads from environment variables:
 
 ```go
 // API key is read from OPUSDNS_API_KEY environment variable
-c, err := client.NewClient()
+client, err := opusdns.NewClient()
 ```
 
 ### Configuration Options
@@ -115,16 +115,16 @@ The client provides access to the following services:
 
 | Service | Description |
 |---------|-------------|
-| `c.DNS` | DNS zone and record management |
-| `c.Domains` | Domain registration, transfer, and renewal |
-| `c.Contacts` | Contact (registrant/admin/tech) management |
-| `c.EmailForwards` | Email forwarding configuration |
-| `c.DomainForwards` | Domain/URL forwarding (redirects) |
-| `c.TLDs` | TLD information and pricing |
-| `c.Availability` | Domain availability checking |
-| `c.Organizations` | Organization and billing management |
-| `c.Users` | User management |
-| `c.Events` | Event and audit log access |
+| `client.DNS` | DNS zone and record management |
+| `client.Domains` | Domain registration, transfer, and renewal |
+| `client.Contacts` | Contact (registrant/admin/tech) management |
+| `client.EmailForwards` | Email forwarding configuration |
+| `client.DomainForwards` | Domain/URL forwarding (redirects) |
+| `client.TLDs` | TLD information and pricing |
+| `client.Availability` | Domain availability checking |
+| `client.Organizations` | Organization and billing management |
+| `client.Users` | User management |
+| `client.Events` | Event and audit log access |
 
 ## DNS Management
 
@@ -132,10 +132,10 @@ The client provides access to the following services:
 
 ```go
 // List all zones (automatic pagination)
-zones, err := c.DNS.ListZones(ctx, nil)
+zones, err := client.DNS.ListZones(ctx, nil)
 
 // List with filtering and sorting
-zones, err := c.DNS.ListZones(ctx, &models.ListZonesOptions{
+zones, err := client.DNS.ListZones(ctx, &models.ListZonesOptions{
     Search:       "example",
     DNSSECStatus: models.DNSSECStatusEnabled,
     SortBy:       models.ZoneSortByCreatedOn,
@@ -143,7 +143,7 @@ zones, err := c.DNS.ListZones(ctx, &models.ListZonesOptions{
 })
 
 // Paginated access
-resp, err := c.DNS.ListZonesPage(ctx, &models.ListZonesOptions{
+resp, err := client.DNS.ListZonesPage(ctx, &models.ListZonesOptions{
     Page:     1,
     PageSize: 50,
 })
@@ -153,7 +153,7 @@ fmt.Printf("Page %d of %d\n", resp.Pagination.CurrentPage, resp.Pagination.Total
 ### Create a Zone
 
 ```go
-zone, err := c.DNS.CreateZone(ctx, &models.ZoneCreateRequest{
+zone, err := client.DNS.CreateZone(ctx, &models.ZoneCreateRequest{
     Name: "example.com",
     RRSets: []models.RRSetCreate{
         {
@@ -176,7 +176,7 @@ zone, err := c.DNS.CreateZone(ctx, &models.ZoneCreateRequest{
 
 ```go
 // Add or update a single record
-err := c.DNS.UpsertRecord(ctx, "example.com", models.Record{
+err := client.DNS.UpsertRecord(ctx, "example.com", models.Record{
     Name:  "www",
     Type:  models.RRSetTypeA,
     TTL:   3600,
@@ -184,7 +184,7 @@ err := c.DNS.UpsertRecord(ctx, "example.com", models.Record{
 })
 
 // Delete a record
-err := c.DNS.DeleteRecord(ctx, "example.com", models.Record{
+err := client.DNS.DeleteRecord(ctx, "example.com", models.Record{
     Name:  "www",
     Type:  models.RRSetTypeA,
     TTL:   3600,
@@ -192,7 +192,7 @@ err := c.DNS.DeleteRecord(ctx, "example.com", models.Record{
 })
 
 // Batch operations (atomic)
-err := c.DNS.PatchRecords(ctx, "example.com", []models.RecordOperation{
+err := client.DNS.PatchRecords(ctx, "example.com", []models.RecordOperation{
     {
         Op: models.RecordOpUpsert,
         Record: models.Record{
@@ -218,11 +218,11 @@ err := c.DNS.PatchRecords(ctx, "example.com", []models.RecordOperation{
 
 ```go
 // Enable DNSSEC
-changes, err := c.DNS.EnableDNSSEC(ctx, "example.com")
+changes, err := client.DNS.EnableDNSSEC(ctx, "example.com")
 fmt.Printf("DNSSEC enabled with %d changes\n", changes.NumChanges)
 
 // Disable DNSSEC
-changes, err := c.DNS.DisableDNSSEC(ctx, "example.com")
+changes, err := client.DNS.DisableDNSSEC(ctx, "example.com")
 ```
 
 ## Domain Registration
@@ -231,7 +231,7 @@ changes, err := c.DNS.DisableDNSSEC(ctx, "example.com")
 
 ```go
 // Check multiple domains
-result, err := c.Availability.CheckAvailability(ctx, []string{
+result, err := client.Availability.CheckAvailability(ctx, []string{
     "example.com",
     "example.de",
     "example.io",
@@ -244,14 +244,14 @@ for _, avail := range result.Results {
 }
 
 // Check single domain
-avail, err := c.Availability.CheckSingleAvailability(ctx, "example.com")
+avail, err := client.Availability.CheckSingleAvailability(ctx, "example.com")
 ```
 
 ### Register a Domain
 
 ```go
 // First, create a contact
-contact, err := c.Contacts.CreateContact(ctx, &models.ContactCreateRequest{
+contact, err := client.Contacts.CreateContact(ctx, &models.ContactCreateRequest{
     FirstName:  "John",
     LastName:   "Doe",
     Email:      "john@example.com",
@@ -264,7 +264,7 @@ contact, err := c.Contacts.CreateContact(ctx, &models.ContactCreateRequest{
 })
 
 // Then register the domain
-domain, err := c.Domains.CreateDomain(ctx, &models.DomainCreateRequest{
+domain, err := client.Domains.CreateDomain(ctx, &models.DomainCreateRequest{
     Name:   "example.com",
     Period: 1, // 1 year
     Contacts: map[models.DomainContactType]models.ContactHandle{
@@ -284,7 +284,7 @@ domain, err := c.Domains.CreateDomain(ctx, &models.DomainCreateRequest{
 ### Transfer a Domain
 
 ```go
-domain, err := c.Domains.TransferDomain(ctx, &models.DomainTransferRequest{
+domain, err := client.Domains.TransferDomain(ctx, &models.DomainTransferRequest{
     Name:     "example.com",
     AuthCode: "abc123xyz",
     Contacts: map[models.DomainContactType]models.ContactHandle{
@@ -296,7 +296,7 @@ domain, err := c.Domains.TransferDomain(ctx, &models.DomainTransferRequest{
 ### Renew a Domain
 
 ```go
-domain, err := c.Domains.RenewDomain(ctx, "example.com", &models.DomainRenewRequest{
+domain, err := client.Domains.RenewDomain(ctx, "example.com", &models.DomainRenewRequest{
     Period: 2, // Renew for 2 years
 })
 ```
@@ -305,7 +305,7 @@ domain, err := c.Domains.RenewDomain(ctx, "example.com", &models.DomainRenewRequ
 
 ```go
 // Create email forwarding for a domain
-emailFwd, err := c.EmailForwards.CreateEmailForward(ctx, &models.EmailForwardCreateRequest{
+emailFwd, err := client.EmailForwards.CreateEmailForward(ctx, &models.EmailForwardCreateRequest{
     Hostname: "example.com",
     Aliases: []models.EmailForwardAliasCreate{
         {
@@ -320,7 +320,7 @@ emailFwd, err := c.EmailForwards.CreateEmailForward(ctx, &models.EmailForwardCre
 })
 
 // Add another alias
-alias, err := c.EmailForwards.CreateAlias(ctx, emailFwd.EmailForwardID, &models.EmailForwardAliasCreate{
+alias, err := client.EmailForwards.CreateAlias(ctx, emailFwd.EmailForwardID, &models.EmailForwardAliasCreate{
     LocalPart:    "support",
     Destinations: []string{"support@company.com", "backup@company.com"},
 })
@@ -329,7 +329,7 @@ alias, err := c.EmailForwards.CreateAlias(ctx, emailFwd.EmailForwardID, &models.
 ## Domain Forwarding (URL Redirects)
 
 ```go
-forward, err := c.DomainForwards.CreateDomainForward(ctx, &models.DomainForwardCreateRequest{
+forward, err := client.DomainForwards.CreateDomainForward(ctx, &models.DomainForwardCreateRequest{
     Hostname: "old-domain.com",
     Configs: []models.DomainForwardConfigCreate{
         {
@@ -355,21 +355,21 @@ forward, err := c.DomainForwards.CreateDomainForward(ctx, &models.DomainForwardC
 The client provides detailed error types for different failure scenarios:
 
 ```go
-zone, err := c.DNS.GetZone(ctx, "example.com")
+zone, err := client.DNS.GetZone(ctx, "example.com")
 if err != nil {
     // Check for specific error types
-    if errors.Is(err, client.ErrNotFound) {
+    if errors.Is(err, opusdns.ErrNotFound) {
         fmt.Println("Zone not found")
-    } else if errors.Is(err, client.ErrUnauthorized) {
+    } else if errors.Is(err, opusdns.ErrUnauthorized) {
         fmt.Println("Invalid API key")
-    } else if errors.Is(err, client.ErrRateLimited) {
+    } else if errors.Is(err, opusdns.ErrRateLimited) {
         fmt.Println("Rate limited - try again later")
-    } else if errors.Is(err, client.ErrForbidden) {
+    } else if errors.Is(err, opusdns.ErrForbidden) {
         fmt.Println("Insufficient permissions")
     }
 
     // Get detailed API error information
-    if apiErr, ok := client.IsAPIError(err); ok {
+    if apiErr, ok := opusdns.IsAPIError(err); ok {
         fmt.Printf("Status: %d\n", apiErr.StatusCode)
         fmt.Printf("Error Code: %s\n", apiErr.ErrorCode)
         fmt.Printf("Message: %s\n", apiErr.Message)
@@ -377,7 +377,7 @@ if err != nil {
     }
 
     // Check if error is retryable
-    if client.IsRetryableError(err) {
+    if opusdns.IsRetryableError(err) {
         fmt.Println("This error is retryable")
     }
 }
@@ -401,13 +401,13 @@ if err != nil {
 ### Helper Functions
 
 ```go
-client.IsNotFoundError(err)      // Check for 404
-client.IsUnauthorizedError(err)  // Check for 401
-client.IsForbiddenError(err)     // Check for 403
-client.IsRateLimitError(err)     // Check for 429
-client.IsConflictError(err)      // Check for 409
-client.IsRetryableError(err)     // Check if retryable (429, 5xx)
-client.IsAPIError(err)           // Extract APIError details
+opusdns.IsNotFoundError(err)      // Check for 404
+opusdns.IsUnauthorizedError(err)  // Check for 401
+opusdns.IsForbiddenError(err)     // Check for 403
+opusdns.IsRateLimitError(err)     // Check for 429
+opusdns.IsConflictError(err)      // Check for 409
+opusdns.IsRetryableError(err)     // Check if retryable (429, 5xx)
+opusdns.IsAPIError(err)           // Extract APIError details
 ```
 
 ## Thread Safety
@@ -420,7 +420,7 @@ for _, zoneName := range zoneNames {
     wg.Add(1)
     go func(name string) {
         defer wg.Done()
-        zone, err := c.DNS.GetZone(ctx, name)
+        zone, err := client.DNS.GetZone(ctx, name)
         // ...
     }(zoneName)
 }

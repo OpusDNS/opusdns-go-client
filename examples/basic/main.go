@@ -7,8 +7,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/opusdns/opusdns-go-client/client"
 	"github.com/opusdns/opusdns-go-client/models"
+	"github.com/opusdns/opusdns-go-client/opusdns"
 )
 
 func main() {
@@ -18,9 +18,9 @@ func main() {
 
 	// Create client using environment variables or explicit configuration
 	// The API key can be set via OPUSDNS_API_KEY environment variable
-	c, err := client.NewClient(
-		client.WithAPIKey(os.Getenv("OPUSDNS_API_KEY")),
-		client.WithDebug(os.Getenv("OPUSDNS_DEBUG") == "true"),
+	client, err := opusdns.NewClient(
+		opusdns.WithAPIKey(os.Getenv("OPUSDNS_API_KEY")),
+		opusdns.WithDebug(os.Getenv("OPUSDNS_DEBUG") == "true"),
 	)
 	if err != nil {
 		log.Fatalf("Failed to create client: %v", err)
@@ -28,28 +28,28 @@ func main() {
 
 	// Example 1: List all DNS zones
 	fmt.Println("=== Listing DNS Zones ===")
-	listZonesExample(ctx, c)
+	listZonesExample(ctx, client)
 
 	// Example 2: Create and manage a zone (if DEMO_ZONE is set)
 	if demoZone := os.Getenv("DEMO_ZONE"); demoZone != "" {
 		fmt.Println("\n=== Zone Management Demo ===")
-		zoneManagementExample(ctx, c, demoZone)
+		zoneManagementExample(ctx, client, demoZone)
 	}
 
 	// Example 3: Check domain availability
 	fmt.Println("\n=== Domain Availability Check ===")
-	availabilityExample(ctx, c)
+	availabilityExample(ctx, client)
 
 	// Example 4: Error handling
 	fmt.Println("\n=== Error Handling Example ===")
-	errorHandlingExample(ctx, c)
+	errorHandlingExample(ctx, client)
 
 	fmt.Println("\n=== Examples completed successfully ===")
 }
 
-func listZonesExample(ctx context.Context, c *client.Client) {
+func listZonesExample(ctx context.Context, client *opusdns.Client) {
 	// List all zones with automatic pagination
-	zones, err := c.DNS.ListZones(ctx, nil)
+	zones, err := client.DNS.ListZones(ctx, nil)
 	if err != nil {
 		log.Printf("Failed to list zones: %v", err)
 		return
@@ -70,7 +70,7 @@ func listZonesExample(ctx context.Context, c *client.Client) {
 
 	// Example of paginated listing
 	fmt.Println("\nPaginated listing (first page only):")
-	resp, err := c.DNS.ListZonesPage(ctx, &models.ListZonesOptions{
+	resp, err := client.DNS.ListZonesPage(ctx, &models.ListZonesOptions{
 		Page:      1,
 		PageSize:  5,
 		SortBy:    models.ZoneSortByCreatedOn,
@@ -88,10 +88,10 @@ func listZonesExample(ctx context.Context, c *client.Client) {
 	)
 }
 
-func zoneManagementExample(ctx context.Context, c *client.Client, zoneName string) {
+func zoneManagementExample(ctx context.Context, client *opusdns.Client, zoneName string) {
 	// Create a new zone
 	fmt.Printf("Creating zone: %s\n", zoneName)
-	zone, err := c.DNS.CreateZone(ctx, &models.ZoneCreateRequest{
+	zone, err := client.DNS.CreateZone(ctx, &models.ZoneCreateRequest{
 		Name: zoneName,
 		RRSets: []models.RRSetCreate{
 			{
@@ -110,7 +110,7 @@ func zoneManagementExample(ctx context.Context, c *client.Client, zoneName strin
 
 	// Add a TXT record
 	fmt.Println("Adding TXT record...")
-	err = c.DNS.UpsertRecord(ctx, zoneName, models.Record{
+	err = client.DNS.UpsertRecord(ctx, zoneName, models.Record{
 		Name:  "_test",
 		Type:  models.RRSetTypeTXT,
 		TTL:   300,
@@ -124,7 +124,7 @@ func zoneManagementExample(ctx context.Context, c *client.Client, zoneName strin
 
 	// Batch operations
 	fmt.Println("Performing batch operations...")
-	err = c.DNS.PatchRecords(ctx, zoneName, []models.RecordOperation{
+	err = client.DNS.PatchRecords(ctx, zoneName, []models.RecordOperation{
 		{
 			Op: models.RecordOpUpsert,
 			Record: models.Record{
@@ -152,7 +152,7 @@ func zoneManagementExample(ctx context.Context, c *client.Client, zoneName strin
 
 	// Get zone details with records
 	fmt.Println("Fetching zone details...")
-	zone, err = c.DNS.GetZone(ctx, zoneName)
+	zone, err = client.DNS.GetZone(ctx, zoneName)
 	if err != nil {
 		log.Printf("Failed to get zone: %v", err)
 	} else {
@@ -164,7 +164,7 @@ func zoneManagementExample(ctx context.Context, c *client.Client, zoneName strin
 
 	// Clean up - delete the zone
 	fmt.Println("Cleaning up (deleting zone)...")
-	err = c.DNS.DeleteZone(ctx, zoneName)
+	err = client.DNS.DeleteZone(ctx, zoneName)
 	if err != nil {
 		log.Printf("Failed to delete zone: %v", err)
 	} else {
@@ -172,12 +172,12 @@ func zoneManagementExample(ctx context.Context, c *client.Client, zoneName strin
 	}
 }
 
-func availabilityExample(ctx context.Context, c *client.Client) {
+func availabilityExample(ctx context.Context, client *opusdns.Client) {
 	domains := []string{"example.com", "opusdns-test-12345.com", "google.com"}
 
 	fmt.Printf("Checking availability for: %v\n", domains)
 
-	result, err := c.Availability.CheckAvailability(ctx, domains)
+	result, err := client.Availability.CheckAvailability(ctx, domains)
 	if err != nil {
 		log.Printf("Failed to check availability: %v", err)
 		return
@@ -193,13 +193,13 @@ func availabilityExample(ctx context.Context, c *client.Client) {
 	}
 }
 
-func errorHandlingExample(ctx context.Context, c *client.Client) {
+func errorHandlingExample(ctx context.Context, client *opusdns.Client) {
 	// Try to get a non-existent zone
-	_, err := c.DNS.GetZone(ctx, "this-zone-definitely-does-not-exist-12345.com")
+	_, err := client.DNS.GetZone(ctx, "this-zone-definitely-does-not-exist-12345.com")
 	if err != nil {
-		if client.IsNotFoundError(err) {
+		if opusdns.IsNotFoundError(err) {
 			fmt.Println("✓ Correctly caught NotFound error")
-		} else if apiErr, ok := client.IsAPIError(err); ok {
+		} else if apiErr, ok := opusdns.IsAPIError(err); ok {
 			fmt.Printf("✓ Caught API error: HTTP %d - %s\n", apiErr.StatusCode, apiErr.Message)
 		} else {
 			fmt.Printf("✓ Caught error: %v\n", err)
@@ -208,7 +208,7 @@ func errorHandlingExample(ctx context.Context, c *client.Client) {
 
 	// Demonstrate error type checking
 	fmt.Println("\nError type checking examples:")
-	fmt.Printf("  IsNotFoundError: %v\n", client.IsNotFoundError(err))
-	fmt.Printf("  IsUnauthorizedError: %v\n", client.IsUnauthorizedError(err))
-	fmt.Printf("  IsRetryableError: %v\n", client.IsRetryableError(err))
+	fmt.Printf("  IsNotFoundError: %v\n", opusdns.IsNotFoundError(err))
+	fmt.Printf("  IsUnauthorizedError: %v\n", opusdns.IsUnauthorizedError(err))
+	fmt.Printf("  IsRetryableError: %v\n", opusdns.IsRetryableError(err))
 }

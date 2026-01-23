@@ -155,4 +155,4 @@
 // # API Documentation
 //
 // For complete API documentation, visit https://developers.opusdns.com
-package client
+package opusdns

@@ -7,8 +7,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/opusdns/opusdns-go-client/client"
 	"github.com/opusdns/opusdns-go-client/models"
+	"github.com/opusdns/opusdns-go-client/opusdns"
 )
 
 func main() {
@@ -16,8 +16,8 @@ func main() {
 	defer cancel()
 
 	// Create client
-	c, err := client.NewClient(
-		client.WithAPIKey(os.Getenv("OPUSDNS_API_KEY")),
+	client, err := opusdns.NewClient(
+		opusdns.WithAPIKey(os.Getenv("OPUSDNS_API_KEY")),
 	)
 	if err != nil {
 		log.Fatalf("Failed to create client: %v", err)
@@ -25,26 +25,26 @@ func main() {
 
 	// Example 1: List all domains
 	fmt.Println("=== Listing Domains ===")
-	listDomainsExample(ctx, c)
+	listDomainsExample(ctx, client)
 
 	// Example 2: Get domain summary
 	fmt.Println("\n=== Domain Summary ===")
-	domainSummaryExample(ctx, c)
+	domainSummaryExample(ctx, client)
 
 	// Example 3: Check domain availability
 	fmt.Println("\n=== Domain Availability ===")
-	checkAvailabilityExample(ctx, c)
+	checkAvailabilityExample(ctx, client)
 
 	// Example 4: Get TLD information
 	fmt.Println("\n=== TLD Information ===")
-	tldInfoExample(ctx, c)
+	tldInfoExample(ctx, client)
 
 	fmt.Println("\n=== Examples completed ===")
 }
 
-func listDomainsExample(ctx context.Context, c *client.Client) {
+func listDomainsExample(ctx context.Context, client *opusdns.Client) {
 	// List domains with filtering and sorting
-	domains, err := c.Domains.ListDomainsPage(ctx, &models.ListDomainsOptions{
+	domains, err := client.Domains.ListDomainsPage(ctx, &models.ListDomainsOptions{
 		Page:      1,
 		PageSize:  10,
 		SortBy:    models.DomainSortByExpiresOn,
@@ -77,8 +77,8 @@ func listDomainsExample(ctx context.Context, c *client.Client) {
 	}
 }
 
-func domainSummaryExample(ctx context.Context, c *client.Client) {
-	summary, err := c.Domains.GetSummary(ctx)
+func domainSummaryExample(ctx context.Context, client *opusdns.Client) {
+	summary, err := client.Domains.GetSummary(ctx)
 	if err != nil {
 		log.Printf("Failed to get domain summary: %v", err)
 		return
@@ -96,7 +96,7 @@ func domainSummaryExample(ctx context.Context, c *client.Client) {
 	}
 }
 
-func checkAvailabilityExample(ctx context.Context, c *client.Client) {
+func checkAvailabilityExample(ctx context.Context, client *opusdns.Client) {
 	domainsToCheck := []string{
 		"example-test-domain-12345.com",
 		"example-test-domain-12345.de",
@@ -104,7 +104,7 @@ func checkAvailabilityExample(ctx context.Context, c *client.Client) {
 		"google.com",
 	}
 
-	result, err := c.Availability.CheckAvailability(ctx, domainsToCheck)
+	result, err := client.Availability.CheckAvailability(ctx, domainsToCheck)
 	if err != nil {
 		log.Printf("Failed to check availability: %v", err)
 		return
@@ -120,9 +120,9 @@ func checkAvailabilityExample(ctx context.Context, c *client.Client) {
 	}
 }
 
-func tldInfoExample(ctx context.Context, c *client.Client) {
+func tldInfoExample(ctx context.Context, client *opusdns.Client) {
 	// Get TLD portfolio
-	portfolio, err := c.TLDs.GetPortfolio(ctx)
+	portfolio, err := client.TLDs.GetPortfolio(ctx)
 	if err != nil {
 		log.Printf("Failed to get TLD portfolio: %v", err)
 		return
@@ -131,7 +131,7 @@ func tldInfoExample(ctx context.Context, c *client.Client) {
 	fmt.Printf("Available TLDs in portfolio: %d\n", portfolio.Total)
 
 	// Get details for a specific TLD
-	tldDetails, err := c.TLDs.GetTLD(ctx, "com")
+	tldDetails, err := client.TLDs.GetTLD(ctx, "com")
 	if err != nil {
 		log.Printf("Failed to get TLD details: %v", err)
 		return
