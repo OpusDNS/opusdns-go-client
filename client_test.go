@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 	"time"
 
@@ -13,372 +12,271 @@ import (
 )
 
 func TestNewClient(t *testing.T) {
-	tests := []struct {
-		name   string
-		config *Config
-		want   *Config
-	}{
-		{
-			name: "default values",
-			config: &Config{
-				APIKey: "opk_test123",
-			},
-			want: &Config{
-				APIKey:      "opk_test123",
-				APIEndpoint: DefaultAPIEndpoint,
-				TTL:         DefaultTTL,
-				HTTPTimeout: DefaultTimeout,
-				MaxRetries:  DefaultMaxRetries,
-			},
-		},
-		{
-			name: "custom values",
-			config: &Config{
-				APIKey:      "opk_custom",
-				APIEndpoint: "https://sandbox.opusdns.com",
-				TTL:         120,
-				HTTPTimeout: 60 * time.Second,
-				MaxRetries:  5,
-			},
-			want: &Config{
-				APIKey:      "opk_custom",
-				APIEndpoint: "https://sandbox.opusdns.com",
-				TTL:         120,
-				HTTPTimeout: 60 * time.Second,
-				MaxRetries:  5,
-			},
-		},
-	}
+	t.Run("applies defaults", func(t *testing.T) {
+		client := NewClient(&Config{APIKey: "opk_test"})
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			client := NewClient(tt.config)
-			assert.Equal(t, tt.want.APIKey, client.config.APIKey)
-			assert.Equal(t, tt.want.APIEndpoint, client.config.APIEndpoint)
-			assert.Equal(t, tt.want.TTL, client.config.TTL)
-			assert.Equal(t, tt.want.HTTPTimeout, client.config.HTTPTimeout)
-			assert.Equal(t, tt.want.MaxRetries, client.config.MaxRetries)
+		assert.Equal(t, "opk_test", client.config.APIKey)
+		assert.Equal(t, DefaultAPIEndpoint, client.config.APIEndpoint)
+		assert.Equal(t, DefaultTTL, client.config.TTL)
+		assert.Equal(t, DefaultTimeout, client.config.HTTPTimeout)
+		assert.Equal(t, DefaultMaxRetries, client.config.MaxRetries)
+	})
+
+	t.Run("uses custom values", func(t *testing.T) {
+		client := NewClient(&Config{
+			APIKey:      "opk_custom",
+			APIEndpoint: "https://custom.api",
+			TTL:         300,
+			HTTPTimeout: 60 * time.Second,
+			MaxRetries:  5,
 		})
-	}
+
+		assert.Equal(t, "opk_custom", client.config.APIKey)
+		assert.Equal(t, "https://custom.api", client.config.APIEndpoint)
+		assert.Equal(t, 300, client.config.TTL)
+		assert.Equal(t, 60*time.Second, client.config.HTTPTimeout)
+		assert.Equal(t, 5, client.config.MaxRetries)
+	})
 }
 
 func TestListZones(t *testing.T) {
-	tests := []struct {
-		name       string
-		response   interface{}
-		statusCode int
-		wantErr    bool
-		wantZones  int
-	}{
-		{
-			name: "successful single page",
-			response: ZoneListResponse{
+	t.Run("returns zones", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assert.Equal(t, "GET", r.Method)
+			assert.Equal(t, "opk_test", r.Header.Get("X-Api-Key"))
+			assert.Contains(t, r.URL.Path, "/v1/dns")
+
+			_ = json.NewEncoder(w).Encode(zoneListResponse{
 				Results: []Zone{
 					{Name: "example.com", DNSSECStatus: "disabled"},
 					{Name: "test.com", DNSSECStatus: "enabled"},
 				},
-				Pagination: Pagination{
-					TotalPages:  1,
-					CurrentPage: 1,
-					HasNextPage: false,
-				},
-			},
-			statusCode: http.StatusOK,
-			wantErr:    false,
-			wantZones:  2,
-		},
-		{
-			name:       "server error",
-			response:   map[string]string{"error": "internal server error"},
-			statusCode: http.StatusInternalServerError,
-			wantErr:    true,
-		},
-		{
-			name:       "unauthorized",
-			response:   map[string]string{"message": "invalid API key"},
-			statusCode: http.StatusUnauthorized,
-			wantErr:    true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				assert.Equal(t, "/v1/dns", r.URL.Path)
-				assert.Equal(t, "opk_test123", r.Header.Get("X-Api-Key"))
-
-				w.WriteHeader(tt.statusCode)
-				_ = json.NewEncoder(w).Encode(tt.response)
-			}))
-			defer server.Close()
-
-			client := NewClient(&Config{
-				APIKey:      "opk_test123",
-				APIEndpoint: server.URL,
+				Pagination: Pagination{HasNextPage: false},
 			})
+		}))
+		defer server.Close()
 
-			zones, err := client.ListZones()
+		client := NewClient(&Config{APIKey: "opk_test", APIEndpoint: server.URL})
+		zones, err := client.ListZones()
 
-			if tt.wantErr {
-				assert.Error(t, err)
+		require.NoError(t, err)
+		assert.Len(t, zones, 2)
+		assert.Equal(t, "example.com", zones[0].Name)
+	})
+
+	t.Run("handles pagination", func(t *testing.T) {
+		page := 0
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			page++
+			if page == 1 {
+				_ = json.NewEncoder(w).Encode(zoneListResponse{
+					Results:    []Zone{{Name: "zone1.com"}, {Name: "zone2.com"}},
+					Pagination: Pagination{HasNextPage: true, CurrentPage: 1},
+				})
 			} else {
-				assert.NoError(t, err)
-				assert.Len(t, zones, tt.wantZones)
+				_ = json.NewEncoder(w).Encode(zoneListResponse{
+					Results:    []Zone{{Name: "zone3.com"}},
+					Pagination: Pagination{HasNextPage: false, CurrentPage: 2},
+				})
 			}
-		})
-	}
+		}))
+		defer server.Close()
+
+		client := NewClient(&Config{APIKey: "opk_test", APIEndpoint: server.URL})
+		zones, err := client.ListZones()
+
+		require.NoError(t, err)
+		assert.Len(t, zones, 3)
+	})
+
+	t.Run("returns error on unauthorized", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusUnauthorized)
+			_ = json.NewEncoder(w).Encode(map[string]string{"message": "invalid API key"})
+		}))
+		defer server.Close()
+
+		client := NewClient(&Config{APIKey: "bad_key", APIEndpoint: server.URL})
+		_, err := client.ListZones()
+
+		require.Error(t, err)
+		apiErr, ok := err.(*APIError)
+		require.True(t, ok)
+		assert.Equal(t, 401, apiErr.StatusCode)
+	})
 }
 
-func TestFindZoneForFQDN(t *testing.T) {
-	tests := []struct {
-		name       string
-		fqdn       string
-		validZones map[string]bool // zones that exist
-		wantZone   string
-		wantErr    bool
-	}{
-		{
-			name:       "subdomain match",
-			fqdn:       "_acme-challenge.www.example.com",
-			validZones: map[string]bool{"example.com": true},
-			wantZone:   "example.com",
-			wantErr:    false,
-		},
-		{
-			name:       "longer zone match first",
-			fqdn:       "_acme-challenge.sub.example.com",
-			validZones: map[string]bool{"sub.example.com": true, "example.com": true},
-			wantZone:   "sub.example.com",
-			wantErr:    false,
-		},
-		{
-			name:       "no match",
-			fqdn:       "_acme-challenge.notfound.com",
-			validZones: map[string]bool{"example.com": true},
-			wantZone:   "",
-			wantErr:    true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				// Extract zone from path: /v1/dns/{zone}
-				path := strings.TrimPrefix(r.URL.Path, "/v1/dns/")
-				if tt.validZones[path] {
-					// Valid zone response with dnssec_status
-					resp := map[string]interface{}{
-						"name":          path + ".",
-						"dnssec_status": "disabled",
-					}
-					w.WriteHeader(http.StatusOK)
-					_ = json.NewEncoder(w).Encode(resp)
-				} else {
-					// Zone not found
-					w.WriteHeader(http.StatusNotFound)
-					_ = json.NewEncoder(w).Encode(map[string]string{"error": "not found"})
-				}
-			}))
-			defer server.Close()
-
-			client := NewClient(&Config{
-				APIKey:      "opk_test123",
-				APIEndpoint: server.URL,
-			})
-
-			zone, err := client.FindZoneForFQDN(tt.fqdn)
-
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-				assert.Equal(t, tt.wantZone, zone)
-			}
+func TestGetZone(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/v1/dns/example.com", r.URL.Path)
+		_ = json.NewEncoder(w).Encode(Zone{
+			Name:         "example.com",
+			DNSSECStatus: "disabled",
 		})
-	}
+	}))
+	defer server.Close()
+
+	client := NewClient(&Config{APIKey: "opk_test", APIEndpoint: server.URL})
+	zone, err := client.GetZone("example.com.")
+
+	require.NoError(t, err)
+	assert.Equal(t, "example.com", zone.Name)
 }
 
-func TestUpsertTXTRecord(t *testing.T) {
-	tests := []struct {
-		name       string
-		fqdn       string
-		value      string
-		validZones map[string]bool
-		wantErr    bool
-		wantOp     string
-		wantName   string
-		wantType   string
-		wantRData  string
-	}{
-		{
-			name:       "successful upsert",
-			fqdn:       "_acme-challenge.example.com",
-			value:      "challenge-value",
-			validZones: map[string]bool{"example.com": true},
-			wantErr:    false,
-			wantOp:     "upsert",
-			wantName:   "_acme-challenge",
-			wantType:   "TXT",
-			wantRData:  "\"challenge-value\"",
-		},
-		{
-			name:       "value already quoted",
-			fqdn:       "_acme-challenge.example.com",
-			value:      "\"challenge-value\"",
-			validZones: map[string]bool{"example.com": true},
-			wantErr:    false,
-			wantOp:     "upsert",
-			wantName:   "_acme-challenge",
-			wantType:   "TXT",
-			wantRData:  "\"challenge-value\"",
-		},
-		{
-			name:       "subdomain",
-			fqdn:       "_acme-challenge.sub.example.com",
-			value:      "test",
-			validZones: map[string]bool{"example.com": true},
-			wantErr:    false,
-			wantOp:     "upsert",
-			wantName:   "_acme-challenge.sub",
-			wantType:   "TXT",
-			wantRData:  "\"test\"",
-		},
-	}
+func TestCreateZone(t *testing.T) {
+	t.Run("creates empty zone", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assert.Equal(t, "POST", r.Method)
+			assert.Equal(t, "/v1/dns", r.URL.Path)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			var receivedReq RRSetPatchRequest
+			var req zoneCreateRequest
+			_ = json.NewDecoder(r.Body).Decode(&req)
+			assert.Equal(t, "newzone.com", req.Name)
+			assert.Empty(t, req.RRSets)
 
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				// Handle zone detection GET requests
-				if r.Method == "GET" && strings.HasPrefix(r.URL.Path, "/v1/dns/") {
-					zone := strings.TrimPrefix(r.URL.Path, "/v1/dns/")
-					if tt.validZones[zone] {
-						resp := map[string]interface{}{
-							"name":          zone + ".",
-							"dnssec_status": "disabled",
-						}
-						w.WriteHeader(http.StatusOK)
-						_ = json.NewEncoder(w).Encode(resp)
-					} else {
-						w.WriteHeader(http.StatusNotFound)
-						_ = json.NewEncoder(w).Encode(map[string]string{"error": "not found"})
-					}
-					return
-				}
+			w.WriteHeader(http.StatusCreated)
+			_ = json.NewEncoder(w).Encode(Zone{Name: "newzone.com"})
+		}))
+		defer server.Close()
 
-				// Handle PATCH request
-				assert.Equal(t, "PATCH", r.Method)
-				assert.Equal(t, "opk_test123", r.Header.Get("X-Api-Key"))
+		client := NewClient(&Config{APIKey: "opk_test", APIEndpoint: server.URL})
+		zone, err := client.CreateZone("newzone.com", nil)
 
-				err := json.NewDecoder(r.Body).Decode(&receivedReq)
-				require.NoError(t, err)
+		require.NoError(t, err)
+		assert.Equal(t, "newzone.com", zone.Name)
+	})
 
-				w.WriteHeader(http.StatusNoContent)
-			}))
-			defer server.Close()
+	t.Run("creates zone with records", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			var req zoneCreateRequest
+			_ = json.NewDecoder(r.Body).Decode(&req)
+			assert.NotEmpty(t, req.RRSets)
 
-			client := NewClient(&Config{
-				APIKey:      "opk_test123",
-				APIEndpoint: server.URL,
-				TTL:         60,
-			})
+			w.WriteHeader(http.StatusCreated)
+			_ = json.NewEncoder(w).Encode(Zone{Name: "newzone.com"})
+		}))
+		defer server.Close()
 
-			err := client.UpsertTXTRecord(tt.fqdn, tt.value)
-
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-				require.Len(t, receivedReq.Ops, 1)
-				assert.Equal(t, tt.wantOp, receivedReq.Ops[0].Op)
-				assert.Equal(t, tt.wantName, receivedReq.Ops[0].Record.Name)
-				assert.Equal(t, tt.wantType, receivedReq.Ops[0].Record.Type)
-				assert.Equal(t, 60, receivedReq.Ops[0].Record.TTL)
-				assert.Equal(t, tt.wantRData, receivedReq.Ops[0].Record.RData)
-			}
+		client := NewClient(&Config{APIKey: "opk_test", APIEndpoint: server.URL})
+		_, err := client.CreateZone("newzone.com", []Record{
+			{Name: "www", Type: "A", TTL: 3600, RData: "1.2.3.4"},
 		})
-	}
+
+		require.NoError(t, err)
+	})
 }
 
-func TestRemoveTXTRecord(t *testing.T) {
-	tests := []struct {
-		name       string
-		fqdn       string
-		value      string
-		validZones map[string]bool
-		wantErr    bool
-		wantOp     string
-		wantName   string
-		wantType   string
-		wantTTL    int
-		wantRData  string
-	}{
-		{
-			name:       "successful remove",
-			fqdn:       "_acme-challenge.example.com",
-			value:      "test-value",
-			validZones: map[string]bool{"example.com": true},
-			wantErr:    false,
-			wantOp:     "remove",
-			wantName:   "_acme-challenge",
-			wantType:   "TXT",
-			wantTTL:    DefaultTTL,
-			wantRData:  "\"test-value\"",
-		},
-	}
+func TestDeleteZone(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "DELETE", r.Method)
+		assert.Equal(t, "/v1/dns/example.com", r.URL.Path)
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			var receivedReq RRSetPatchRequest
+	client := NewClient(&Config{APIKey: "opk_test", APIEndpoint: server.URL})
+	err := client.DeleteZone("example.com")
 
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				// Handle zone detection GET requests
-				if r.Method == "GET" && strings.HasPrefix(r.URL.Path, "/v1/dns/") {
-					zone := strings.TrimPrefix(r.URL.Path, "/v1/dns/")
-					if tt.validZones[zone] {
-						resp := map[string]interface{}{
-							"name":          zone + ".",
-							"dnssec_status": "disabled",
-						}
-						w.WriteHeader(http.StatusOK)
-						_ = json.NewEncoder(w).Encode(resp)
-					} else {
-						w.WriteHeader(http.StatusNotFound)
-						_ = json.NewEncoder(w).Encode(map[string]string{"error": "not found"})
-					}
-					return
-				}
+	require.NoError(t, err)
+}
 
-				// Handle PATCH request
-				assert.Equal(t, "PATCH", r.Method)
-				err := json.NewDecoder(r.Body).Decode(&receivedReq)
-				require.NoError(t, err)
+func TestDNSSEC(t *testing.T) {
+	t.Run("enable", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assert.Equal(t, "POST", r.Method)
+			assert.Equal(t, "/v1/dns/example.com/dnssec/enable", r.URL.Path)
+			_ = json.NewEncoder(w).Encode(DNSChanges{NumChanges: 5})
+		}))
+		defer server.Close()
 
-				w.WriteHeader(http.StatusNoContent)
-			}))
-			defer server.Close()
+		client := NewClient(&Config{APIKey: "opk_test", APIEndpoint: server.URL})
+		changes, err := client.EnableDNSSEC("example.com")
 
-			client := NewClient(&Config{
-				APIKey:      "opk_test123",
-				APIEndpoint: server.URL,
-			})
+		require.NoError(t, err)
+		assert.Equal(t, 5, changes.NumChanges)
+	})
 
-			err := client.RemoveTXTRecord(tt.fqdn, tt.value)
+	t.Run("disable", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assert.Equal(t, "/v1/dns/example.com/dnssec/disable", r.URL.Path)
+			_ = json.NewEncoder(w).Encode(DNSChanges{NumChanges: 3})
+		}))
+		defer server.Close()
 
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-				require.Len(t, receivedReq.Ops, 1)
-				assert.Equal(t, tt.wantOp, receivedReq.Ops[0].Op)
-				assert.Equal(t, tt.wantName, receivedReq.Ops[0].Record.Name)
-				assert.Equal(t, tt.wantType, receivedReq.Ops[0].Record.Type)
-				assert.Equal(t, tt.wantTTL, receivedReq.Ops[0].Record.TTL)
-				assert.Equal(t, tt.wantRData, receivedReq.Ops[0].Record.RData)
-			}
+		client := NewClient(&Config{APIKey: "opk_test", APIEndpoint: server.URL})
+		changes, err := client.DisableDNSSEC("example.com")
+
+		require.NoError(t, err)
+		assert.Equal(t, 3, changes.NumChanges)
+	})
+}
+
+func TestGetRecords(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/v1/dns/example.com/rrsets", r.URL.Path)
+		_ = json.NewEncoder(w).Encode([]RRSet{
+			{Name: "www", Type: "A", TTL: 3600},
+			{Name: "mail", Type: "MX", TTL: 3600},
 		})
-	}
+	}))
+	defer server.Close()
+
+	client := NewClient(&Config{APIKey: "opk_test", APIEndpoint: server.URL})
+	rrsets, err := client.GetRecords("example.com")
+
+	require.NoError(t, err)
+	assert.Len(t, rrsets, 2)
+}
+
+func TestUpsertRecord(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "PATCH", r.Method)
+		assert.Equal(t, "/v1/dns/example.com/records", r.URL.Path)
+
+		var req recordPatchRequest
+		_ = json.NewDecoder(r.Body).Decode(&req)
+
+		require.Len(t, req.Ops, 1)
+		assert.Equal(t, "upsert", req.Ops[0].Op)
+		assert.Equal(t, "www", req.Ops[0].Record.Name)
+		assert.Equal(t, "A", req.Ops[0].Record.Type)
+
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+
+	client := NewClient(&Config{APIKey: "opk_test", APIEndpoint: server.URL})
+	err := client.UpsertRecord("example.com", Record{
+		Name:  "www",
+		Type:  "A",
+		TTL:   3600,
+		RData: "1.2.3.4",
+	})
+
+	require.NoError(t, err)
+}
+
+func TestDeleteRecord(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req recordPatchRequest
+		_ = json.NewDecoder(r.Body).Decode(&req)
+
+		require.Len(t, req.Ops, 1)
+		assert.Equal(t, "remove", req.Ops[0].Op)
+
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+
+	client := NewClient(&Config{APIKey: "opk_test", APIEndpoint: server.URL})
+	err := client.DeleteRecord("example.com", Record{
+		Name:  "www",
+		Type:  "A",
+		TTL:   3600,
+		RData: "1.2.3.4",
+	})
+
+	require.NoError(t, err)
 }
 
 func TestRetryLogic(t *testing.T) {
@@ -387,119 +285,32 @@ func TestRetryLogic(t *testing.T) {
 		attempts++
 		if attempts < 3 {
 			w.WriteHeader(http.StatusTooManyRequests)
-			_ = json.NewEncoder(w).Encode(map[string]string{"error": "rate limited"})
 			return
 		}
-		resp := ZoneListResponse{
-			Results: []Zone{
-				{Name: "example.com"},
-			},
-			Pagination: Pagination{
-				TotalPages:  1,
-				CurrentPage: 1,
-				HasNextPage: false,
-			},
-		}
-		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(zoneListResponse{
+			Results:    []Zone{{Name: "example.com"}},
+			Pagination: Pagination{HasNextPage: false},
+		})
 	}))
 	defer server.Close()
 
 	client := NewClient(&Config{
-		APIKey:      "opk_test123",
+		APIKey:      "opk_test",
 		APIEndpoint: server.URL,
 		MaxRetries:  3,
 	})
 
 	zones, err := client.ListZones()
-	assert.NoError(t, err)
+
+	require.NoError(t, err)
 	assert.Len(t, zones, 1)
 	assert.Equal(t, 3, attempts)
 }
 
-func TestZoneOperations(t *testing.T) {
-	// Tests for ListZones now makes multiple calls (no cache)
-	calls := 0
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		calls++
-		resp := ZoneListResponse{
-			Results: []Zone{
-				{Name: "example.com"},
-			},
-			Pagination: Pagination{
-				TotalPages:  1,
-				CurrentPage: 1,
-				HasNextPage: false,
-			},
-		}
-		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(resp)
-	}))
-	defer server.Close()
+func TestAPIError(t *testing.T) {
+	err := &APIError{StatusCode: 404, Message: "zone not found"}
+	assert.Equal(t, "opusdns: API error 404: zone not found", err.Error())
 
-	client := NewClient(&Config{
-		APIKey:      "opk_test123",
-		APIEndpoint: server.URL,
-	})
-
-	// First call should hit the API
-	zones1, err := client.ListZones()
-	assert.NoError(t, err)
-	assert.Len(t, zones1, 1)
-	assert.Equal(t, 1, calls)
-
-	// Second call should also hit the API (no cache)
-	zones2, err := client.ListZones()
-	assert.NoError(t, err)
-	assert.Len(t, zones2, 1)
-	assert.Equal(t, 2, calls, "should be 2 as there is no cache")
-}
-
-func TestPagination(t *testing.T) {
-	page := 0
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		page++
-		
-		var resp ZoneListResponse
-		if page == 1 {
-			resp = ZoneListResponse{
-				Results: []Zone{
-					{Name: "zone1.com"},
-					{Name: "zone2.com"},
-				},
-				Pagination: Pagination{
-					TotalPages:  2,
-					CurrentPage: 1,
-					HasNextPage: true,
-				},
-			}
-		} else {
-			resp = ZoneListResponse{
-				Results: []Zone{
-					{Name: "zone3.com"},
-				},
-				Pagination: Pagination{
-					TotalPages:  2,
-					CurrentPage: 2,
-					HasNextPage: false,
-				},
-			}
-		}
-		
-		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(resp)
-	}))
-	defer server.Close()
-
-	client := NewClient(&Config{
-		APIKey:      "opk_test123",
-		APIEndpoint: server.URL,
-	})
-
-	zones, err := client.ListZones()
-	assert.NoError(t, err)
-	assert.Len(t, zones, 3)
-	assert.Equal(t, "zone1.com", zones[0].Name)
-	assert.Equal(t, "zone2.com", zones[1].Name)
-	assert.Equal(t, "zone3.com", zones[2].Name)
+	err2 := &APIError{StatusCode: 500}
+	assert.Equal(t, "opusdns: API error 500", err2.Error())
 }

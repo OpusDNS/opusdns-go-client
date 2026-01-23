@@ -1,13 +1,8 @@
-# OpusDNS Go Client Library
+# OpusDNS Go Client
 
-A Go client library for the [OpusDNS](https://opusdns.com) DNS API with support for zone management, DNSSEC, and DNS record operations.
+A Go client library for the [OpusDNS](https://opusdns.com) DNS API.
 
-📚 **Full API Documentation**: [developers.opusdns.com](https://developers.opusdns.com)
-
-## Features
-
-- ✅ **Complete API Coverage**: Zones, RRSets, DNSSEC operations
-- ✅ **ACME Support**: Convenience methods for DNS-01 challenges
+📚 **API Documentation**: [developers.opusdns.com](https://developers.opusdns.com)
 
 ## Installation
 
@@ -28,7 +23,6 @@ import (
 )
 
 func main() {
-    // Create client with your API key
     client := opusdns.NewClient(&opusdns.Config{
         APIKey: "opk_...", // Your OpusDNS API key
     })
@@ -38,6 +32,7 @@ func main() {
     if err != nil {
         log.Fatal(err)
     }
+
     for _, zone := range zones {
         fmt.Printf("Zone: %s (DNSSEC: %s)\n", zone.Name, zone.DNSSECStatus)
     }
@@ -48,163 +43,75 @@ func main() {
 
 ```go
 client := opusdns.NewClient(&opusdns.Config{
-    // Required: Your OpusDNS API key (format: opk_...)
-    APIKey: "opk_...",
-
-    // Optional: API endpoint (default: https://api.opusdns.com)
-    APIEndpoint: "https://api.opusdns.com",
-
-    // Optional: Default TTL for records in seconds (default: 60)
-    TTL: 60,
-
-    // Optional: HTTP request timeout (default: 30s)
-    HTTPTimeout: 30 * time.Second,
-
-    // Optional: Max retries for transient failures (default: 3)
-    MaxRetries: 3,
+    APIKey:      "opk_...",                       // Required
+    APIEndpoint: "https://api.opusdns.com",       // Optional (default)
+    TTL:         60,                              // Optional: default TTL for records
+    HTTPTimeout: 30 * time.Second,                // Optional: request timeout
+    MaxRetries:  3,                               // Optional: retry count for 429/5xx
 })
 ```
 
 ## Zone Operations
 
-### List Zones
-
 ```go
+// List all zones
 zones, err := client.ListZones()
-```
 
-Returns all DNS zones with automatic pagination.
-
-### Get Zone
-
-```go
+// Get a specific zone
 zone, err := client.GetZone("example.com")
-fmt.Printf("Zone: %s, DNSSEC: %s\n", zone.Name, zone.DNSSECStatus)
-```
 
-### Create Zone
-
-```go
-// Create an empty zone
+// Create a zone (empty)
 zone, err := client.CreateZone("example.com", nil)
 
 // Create a zone with initial records
-zone, err := client.CreateZone("example.com", []opusdns.RRSetCreateRequest{
-    {
-        Name:    "www",
-        Type:    "A",
-        TTL:     3600,
-        Records: []string{"192.0.2.1"},
-    },
+zone, err := client.CreateZone("example.com", []opusdns.Record{
+    {Name: "www", Type: "A", TTL: 3600, RData: "192.0.2.1"},
+    {Name: "www", Type: "AAAA", TTL: 3600, RData: "2001:db8::1"},
 })
-```
 
-### Delete Zone
-
-```go
+// Delete a zone
 err := client.DeleteZone("example.com")
-```
-
-## DNSSEC Operations
-
-### Enable DNSSEC
-
-```go
-changes, err := client.EnableDNSSEC("example.com")
-fmt.Printf("DNSSEC enabled, %d changes made\n", changes.NumChanges)
-```
-
-### Disable DNSSEC
-
-```go
-changes, err := client.DisableDNSSEC("example.com")
 ```
 
 ## Record Operations
 
-### Get RRSets
-
 ```go
-rrsets, err := client.GetRRSets("example.com")
-for _, rrset := range rrsets {
-    fmt.Printf("%s %s %d\n", rrset.Name, rrset.Type, rrset.TTL)
-    for _, record := range rrset.Records {
-        fmt.Printf("  %s\n", record.RData)
-    }
-}
-```
+// Get all record sets
+rrsets, err := client.GetRecords("example.com")
 
-### Upsert Record
-
-```go
-err := client.UpsertRecord("example.com", opusdns.RRSet{
+// Create or update a record
+err := client.UpsertRecord("example.com", opusdns.Record{
     Name:  "www",
     Type:  "A",
     TTL:   3600,
     RData: "192.0.2.1",
 })
-```
 
-### Remove Record
-
-```go
-err := client.RemoveRecord("example.com", opusdns.RRSet{
+// Delete a record
+err := client.DeleteRecord("example.com", opusdns.Record{
     Name:  "www",
     Type:  "A",
     TTL:   3600,
     RData: "192.0.2.1",
 })
-```
 
-### Batch Operations
-
-```go
-err := client.PatchRRSets("example.com", []opusdns.RRSetOperation{
-    {
-        Op: "upsert",
-        Record: opusdns.RRSet{
-            Name:  "www",
-            Type:  "A",
-            TTL:   3600,
-            RData: "192.0.2.1",
-        },
-    },
-    {
-        Op: "remove",
-        Record: opusdns.RRSet{
-            Name:  "old",
-            Type:  "CNAME",
-            TTL:   3600,
-            RData: "example.com.",
-        },
-    },
+// Batch operations
+err := client.PatchRecords("example.com", []opusdns.RecordOperation{
+    {Op: "upsert", Record: opusdns.Record{Name: "www", Type: "A", TTL: 3600, RData: "192.0.2.1"}},
+    {Op: "remove", Record: opusdns.Record{Name: "old", Type: "CNAME", TTL: 3600, RData: "legacy.example.com."}},
 })
 ```
 
-## ACME DNS-01 Challenge Support
-
-### Add Challenge Record
+## DNSSEC
 
 ```go
-// Automatically finds the zone and creates the TXT record
-err := client.UpsertTXTRecord("_acme-challenge.www.example.com", "token")
+// Enable DNSSEC
+changes, err := client.EnableDNSSEC("example.com")
+fmt.Printf("DNSSEC enabled: %d changes\n", changes.NumChanges)
+
+// Disable DNSSEC
+changes, err := client.DisableDNSSEC("example.com")
 ```
-
-### Remove Challenge Record
-
-```go
-err := client.RemoveTXTRecord("_acme-challenge.www.example.com", "token")
-```
-
-### Find Zone for FQDN
-
-```go
-zone, err := client.FindZoneForFQDN("_acme-challenge.sub.example.com")
-// Returns "example.com" if that zone exists
-```
-
-The zone detection iterates through domain parts and checks the API:
-- `_acme-challenge.sub.example.com` → tries `sub.example.com`, then `example.com`
 
 ## Error Handling
 
@@ -212,48 +119,25 @@ The zone detection iterates through domain parts and checks the API:
 zones, err := client.ListZones()
 if err != nil {
     if apiErr, ok := err.(*opusdns.APIError); ok {
-        fmt.Printf("API Error %d: %s\n", apiErr.StatusCode, apiErr.Message)
+        fmt.Printf("API error %d: %s\n", apiErr.StatusCode, apiErr.Message)
     } else {
         fmt.Printf("Error: %v\n", err)
     }
 }
 ```
 
-### Common Errors
-
-| HTTP | Description | Action |
-|------|-------------|--------|
-| 401 | Invalid API key | Verify credentials |
-| 404 | Zone not found | Check zone exists |
-| 429 | Rate limited | Auto-retried |
-| 5xx | Server error | Auto-retried |
-
-## Retry Logic
-
-The client automatically retries on:
-- HTTP 429 (Rate Limited)
-- HTTP 5xx (Server Errors)
-
-Uses exponential backoff: 1s, 2s, 4s (up to `MaxRetries` attempts).
-
-## Testing
-
-```bash
-go test -v ./...
-```
-
-## Environment Variables
-
-```bash
-export OPUSDNS_API_KEY="opk_..."
-export OPUSDNS_API_ENDPOINT="https://api.opusdns.com"  # optional
-```
+| Status | Description | Behavior |
+|--------|-------------|----------|
+| 401 | Invalid API key | Returns error |
+| 404 | Resource not found | Returns error |
+| 429 | Rate limited | Auto-retry with backoff |
+| 5xx | Server error | Auto-retry with backoff |
 
 ## Requirements
 
-- Go 1.25+
-- OpusDNS API key
+- Go 1.21+
+- OpusDNS API key ([Get one here](https://opusdns.com))
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) for details.
+MIT License - see [LICENSE](LICENSE)
