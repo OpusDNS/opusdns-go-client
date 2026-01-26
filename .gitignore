@@ -5,6 +5,19 @@
 *.so
 *.dylib
 
+# CLI binaries (built from cmd/)
+opusdns
+create-zone
+list-domains
+list-zones
+get-zone
+delete-zone
+list-contacts
+get-contact
+create-contact
+update-contact
+delete-contact
+
 # Test binary, built with `go test -c`
 *.test
 
