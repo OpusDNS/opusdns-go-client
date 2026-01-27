@@ -4,7 +4,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/opusdns/opusdns-go-client)](https://goreportcard.com/report/github.com/opusdns/opusdns-go-client)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-The official Go client library for the [OpusDNS](https://opusdns.com) API — a comprehensive DNS and domain management platform.
+The official Go client library for the [OpusDNS](https://opusdns.com) API - a comprehensive DNS and domain management platform.
 
 ## Features
 
@@ -23,7 +23,7 @@ The official Go client library for the [OpusDNS](https://opusdns.com) API — a 
 go get github.com/opusdns/opusdns-go-client
 ```
 
-Requires Go 1.21 or later.
+Requires Go 1.25 or later.
 
 ## Quick Start
 
@@ -160,13 +160,13 @@ zone, err := client.DNS.CreateZone(ctx, &models.ZoneCreateRequest{
             Name:    "www",
             Type:    models.RRSetTypeA,
             TTL:     3600,
-            Records: []string{"192.0.2.1", "192.0.2.2"},
+            Records: []models.RecordCreate{{RData: "192.0.2.1"}, {RData: "192.0.2.2"}},
         },
         {
             Name:    "@",
             Type:    models.RRSetTypeMX,
             TTL:     3600,
-            Records: []string{"10 mail.example.com."},
+            Records: []models.RecordCreate{{RData: "10 mail.example.com."}},
         },
     },
 })
