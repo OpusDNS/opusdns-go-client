@@ -63,4 +63,4 @@ release:
     name: opusdns-go-client
   draft: false
   prerelease: auto
-  name_template: "v{{.Version}}"
+  name_template: "{{.Version}}"
