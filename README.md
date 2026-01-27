@@ -444,7 +444,7 @@ go run main.go
 
 ## Requirements
 
-- Go 1.21 or later
+- Go 1.25 or later
 - OpusDNS API key ([Get one here](https://opusdns.com))
 
 ## API Documentation
