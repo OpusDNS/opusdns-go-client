@@ -8,11 +8,10 @@ linters:
     - ineffassign
     - staticcheck
     - unused
+  settings:
+    errcheck:
+      check-type-assertions: true
 
-linters-settings:
-  errcheck:
-    check-type-assertions: true
-
-issues:
-  exclude-dirs:
+run:
+  skip-dirs:
     - vendor

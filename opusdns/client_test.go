@@ -201,7 +201,7 @@ func TestDNSService_CreateZone(t *testing.T) {
 		_, err = client.DNS.CreateZone(context.Background(), &models.ZoneCreateRequest{
 			Name: "newzone.com",
 			RRSets: []models.RRSetCreate{
-				{Name: "www", Type: models.RRSetTypeA, TTL: 3600, Records: []string{"1.2.3.4"}},
+				{Name: "www", Type: models.RRSetTypeA, TTL: 3600, Records: []models.RecordCreate{{RData: "1.2.3.4"}}},
 			},
 		})
 
@@ -512,11 +512,9 @@ func TestUsersService_GetCurrentUser(t *testing.T) {
 		assert.Equal(t, "GET", r.Method)
 		assert.Equal(t, "/v1/users/me", r.URL.Path)
 
-		_ = json.NewEncoder(w).Encode(models.CurrentUser{
-			User: models.User{
-				UserID: "user_123",
-				Email:  "user@example.com",
-			},
+		_ = json.NewEncoder(w).Encode(models.User{
+			UserID: "user_123",
+			Email:  "user@example.com",
 		})
 	}))
 	defer server.Close()
