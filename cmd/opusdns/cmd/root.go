@@ -15,6 +15,11 @@ var (
 	debug   bool
 	timeout time.Duration
 	client  *opusdns.Client
+
+	// Version information (set by main.go)
+	version = "dev"
+	commit  = "none"
+	date    = "unknown"
 )
 
 var rootCmd = &cobra.Command{
@@ -25,8 +30,8 @@ your DNS zones, domains, contacts, and more through the OpusDNS API.
 
 Set your API key via the OPUSDNS_API_KEY environment variable or use the --api-key flag.`,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		// Skip client initialization for help commands
-		if cmd.Name() == "help" || cmd.Name() == "completion" {
+		// Skip client initialization for help and version commands
+		if cmd.Name() == "help" || cmd.Name() == "completion" || cmd.Name() == "version" {
 			return nil
 		}
 
@@ -56,10 +61,28 @@ func Execute() error {
 	return rootCmd.Execute()
 }
 
+// SetVersion sets the version information from main.go
+func SetVersion(v, c, d string) {
+	version = v
+	commit = c
+	date = d
+}
+
 func init() {
 	rootCmd.PersistentFlags().StringVar(&apiKey, "api-key", "", "OpusDNS API key (or set OPUSDNS_API_KEY)")
 	rootCmd.PersistentFlags().BoolVar(&debug, "debug", false, "Enable debug output")
 	rootCmd.PersistentFlags().DurationVar(&timeout, "timeout", 30*time.Second, "Request timeout")
+
+	// Add version command
+	rootCmd.AddCommand(&cobra.Command{
+		Use:   "version",
+		Short: "Print version information",
+		Run: func(cmd *cobra.Command, args []string) {
+			fmt.Printf("opusdns %s\n", version)
+			fmt.Printf("  commit: %s\n", commit)
+			fmt.Printf("  built:  %s\n", date)
+		},
+	})
 }
 
 // getContext returns a context with the configured timeout
