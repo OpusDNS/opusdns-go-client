@@ -118,7 +118,7 @@ func (s *DomainForwardsService) CreateDomainForward(ctx context.Context, req *mo
 }
 
 // UpdateDomainForwardConfig updates the configuration for a specific protocol.
-func (s *DomainForwardsService) UpdateDomainForwardConfig(ctx context.Context, hostname string, protocol models.DomainForwardProtocol, req *models.DomainForwardConfigUpdate) (*models.DomainForward, error) {
+func (s *DomainForwardsService) UpdateDomainForwardConfig(ctx context.Context, hostname string, protocol models.HttpProtocol, req *models.DomainForwardProtocolSetRequest) (*models.DomainForward, error) {
 	path := s.client.http.BuildPath("domain-forwards", url.PathEscape(hostname), string(protocol))
 
 	resp, err := s.client.http.Patch(ctx, path, req)
@@ -147,7 +147,7 @@ func (s *DomainForwardsService) DeleteDomainForward(ctx context.Context, hostnam
 }
 
 // DeleteDomainForwardConfig deletes a specific protocol configuration.
-func (s *DomainForwardsService) DeleteDomainForwardConfig(ctx context.Context, hostname string, protocol models.DomainForwardProtocol) error {
+func (s *DomainForwardsService) DeleteDomainForwardConfig(ctx context.Context, hostname string, protocol models.HttpProtocol) error {
 	path := s.client.http.BuildPath("domain-forwards", url.PathEscape(hostname), string(protocol))
 
 	resp, err := s.client.http.Delete(ctx, path)

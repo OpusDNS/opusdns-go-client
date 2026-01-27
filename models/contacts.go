@@ -14,7 +14,6 @@ const (
 	ContactSortByLastName  ContactSortField = "last_name"
 	ContactSortByEmail     ContactSortField = "email"
 	ContactSortByCreatedOn ContactSortField = "created_on"
-	ContactSortByUpdatedOn ContactSortField = "updated_on"
 )
 
 // RegistryHandleAttributeType represents TLD-specific contact attribute types.
@@ -48,6 +47,9 @@ const (
 type Contact struct {
 	// ContactID is the unique identifier for the contact.
 	ContactID ContactID `json:"contact_id"`
+
+	// OrganizationID is the organization that owns this contact.
+	OrganizationID TypeID `json:"organization_id,omitempty"`
 
 	// FirstName is the contact's first name.
 	FirstName string `json:"first_name"`
@@ -99,6 +101,9 @@ type Contact struct {
 
 	// UpdatedOn is when the contact was last updated.
 	UpdatedOn *time.Time `json:"updated_on,omitempty"`
+
+	// DeletedOn is when the contact was deleted.
+	DeletedOn *time.Time `json:"deleted_on,omitempty"`
 }
 
 // FullName returns the contact's full name.

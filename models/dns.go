@@ -12,9 +12,6 @@ const (
 
 	// DNSSECStatusEnabled indicates DNSSEC is fully enabled.
 	DNSSECStatusEnabled DNSSECStatus = "enabled"
-
-	// DNSSECStatusPending indicates DNSSEC is being enabled or disabled.
-	DNSSECStatusPending DNSSECStatus = "pending"
 )
 
 // RRSetType represents a DNS record type.
@@ -43,9 +40,10 @@ const (
 type ZoneSortField string
 
 const (
-	ZoneSortByName      ZoneSortField = "name"
-	ZoneSortByCreatedOn ZoneSortField = "created_on"
-	ZoneSortByUpdatedOn ZoneSortField = "updated_on"
+	ZoneSortByName         ZoneSortField = "name"
+	ZoneSortByCreatedOn    ZoneSortField = "created_on"
+	ZoneSortByUpdatedOn    ZoneSortField = "updated_on"
+	ZoneSortByDNSSECStatus ZoneSortField = "dnssec_status"
 )
 
 // Zone represents a DNS zone managed by OpusDNS.
@@ -93,6 +91,9 @@ type ZoneCreateRequest struct {
 	// Name is the domain name for the new zone (e.g., "example.com").
 	Name string `json:"name"`
 
+	// DNSSECStatus is the initial DNSSEC status for the zone.
+	DNSSECStatus DNSSECStatus `json:"dnssec_status,omitempty"`
+
 	// RRSets is an optional list of initial resource record sets to create with the zone.
 	RRSets []RRSetCreate `json:"rrsets,omitempty"`
 }
@@ -121,6 +122,12 @@ type RecordData struct {
 	Protected bool `json:"protected,omitempty"`
 }
 
+// RecordCreate represents a DNS record for creation.
+type RecordCreate struct {
+	// RData is the record data (e.g., IP address, hostname, etc.).
+	RData string `json:"rdata"`
+}
+
 // RRSetCreate represents a resource record set for creation.
 type RRSetCreate struct {
 	// Name is the record name relative to the zone.
@@ -133,7 +140,7 @@ type RRSetCreate struct {
 	TTL int `json:"ttl"`
 
 	// Records contains the record data values.
-	Records []string `json:"records"`
+	Records []RecordCreate `json:"records"`
 }
 
 // Record represents a single DNS record (convenience type).

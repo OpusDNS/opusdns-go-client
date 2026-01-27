@@ -6,121 +6,105 @@ import "time"
 // OrganizationID is a TypeID for organizations.
 type OrganizationID = TypeID
 
+// OrganizationStatus represents the status of an organization.
+type OrganizationStatus string
+
+const (
+	// OrganizationStatusActive indicates the organization is active.
+	OrganizationStatusActive OrganizationStatus = "active"
+
+	// OrganizationStatusSuspended indicates the organization is suspended.
+	OrganizationStatusSuspended OrganizationStatus = "suspended"
+
+	// OrganizationStatusDeleted indicates the organization is deleted.
+	OrganizationStatusDeleted OrganizationStatus = "deleted"
+)
+
 // Organization represents an organization (account) in OpusDNS.
 type Organization struct {
 	// OrganizationID is the unique identifier for the organization.
-	OrganizationID OrganizationID `json:"organization_id"`
+	OrganizationID OrganizationID `json:"organization_id,omitempty"`
 
 	// Name is the organization name.
 	Name string `json:"name"`
 
-	// Email is the primary contact email for the organization.
-	Email string `json:"email,omitempty"`
+	// ParentOrganizationID is the ID of the parent organization.
+	ParentOrganizationID *OrganizationID `json:"parent_organization_id,omitempty"`
 
-	// Phone is the primary contact phone number.
-	Phone *string `json:"phone,omitempty"`
+	// Status is the status of the organization.
+	Status OrganizationStatus `json:"status,omitempty"`
 
-	// Address contains the organization's address.
-	Address *OrganizationAddress `json:"address,omitempty"`
+	// Address1 is the first line of the organization's address.
+	Address1 *string `json:"address_1,omitempty"`
 
-	// BillingPlan contains the current billing plan.
-	BillingPlan *BillingPlan `json:"billing_plan,omitempty"`
+	// Address2 is the second line of the organization's address.
+	Address2 *string `json:"address_2,omitempty"`
 
-	// BillingMetadata contains additional billing information.
-	BillingMetadata *BillingMetadata `json:"billing_metadata,omitempty"`
+	// City is the city of the organization's address.
+	City *string `json:"city,omitempty"`
 
-	// Settings contains organization-specific settings.
-	Settings *OrganizationSettings `json:"settings,omitempty"`
+	// State is the state or province of the organization's address.
+	State *string `json:"state,omitempty"`
 
-	// Verified indicates if the organization has been verified.
-	Verified bool `json:"verified,omitempty"`
+	// PostalCode is the postal code of the organization's address.
+	PostalCode *string `json:"postal_code,omitempty"`
 
-	// Active indicates if the organization is active.
-	Active bool `json:"active,omitempty"`
+	// CountryCode is the ISO 3166-1 alpha-2 country code.
+	CountryCode *string `json:"country_code,omitempty"`
+
+	// BusinessNumber is the government issued business identifier.
+	BusinessNumber *string `json:"business_number,omitempty"`
+
+	// TaxID is the tax ID of the organization.
+	TaxID *string `json:"tax_id,omitempty"`
+
+	// TaxIDType is the type of tax ID.
+	TaxIDType *string `json:"tax_id_type,omitempty"`
+
+	// TaxRate is the tax rate for the organization.
+	TaxRate *string `json:"tax_rate,omitempty"`
+
+	// Currency is the currency used by the organization.
+	Currency *Currency `json:"currency,omitempty"`
+
+	// DefaultLocale is the default locale for the organization.
+	DefaultLocale *string `json:"default_locale,omitempty"`
+
+	// Attributes contains organization attributes.
+	Attributes []OrganizationAttribute `json:"attributes,omitempty"`
+
+	// Users contains the users belonging to this organization.
+	Users []User `json:"users,omitempty"`
 
 	// CreatedOn is when the organization was created.
 	CreatedOn *time.Time `json:"created_on,omitempty"`
 
-	// UpdatedOn is when the organization was last updated.
+	// DeletedOn is when the organization was deleted.
+	DeletedOn *time.Time `json:"deleted_on,omitempty"`
+}
+
+// OrganizationAttribute represents a custom attribute for an organization.
+type OrganizationAttribute struct {
+	// OrganizationAttributeID is the unique identifier for the attribute.
+	OrganizationAttributeID int `json:"organization_attribute_id"`
+
+	// Key is the attribute key.
+	Key string `json:"key"`
+
+	// Value is the attribute value.
+	Value interface{} `json:"value,omitempty"`
+
+	// Private indicates if the attribute is private and not visible to users.
+	Private bool `json:"private,omitempty"`
+
+	// Protected indicates if the attribute is protected and cannot be modified by users.
+	Protected bool `json:"protected,omitempty"`
+
+	// CreatedOn is when the attribute was created.
+	CreatedOn *time.Time `json:"created_on,omitempty"`
+
+	// UpdatedOn is when the attribute was last updated.
 	UpdatedOn *time.Time `json:"updated_on,omitempty"`
-}
-
-// OrganizationAddress represents an organization's address.
-type OrganizationAddress struct {
-	// Street is the street address.
-	Street string `json:"street,omitempty"`
-
-	// City is the city.
-	City string `json:"city,omitempty"`
-
-	// State is the state or province.
-	State *string `json:"state,omitempty"`
-
-	// PostalCode is the postal or ZIP code.
-	PostalCode string `json:"postal_code,omitempty"`
-
-	// Country is the two-letter country code (ISO 3166-1 alpha-2).
-	Country string `json:"country,omitempty"`
-}
-
-// OrganizationSettings contains organization-specific settings.
-type OrganizationSettings struct {
-	// DefaultTTL is the default TTL for DNS records.
-	DefaultTTL int `json:"default_ttl,omitempty"`
-
-	// DefaultNameservers is the default list of nameservers.
-	DefaultNameservers []string `json:"default_nameservers,omitempty"`
-
-	// AutoRenewEnabled is the default auto-renew setting for domains.
-	AutoRenewEnabled bool `json:"auto_renew_enabled,omitempty"`
-
-	// TransferLockEnabled is the default transfer lock setting for domains.
-	TransferLockEnabled bool `json:"transfer_lock_enabled,omitempty"`
-
-	// TwoFactorRequired indicates if 2FA is required for users.
-	TwoFactorRequired bool `json:"two_factor_required,omitempty"`
-
-	// IPRestrictionsEnabled indicates if IP restrictions are enabled.
-	IPRestrictionsEnabled bool `json:"ip_restrictions_enabled,omitempty"`
-}
-
-// BillingPlan represents a billing plan.
-type BillingPlan struct {
-	// PlanID is the unique identifier for the plan.
-	PlanID *string `json:"plan_id,omitempty"`
-
-	// Name is the plan name.
-	Name *string `json:"name,omitempty"`
-
-	// PlanLevel is the plan level (e.g., "basic", "premium", "enterprise").
-	PlanLevel *string `json:"plan_level,omitempty"`
-
-	// Type is the plan type or billing interval.
-	Type *string `json:"type,omitempty"`
-
-	// Amount is the plan price.
-	Amount string `json:"amount,omitempty"`
-
-	// Currency is the plan currency.
-	Currency Currency `json:"currency,omitempty"`
-}
-
-// BillingMetadata contains additional billing information.
-type BillingMetadata struct {
-	// CustomerNumber is the customer account number.
-	CustomerNumber *int `json:"customer_number,omitempty"`
-
-	// BillingModel is the payment terms.
-	BillingModel *string `json:"billing_model,omitempty"`
-
-	// CreditLimit is the credit limit for the organization.
-	CreditLimit *int `json:"credit_limit,omitempty"`
-
-	// WalletBalance is the current wallet balance.
-	WalletBalance *string `json:"wallet_balance,omitempty"`
-
-	// Currency is the billing currency.
-	Currency Currency `json:"currency,omitempty"`
 }
 
 // OrganizationListResponse represents the paginated response when listing organizations.
@@ -137,43 +121,82 @@ type OrganizationUpdateRequest struct {
 	// Name is the organization name.
 	Name *string `json:"name,omitempty"`
 
-	// Email is the primary contact email.
-	Email *string `json:"email,omitempty"`
+	// Address1 is the first line of the organization's address.
+	Address1 *string `json:"address_1,omitempty"`
 
-	// Phone is the primary contact phone number.
-	Phone *string `json:"phone,omitempty"`
+	// Address2 is the second line of the organization's address.
+	Address2 *string `json:"address_2,omitempty"`
 
-	// Address is the organization address.
-	Address *OrganizationAddress `json:"address,omitempty"`
+	// City is the city of the organization's address.
+	City *string `json:"city,omitempty"`
 
-	// Settings is the organization settings.
-	Settings *OrganizationSettings `json:"settings,omitempty"`
+	// State is the state or province of the organization's address.
+	State *string `json:"state,omitempty"`
+
+	// PostalCode is the postal code of the organization's address.
+	PostalCode *string `json:"postal_code,omitempty"`
+
+	// CountryCode is the ISO 3166-1 alpha-2 country code.
+	CountryCode *string `json:"country_code,omitempty"`
+
+	// BusinessNumber is the government issued business identifier.
+	BusinessNumber *string `json:"business_number,omitempty"`
+
+	// TaxID is the tax ID of the organization.
+	TaxID *string `json:"tax_id,omitempty"`
+
+	// TaxIDType is the type of tax ID.
+	TaxIDType *string `json:"tax_id_type,omitempty"`
+
+	// Currency is the currency used by the organization.
+	Currency *Currency `json:"currency,omitempty"`
+
+	// DefaultLocale is the default locale for the organization.
+	DefaultLocale *string `json:"default_locale,omitempty"`
+}
+
+// OrganizationAttributeCreate represents a request to create an organization attribute.
+type OrganizationAttributeCreate struct {
+	// Key is the attribute key.
+	Key string `json:"key"`
+
+	// Value is the attribute value.
+	Value interface{} `json:"value,omitempty"`
+
+	// Private indicates if the attribute is private.
+	Private bool `json:"private,omitempty"`
+
+	// Protected indicates if the attribute is protected.
+	Protected bool `json:"protected,omitempty"`
+}
+
+// OrganizationAttributeUpdateRequest represents a request to update organization attributes.
+type OrganizationAttributeUpdateRequest struct {
+	// Attributes contains the attributes to set.
+	Attributes []OrganizationAttributeCreate `json:"attributes"`
 }
 
 // IPRestriction represents an IP restriction for API access.
 type IPRestriction struct {
 	// IPRestrictionID is the unique identifier for the restriction.
-	IPRestrictionID TypeID `json:"ip_restriction_id"`
+	IPRestrictionID int `json:"ip_restriction_id"`
 
-	// CIDR is the IP address or CIDR range (e.g., "192.0.2.0/24").
-	CIDR string `json:"cidr"`
+	// OrganizationID is the organization this restriction belongs to.
+	OrganizationID OrganizationID `json:"organization_id"`
 
-	// Description is an optional description of the restriction.
-	Description *string `json:"description,omitempty"`
+	// IPNetwork is the IP address or CIDR network range.
+	IPNetwork string `json:"ip_network"`
 
-	// Enabled indicates if the restriction is active.
-	Enabled bool `json:"enabled"`
+	// LastUsedOn is when the restriction was last used.
+	LastUsedOn *time.Time `json:"last_used_on,omitempty"`
 
 	// CreatedOn is when the restriction was created.
-	CreatedOn *time.Time `json:"created_on,omitempty"`
-
-	// UpdatedOn is when the restriction was last updated.
-	UpdatedOn *time.Time `json:"updated_on,omitempty"`
+	CreatedOn time.Time `json:"created_on"`
 }
 
 // IPRestrictionListResponse represents the paginated response when listing IP restrictions.
 type IPRestrictionListResponse struct {
-	// Results contains the list of IP restrictions for the current page.
+	// Results contains the list of IP restrictions.
 	Results []IPRestriction `json:"results"`
 
 	// Pagination contains the pagination metadata.
@@ -182,26 +205,17 @@ type IPRestrictionListResponse struct {
 
 // IPRestrictionCreateRequest represents a request to create an IP restriction.
 type IPRestrictionCreateRequest struct {
-	// CIDR is the IP address or CIDR range.
-	CIDR string `json:"cidr"`
-
-	// Description is an optional description.
-	Description *string `json:"description,omitempty"`
-
-	// Enabled indicates if the restriction should be active.
-	Enabled bool `json:"enabled"`
+	// IPNetwork is the IP address or CIDR network range.
+	IPNetwork string `json:"ip_network"`
 }
 
 // IPRestrictionUpdateRequest represents a request to update an IP restriction.
 type IPRestrictionUpdateRequest struct {
-	// CIDR is the IP address or CIDR range.
-	CIDR *string `json:"cidr,omitempty"`
+	// IPNetwork is the IP address or CIDR network range.
+	IPNetwork *string `json:"ip_network,omitempty"`
 
-	// Description is the description.
-	Description *string `json:"description,omitempty"`
-
-	// Enabled indicates if the restriction should be active.
-	Enabled *bool `json:"enabled,omitempty"`
+	// LastUsedOn is the timestamp of the last usage.
+	LastUsedOn *time.Time `json:"last_used_on,omitempty"`
 }
 
 // Role represents a user role within an organization.
@@ -234,28 +248,10 @@ type RoleListResponse struct {
 	Results []Role `json:"results"`
 }
 
-// OrganizationAttribute represents a custom attribute for an organization.
-type OrganizationAttribute struct {
-	// Key is the attribute key.
-	Key string `json:"key"`
-
-	// Value is the attribute value.
-	Value string `json:"value"`
-
-	// UpdatedOn is when the attribute was last updated.
-	UpdatedOn *time.Time `json:"updated_on,omitempty"`
-}
-
 // OrganizationAttributesResponse represents the response when getting organization attributes.
 type OrganizationAttributesResponse struct {
 	// Attributes contains the list of attributes.
 	Attributes []OrganizationAttribute `json:"attributes"`
-}
-
-// OrganizationAttributeUpdateRequest represents a request to update organization attributes.
-type OrganizationAttributeUpdateRequest struct {
-	// Attributes contains the attributes to set.
-	Attributes map[string]string `json:"attributes"`
 }
 
 // ProductPricing represents pricing for a specific product.

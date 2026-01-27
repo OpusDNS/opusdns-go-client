@@ -10,63 +10,81 @@ type DomainID = TypeID
 type DomainStatus string
 
 const (
-	DomainStatusActive           DomainStatus = "active"
-	DomainStatusPendingCreate    DomainStatus = "pending_create"
-	DomainStatusPendingTransfer  DomainStatus = "pending_transfer"
-	DomainStatusPendingRenew     DomainStatus = "pending_renew"
-	DomainStatusPendingDelete    DomainStatus = "pending_delete"
-	DomainStatusPendingRestore   DomainStatus = "pending_restore"
-	DomainStatusExpired          DomainStatus = "expired"
-	DomainStatusRedemptionPeriod DomainStatus = "redemption_period"
-	DomainStatusDeleted          DomainStatus = "deleted"
+	// Standard EPP statuses
+	DomainStatusOK                       DomainStatus = "ok"
+	DomainStatusServerTransferProhibited DomainStatus = "serverTransferProhibited"
+	DomainStatusServerUpdateProhibited   DomainStatus = "serverUpdateProhibited"
+	DomainStatusServerDeleteProhibited   DomainStatus = "serverDeleteProhibited"
+	DomainStatusServerRenewProhibited    DomainStatus = "serverRenewProhibited"
+	DomainStatusServerRestoreProhibited  DomainStatus = "serverRestoreProhibited"
+	DomainStatusServerHold               DomainStatus = "serverHold"
+	DomainStatusTransferPeriod           DomainStatus = "transferPeriod"
+	DomainStatusRenewPeriod              DomainStatus = "renewPeriod"
+	DomainStatusRedemptionPeriod         DomainStatus = "redemptionPeriod"
+	DomainStatusPendingUpdate            DomainStatus = "pendingUpdate"
+	DomainStatusPendingTransfer          DomainStatus = "pendingTransfer"
+	DomainStatusPendingRestore           DomainStatus = "pendingRestore"
+	DomainStatusPendingRenew             DomainStatus = "pendingRenew"
+	DomainStatusPendingDelete            DomainStatus = "pendingDelete"
+	DomainStatusPendingCreate            DomainStatus = "pendingCreate"
+	DomainStatusInactive                 DomainStatus = "inactive"
+	DomainStatusAutoRenewPeriod          DomainStatus = "autoRenewPeriod"
+	DomainStatusAddPeriod                DomainStatus = "addPeriod"
+	DomainStatusDeleted                  DomainStatus = "deleted"
+	DomainStatusClientTransferProhibited DomainStatus = "clientTransferProhibited"
+	DomainStatusClientUpdateProhibited   DomainStatus = "clientUpdateProhibited"
+	DomainStatusClientDeleteProhibited   DomainStatus = "clientDeleteProhibited"
+	DomainStatusClientRenewProhibited    DomainStatus = "clientRenewProhibited"
+	DomainStatusClientHold               DomainStatus = "clientHold"
+	DomainStatusFree                     DomainStatus = "free"
+	DomainStatusConnect                  DomainStatus = "connect"
+	DomainStatusFailed                   DomainStatus = "failed"
+	DomainStatusInvalid                  DomainStatus = "invalid"
 )
 
-// RenewMode represents the renewal mode for a domain.
-type RenewMode string
+// PeriodUnit represents the unit of time for a domain period.
+type PeriodUnit string
 
 const (
-	// RenewModeRenew indicates the domain will auto-renew.
-	RenewModeRenew RenewMode = "renew"
+	// PeriodUnitYear represents years.
+	PeriodUnitYear PeriodUnit = "y"
 
-	// RenewModeExpire indicates the domain will expire without renewal.
-	RenewModeExpire RenewMode = "expire"
+	// PeriodUnitMonth represents months.
+	PeriodUnitMonth PeriodUnit = "m"
+
+	// PeriodUnitDay represents days.
+	PeriodUnitDay PeriodUnit = "d"
+)
+
+// DomainPeriod represents a registration/renewal period.
+type DomainPeriod struct {
+	// Value is the amount of time in the specified unit.
+	Value int `json:"value"`
+
+	// Unit is the unit of time (y, m, d).
+	Unit PeriodUnit `json:"unit"`
+}
+
+// RenewalMode represents the renewal mode for a domain.
+type RenewalMode string
+
+const (
+	// RenewalModeRenew indicates the domain will auto-renew.
+	RenewalModeRenew RenewalMode = "renew"
+
+	// RenewalModeExpire indicates the domain will expire without renewal.
+	RenewalModeExpire RenewalMode = "expire"
 )
 
 // IsAutoRenew returns true if the domain is set to auto-renew.
-func (r RenewMode) IsAutoRenew() bool {
-	return r == RenewModeRenew
+func (r RenewalMode) IsAutoRenew() bool {
+	return r == RenewalModeRenew
 }
 
-// RenewModePtr returns a pointer to the given RenewMode.
-func RenewModePtr(r RenewMode) *RenewMode {
+// RenewalModePtr returns a pointer to the given RenewalMode.
+func RenewalModePtr(r RenewalMode) *RenewalMode {
 	return &r
 }
-
-// DomainClientStatus represents client-side domain statuses.
-type DomainClientStatus string
-
-const (
-	DomainClientStatusTransferProhibited DomainClientStatus = "clientTransferProhibited"
-	DomainClientStatusUpdateProhibited   DomainClientStatus = "clientUpdateProhibited"
-	DomainClientStatusDeleteProhibited   DomainClientStatus = "clientDeleteProhibited"
-	DomainClientStatusRenewProhibited    DomainClientStatus = "clientRenewProhibited"
-	DomainClientStatusHold               DomainClientStatus = "clientHold"
-)
-
-// DomainServerStatus represents server-side domain statuses.
-type DomainServerStatus string
-
-const (
-	DomainServerStatusOK                 DomainServerStatus = "ok"
-	DomainServerStatusTransferProhibited DomainServerStatus = "serverTransferProhibited"
-	DomainServerStatusUpdateProhibited   DomainServerStatus = "serverUpdateProhibited"
-	DomainServerStatusDeleteProhibited   DomainServerStatus = "serverDeleteProhibited"
-	DomainServerStatusRenewProhibited    DomainServerStatus = "serverRenewProhibited"
-	DomainServerStatusHold               DomainServerStatus = "serverHold"
-	DomainServerStatusPendingDelete      DomainServerStatus = "pendingDelete"
-	DomainServerStatusPendingTransfer    DomainServerStatus = "pendingTransfer"
-	DomainServerStatusRedemptionPeriod   DomainServerStatus = "redemptionPeriod"
-)
 
 // DomainContactType represents the type of contact for a domain.
 type DomainContactType string
@@ -96,6 +114,15 @@ type Domain struct {
 	// Name is the domain name (e.g., "example.com").
 	Name string `json:"name"`
 
+	// SLD is the second-level domain (e.g., "example" in "example.com").
+	SLD string `json:"sld"`
+
+	// TLD is the top-level domain (e.g., "com" in "example.com").
+	TLD string `json:"tld"`
+
+	// ROID is the registry object identifier for the domain.
+	ROID string `json:"roid"`
+
 	// OwnerID is the organization ID that owns the domain.
 	OwnerID TypeID `json:"owner_id,omitempty"`
 
@@ -111,11 +138,8 @@ type Domain struct {
 	// Hosts contains subordinate hosts (glue records) for the domain.
 	Hosts []DomainHost `json:"hosts,omitempty"`
 
-	// RegistryStatuses contains the server-side statuses.
-	RegistryStatuses []DomainServerStatus `json:"registry_statuses,omitempty"`
-
-	// ClientStatuses contains the client-side statuses.
-	ClientStatuses []DomainClientStatus `json:"client_statuses,omitempty"`
+	// RegistryStatuses contains all the domain statuses from the registry.
+	RegistryStatuses []string `json:"registry_statuses,omitempty"`
 
 	// AuthCode is the authorization code for transfers.
 	AuthCode *string `json:"auth_code,omitempty"`
@@ -123,8 +147,8 @@ type Domain struct {
 	// AuthCodeExpiresOn is when the auth code expires.
 	AuthCodeExpiresOn *time.Time `json:"auth_code_expires_on,omitempty"`
 
-	// RenewMode indicates the renewal mode (renew or expire).
-	RenewMode RenewMode `json:"renewal_mode,omitempty"`
+	// RenewalMode indicates the renewal mode (renew or expire).
+	RenewalMode RenewalMode `json:"renewal_mode,omitempty"`
 
 	// TransferLock indicates if transfers are prohibited.
 	TransferLock bool `json:"transfer_lock,omitempty"`
@@ -153,35 +177,23 @@ type Nameserver struct {
 	// Hostname is the nameserver hostname.
 	Hostname string `json:"hostname"`
 
-	// IPv4 is the optional IPv4 glue record.
-	IPv4 *string `json:"ipv4,omitempty"`
-
-	// IPv6 is the optional IPv6 glue record.
-	IPv6 *string `json:"ipv6,omitempty"`
+	// IPAddresses contains the IP addresses of the nameserver (both IPv4 and IPv6).
+	IPAddresses []string `json:"ip_addresses,omitempty"`
 }
 
 // DomainContact represents a contact associated with a domain.
 type DomainContact struct {
-	// Type is the contact type (registrant, admin, tech, billing).
-	Type DomainContactType `json:"type"`
-
 	// ContactID is the ID of the contact.
 	ContactID ContactID `json:"contact_id"`
 
-	// Attributes contains additional contact attributes.
-	Attributes map[string]string `json:"attributes,omitempty"`
+	// ContactType is the contact type (registrant, admin, tech, billing).
+	ContactType DomainContactType `json:"contact_type"`
 }
 
 // DomainHost represents a subordinate host (glue record) for a domain.
 type DomainHost struct {
-	// Hostname is the full hostname.
-	Hostname string `json:"hostname"`
-
-	// IPv4Addresses contains the IPv4 addresses.
-	IPv4Addresses []string `json:"ipv4_addresses,omitempty"`
-
-	// IPv6Addresses contains the IPv6 addresses.
-	IPv6Addresses []string `json:"ipv6_addresses,omitempty"`
+	// HostID is the unique identifier for the host.
+	HostID TypeID `json:"host_id"`
 }
 
 // DomainListResponse represents the paginated response when listing domains.
@@ -216,20 +228,23 @@ type DomainCreateRequest struct {
 	// Name is the domain name to register.
 	Name string `json:"name"`
 
-	// Period is the registration period in years.
-	Period int `json:"period,omitempty"`
+	// Contacts maps contact types to contact handles.
+	Contacts map[DomainContactType][]ContactHandle `json:"contacts"`
 
-	// Contacts maps contact types to contact IDs.
-	Contacts map[DomainContactType]ContactHandle `json:"contacts"`
+	// RenewalMode sets the renewal mode (renew or expire).
+	RenewalMode RenewalMode `json:"renewal_mode"`
+
+	// Period is the registration period.
+	Period DomainPeriod `json:"period"`
 
 	// Nameservers is the list of nameservers.
 	Nameservers []Nameserver `json:"nameservers,omitempty"`
 
-	// TransferLock enables transfer lock after registration.
-	TransferLock *bool `json:"transfer_lock,omitempty"`
+	// AuthCode is the auth code used for the domain (optional).
+	AuthCode *string `json:"auth_code,omitempty"`
 
-	// RenewMode sets the renewal mode (renew or expire).
-	RenewMode *RenewMode `json:"renewal_mode,omitempty"`
+	// CreateZone creates a zone for the domain on OpusDNS nameserver infrastructure.
+	CreateZone bool `json:"create_zone,omitempty"`
 }
 
 // ContactHandle represents a contact reference with optional attributes.
@@ -252,14 +267,14 @@ type DomainUpdateRequest struct {
 	// TransferLock updates the transfer lock status.
 	TransferLock *bool `json:"transfer_lock,omitempty"`
 
-	// RenewMode updates the renewal mode (renew or expire).
-	RenewMode *RenewMode `json:"renewal_mode,omitempty"`
+	// RenewalMode updates the renewal mode (renew or expire).
+	RenewalMode *RenewalMode `json:"renewal_mode,omitempty"`
 
-	// AddStatuses are client statuses to add.
-	AddStatuses []DomainClientStatus `json:"add_statuses,omitempty"`
+	// AddStatuses are domain statuses to add.
+	AddStatuses []string `json:"add_statuses,omitempty"`
 
-	// RemoveStatuses are client statuses to remove.
-	RemoveStatuses []DomainClientStatus `json:"remove_statuses,omitempty"`
+	// RemoveStatuses are domain statuses to remove.
+	RemoveStatuses []string `json:"remove_statuses,omitempty"`
 }
 
 // DomainTransferRequest represents a request to transfer a domain.
@@ -333,8 +348,8 @@ type ListDomainsOptions struct {
 	// TransferLock filters by transfer lock status.
 	TransferLock *bool
 
-	// RenewMode filters by renewal mode.
-	RenewMode *RenewMode
+	// RenewalMode filters by renewal mode.
+	RenewalMode *RenewalMode
 
 	// ExpiresAfter filters domains expiring after this date.
 	ExpiresAfter *time.Time

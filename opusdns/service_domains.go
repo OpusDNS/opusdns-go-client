@@ -78,8 +78,8 @@ func (s *DomainsService) ListDomainsPage(ctx context.Context, opts *models.ListD
 		if opts.TransferLock != nil {
 			query.Set("transfer_lock", strconv.FormatBool(*opts.TransferLock))
 		}
-		if opts.RenewMode != nil {
-			query.Set("renewal_mode", string(*opts.RenewMode))
+		if opts.RenewalMode != nil {
+			query.Set("renewal_mode", string(*opts.RenewalMode))
 		}
 		if opts.ExpiresAfter != nil {
 			query.Set("expires_after", opts.ExpiresAfter.Format(time.RFC3339))

@@ -14,7 +14,7 @@ type UsersService struct {
 }
 
 // GetCurrentUser retrieves the currently authenticated user.
-func (s *UsersService) GetCurrentUser(ctx context.Context) (*models.CurrentUser, error) {
+func (s *UsersService) GetCurrentUser(ctx context.Context) (*models.User, error) {
 	path := s.client.http.BuildPath("users", "me")
 
 	resp, err := s.client.http.Get(ctx, path, nil)
@@ -22,7 +22,7 @@ func (s *UsersService) GetCurrentUser(ctx context.Context) (*models.CurrentUser,
 		return nil, err
 	}
 
-	var user models.CurrentUser
+	var user models.User
 	if err := s.client.http.DecodeResponse(resp, &user); err != nil {
 		return nil, err
 	}
@@ -85,14 +85,11 @@ func (s *UsersService) ListUsersPage(ctx context.Context, opts *models.ListUsers
 		if opts.Email != "" {
 			query.Set("email", opts.Email)
 		}
-		if opts.Active != nil {
-			query.Set("active", strconv.FormatBool(*opts.Active))
+		if opts.Username != "" {
+			query.Set("username", opts.Username)
 		}
-		if opts.Verified != nil {
-			query.Set("verified", strconv.FormatBool(*opts.Verified))
-		}
-		if opts.RoleID != "" {
-			query.Set("role_id", string(opts.RoleID))
+		if opts.Status != "" {
+			query.Set("status", string(opts.Status))
 		}
 	}
 
@@ -165,52 +162,6 @@ func (s *UsersService) DeleteUser(ctx context.Context, userID models.UserID) err
 	path := s.client.http.BuildPath("users", string(userID))
 
 	resp, err := s.client.http.Delete(ctx, path)
-	if err != nil {
-		return err
-	}
-
-	return s.client.http.DecodeResponse(resp, nil)
-}
-
-// UpdateUserRoles updates a user's roles.
-func (s *UsersService) UpdateUserRoles(ctx context.Context, userID models.UserID, req *models.UserRolesUpdateRequest) (*models.User, error) {
-	path := s.client.http.BuildPath("users", string(userID), "roles")
-
-	resp, err := s.client.http.Put(ctx, path, req)
-	if err != nil {
-		return nil, err
-	}
-
-	var user models.User
-	if err := s.client.http.DecodeResponse(resp, &user); err != nil {
-		return nil, err
-	}
-
-	return &user, nil
-}
-
-// GetUserPermissions retrieves a user's permissions.
-func (s *UsersService) GetUserPermissions(ctx context.Context, userID models.UserID) (*models.UserPermissionsResponse, error) {
-	path := s.client.http.BuildPath("users", string(userID), "permissions")
-
-	resp, err := s.client.http.Get(ctx, path, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	var result models.UserPermissionsResponse
-	if err := s.client.http.DecodeResponse(resp, &result); err != nil {
-		return nil, err
-	}
-
-	return &result, nil
-}
-
-// ResetPassword resets the current user's password.
-func (s *UsersService) ResetPassword(ctx context.Context, req *models.PasswordResetRequest) error {
-	path := s.client.http.BuildPath("users", "me", "password-reset")
-
-	resp, err := s.client.http.Post(ctx, path, req)
 	if err != nil {
 		return err
 	}

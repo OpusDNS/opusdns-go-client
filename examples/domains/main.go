@@ -65,14 +65,14 @@ func listDomainsExample(ctx context.Context, client *opusdns.Client) {
 		if domain.ExpiresOn != nil {
 			expiresOn = domain.ExpiresOn.Format("2006-01-02")
 		}
-		autoRenew := "off"
-		if domain.AutoRenew {
-			autoRenew = "on"
+		renewMode := string(domain.RenewalMode)
+		if renewMode == "" {
+			renewMode = "N/A"
 		}
-		fmt.Printf("  - %s (expires: %s, auto-renew: %s)\n",
+		fmt.Printf("  - %s (expires: %s, renewal-mode: %s)\n",
 			domain.Name,
 			expiresOn,
-			autoRenew,
+			renewMode,
 		)
 	}
 }

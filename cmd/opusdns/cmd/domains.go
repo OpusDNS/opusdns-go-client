@@ -48,7 +48,7 @@ var domainsListCmd = &cobra.Command{
 			if domain.ExpiresOn != nil {
 				expiresOn = domain.ExpiresOn.Format("2006-01-02")
 			}
-			renewMode := string(domain.RenewMode)
+			renewMode := string(domain.RenewalMode)
 			if renewMode == "" {
 				renewMode = "unknown"
 			}
@@ -184,8 +184,8 @@ Examples:
 
 		if cmd.Flags().Changed("renewal-mode") {
 			renewalMode, _ := cmd.Flags().GetString("renewal-mode")
-			mode := models.RenewMode(renewalMode)
-			req.RenewMode = &mode
+			mode := models.RenewalMode(renewalMode)
+			req.RenewalMode = &mode
 			hasChanges = true
 		}
 
@@ -237,9 +237,6 @@ var domainsCheckCmd = &cobra.Command{
 			}
 			fmt.Printf("  %s: %s\n", avail.Domain, status)
 
-			if avail.Price != nil && avail.Price.RegisterPrice != nil {
-				fmt.Printf("      Price: %s %s\n", *avail.Price.RegisterPrice, avail.Price.Currency)
-			}
 		}
 
 		return nil

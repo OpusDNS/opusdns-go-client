@@ -33,18 +33,6 @@ type DomainAvailability struct {
 
 	// Status is the availability status.
 	Status DomainAvailabilityStatus `json:"status"`
-
-	// Reason provides additional context for the status (optional).
-	Reason *string `json:"reason,omitempty"`
-
-	// Price contains pricing information if available.
-	Price *DomainPrice `json:"price,omitempty"`
-
-	// Premium indicates if this is a premium domain.
-	Premium bool `json:"premium,omitempty"`
-
-	// TMCHClaimKey is the TMCH claim key if applicable.
-	TMCHClaimKey *string `json:"tmch_claim_key,omitempty"`
 }
 
 // DomainPrice represents pricing information for a domain.
