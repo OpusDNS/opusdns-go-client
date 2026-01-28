@@ -34,13 +34,18 @@ const (
 
 	// MaxPageSize is the maximum allowed page size.
 	MaxPageSize = 1000
-
-	// Version is the client library version.
-	Version = "1.0.0"
-
-	// UserAgent is the default user agent string.
-	UserAgent = "opusdns-go-client/" + Version
 )
+
+// Version information - can be set via ldflags at build time
+var (
+	// Version is the client library version.
+	Version = "dev"
+)
+
+// UserAgent returns the default user agent string.
+func GetUserAgent() string {
+	return "opusdns-go-client/" + Version
+}
 
 // Environment variable names for configuration.
 const (
@@ -203,7 +208,7 @@ func NewConfig(opts ...Option) *Config {
 		MaxRetries:   DefaultMaxRetries,
 		RetryWaitMin: DefaultRetryWaitMin,
 		RetryWaitMax: DefaultRetryWaitMax,
-		UserAgent:    UserAgent,
+		UserAgent:    GetUserAgent(),
 	}
 
 	// Apply environment variables
