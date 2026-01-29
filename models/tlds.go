@@ -3,12 +3,26 @@ package models
 
 import "time"
 
-// TLD represents a top-level domain with its configuration.
-type TLD struct {
+// TLDInfo represents the basic TLD name and type information.
+type TLDInfo struct {
 	// Name is the TLD name without the leading dot (e.g., "com", "de", "io").
 	Name string `json:"name"`
 
 	// Type is the TLD type (e.g., "gTLD", "ccTLD", "newGTLD").
+	Type TLDType `json:"type,omitempty"`
+
+	// ThirdLevelStructure contains third level domain configurations.
+	ThirdLevelStructure []interface{} `json:"third_level_structure,omitempty"`
+}
+
+// TLD represents a top-level domain with its configuration.
+type TLD struct {
+	// Name is the TLD name without the leading dot (e.g., "com", "de", "io").
+	// This is populated from the nested tlds array for convenience.
+	Name string `json:"name"`
+
+	// Type is the TLD type (e.g., "gTLD", "ccTLD", "newGTLD").
+	// This is populated from the nested tlds array for convenience.
 	Type TLDType `json:"type,omitempty"`
 
 	// Available indicates whether the TLD is available for registration.
@@ -160,13 +174,17 @@ const (
 	AllocationMethodLottery AllocationMethodType = "lottery"
 )
 
-// TLDListResponse represents the paginated response when listing TLDs.
-type TLDListResponse struct {
-	// Results contains the list of TLDs for the current page.
-	Results []TLD `json:"results"`
+// TLDConfiguration represents the full TLD configuration from the API.
+type TLDConfiguration struct {
+	Enabled        bool      `json:"enabled"`
+	ParkingEnabled bool      `json:"parking_enabled,omitempty"`
+	TLDs           []TLDInfo `json:"tlds"`
+}
 
-	// Pagination contains the pagination metadata.
-	Pagination Pagination `json:"pagination"`
+// TLDListResponse represents the response when listing TLDs.
+type TLDListResponse struct {
+	// TLDConfigurations contains the list of TLD configurations.
+	TLDConfigurations []TLDConfiguration `json:"tlds"`
 }
 
 // TLDPortfolio represents a collection of TLDs available to an organization.

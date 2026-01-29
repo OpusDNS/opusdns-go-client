@@ -259,22 +259,17 @@ type ContactHandle struct {
 // DomainUpdateRequest represents a request to update a domain.
 type DomainUpdateRequest struct {
 	// Contacts maps contact types to contact handles to update.
-	Contacts map[DomainContactType]ContactHandle `json:"contacts,omitempty"`
+	Contacts map[DomainContactType][]ContactHandle `json:"contacts,omitempty"`
 
 	// Nameservers is the new list of nameservers.
 	Nameservers []Nameserver `json:"nameservers,omitempty"`
 
-	// TransferLock updates the transfer lock status.
-	TransferLock *bool `json:"transfer_lock,omitempty"`
-
 	// RenewalMode updates the renewal mode (renew or expire).
 	RenewalMode *RenewalMode `json:"renewal_mode,omitempty"`
 
-	// AddStatuses are domain statuses to add.
-	AddStatuses []string `json:"add_statuses,omitempty"`
-
-	// RemoveStatuses are domain statuses to remove.
-	RemoveStatuses []string `json:"remove_statuses,omitempty"`
+	// ClientStatuses is the complete list of client statuses to set on the domain.
+	// This replaces the entire client status list.
+	Statuses []string `json:"statuses"`
 }
 
 // DomainTransferRequest represents a request to transfer a domain.
@@ -286,7 +281,10 @@ type DomainTransferRequest struct {
 	AuthCode string `json:"auth_code"`
 
 	// Contacts maps contact types to contact handles.
-	Contacts map[DomainContactType]ContactHandle `json:"contacts,omitempty"`
+	Contacts map[DomainContactType][]ContactHandle `json:"contacts,omitempty"`
+
+	// RenewalMode sets the renewal mode (renew or expire).
+	RenewalMode RenewalMode `json:"renewal_mode"`
 
 	// Nameservers is the list of nameservers to use after transfer.
 	Nameservers []Nameserver `json:"nameservers,omitempty"`

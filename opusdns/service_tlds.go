@@ -14,6 +14,8 @@ type TLDsService struct {
 }
 
 // ListTLDs retrieves all available TLDs.
+// The API returns a nested structure where each TLD configuration contains
+// an array of TLD info objects. This method flattens that structure.
 func (s *TLDsService) ListTLDs(ctx context.Context, opts *models.ListTLDsOptions) ([]models.TLD, error) {
 	path := s.client.http.BuildPath("tlds", "")
 
@@ -52,7 +54,24 @@ func (s *TLDsService) ListTLDs(ctx context.Context, opts *models.ListTLDsOptions
 		return nil, err
 	}
 
-	return result.Results, nil
+	// Extract TLDs from the nested structure
+	// The API returns: { "tlds": [{ "enabled": true, "tlds": [{"name": "com", "type": "gTLD"}] }] }
+	var tlds []models.TLD
+	for _, config := range result.TLDConfigurations {
+		if !config.Enabled {
+			continue
+		}
+		for _, tldInfo := range config.TLDs {
+			tld := models.TLD{
+				Name:      tldInfo.Name,
+				Type:      tldInfo.Type,
+				Available: config.Enabled,
+			}
+			tlds = append(tlds, tld)
+		}
+	}
+
+	return tlds, nil
 }
 
 // GetTLD retrieves details for a specific TLD.
