@@ -167,11 +167,11 @@ var domainsRenewCmd = &cobra.Command{
 var domainsUpdateCmd = &cobra.Command{
 	Use:   "update <domain-name>",
 	Short: "Update domain settings",
-	Long: `Update domain settings such as renewal mode and transfer lock.
+	Long: `Update domain settings such as renewal mode.
 
 Examples:
   opusdns domains update example.com --renewal-mode renew
-  opusdns domains update example.com --transfer-lock=true`,
+  opusdns domains update example.com --renewal-mode expire`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx, cancel := getContext()
@@ -189,14 +189,8 @@ Examples:
 			hasChanges = true
 		}
 
-		if cmd.Flags().Changed("transfer-lock") {
-			transferLock, _ := cmd.Flags().GetBool("transfer-lock")
-			req.TransferLock = &transferLock
-			hasChanges = true
-		}
-
 		if !hasChanges {
-			return fmt.Errorf("no changes specified. Use --renewal-mode or --transfer-lock")
+			return fmt.Errorf("no changes specified. Use --renewal-mode")
 		}
 
 		domain, err := getClient().Domains.UpdateDomain(ctx, domainName, req)
@@ -265,7 +259,6 @@ func init() {
 	// Update subcommand
 	domainsCmd.AddCommand(domainsUpdateCmd)
 	domainsUpdateCmd.Flags().String("renewal-mode", "", "Renewal mode (renew or expire)")
-	domainsUpdateCmd.Flags().Bool("transfer-lock", false, "Enable/disable transfer lock")
 
 	// Check availability subcommand
 	domainsCmd.AddCommand(domainsCheckCmd)
