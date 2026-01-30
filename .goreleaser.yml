@@ -36,7 +36,7 @@ archives:
           - zip
     name_template: >-
       {{ .ProjectName }}_
-      {{- .Version }}_
+      v{{- .Version }}_
       {{- .Os }}_
       {{- .Arch }}
 
@@ -63,4 +63,4 @@ release:
     name: opusdns-go-client
   draft: false
   prerelease: auto
-  name_template: "{{.Version}}"
+  name_template: "v{{.Version}}"
