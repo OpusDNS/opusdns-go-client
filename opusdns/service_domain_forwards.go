@@ -159,37 +159,27 @@ func (s *DomainForwardsService) DeleteDomainForwardConfig(ctx context.Context, h
 }
 
 // EnableDomainForward enables a domain forward.
-func (s *DomainForwardsService) EnableDomainForward(ctx context.Context, hostname string) (*models.DomainForward, error) {
+func (s *DomainForwardsService) EnableDomainForward(ctx context.Context, hostname string) error {
 	path := s.client.http.BuildPath("domain-forwards", url.PathEscape(hostname), "enable")
 
-	resp, err := s.client.http.Post(ctx, path, nil)
+	resp, err := s.client.http.Patch(ctx, path, nil)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	var domainForward models.DomainForward
-	if err := s.client.http.DecodeResponse(resp, &domainForward); err != nil {
-		return nil, err
-	}
-
-	return &domainForward, nil
+	return s.client.http.DecodeResponse(resp, nil)
 }
 
 // DisableDomainForward disables a domain forward.
-func (s *DomainForwardsService) DisableDomainForward(ctx context.Context, hostname string) (*models.DomainForward, error) {
+func (s *DomainForwardsService) DisableDomainForward(ctx context.Context, hostname string) error {
 	path := s.client.http.BuildPath("domain-forwards", url.PathEscape(hostname), "disable")
 
-	resp, err := s.client.http.Post(ctx, path, nil)
+	resp, err := s.client.http.Patch(ctx, path, nil)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	var domainForward models.DomainForward
-	if err := s.client.http.DecodeResponse(resp, &domainForward); err != nil {
-		return nil, err
-	}
-
-	return &domainForward, nil
+	return s.client.http.DecodeResponse(resp, nil)
 }
 
 // ListDomainForwardsByZone retrieves domain forwards for a specific DNS zone.
