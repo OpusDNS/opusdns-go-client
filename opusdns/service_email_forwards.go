@@ -130,37 +130,27 @@ func (s *EmailForwardsService) DeleteEmailForward(ctx context.Context, emailForw
 }
 
 // EnableEmailForward enables an email forward.
-func (s *EmailForwardsService) EnableEmailForward(ctx context.Context, emailForwardID models.EmailForwardID) (*models.EmailForward, error) {
+func (s *EmailForwardsService) EnableEmailForward(ctx context.Context, emailForwardID models.EmailForwardID) error {
 	path := s.client.http.BuildPath("email-forwards", string(emailForwardID), "enable")
 
-	resp, err := s.client.http.Post(ctx, path, nil)
+	resp, err := s.client.http.Patch(ctx, path, nil)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	var emailForward models.EmailForward
-	if err := s.client.http.DecodeResponse(resp, &emailForward); err != nil {
-		return nil, err
-	}
-
-	return &emailForward, nil
+	return s.client.http.DecodeResponse(resp, nil)
 }
 
 // DisableEmailForward disables an email forward.
-func (s *EmailForwardsService) DisableEmailForward(ctx context.Context, emailForwardID models.EmailForwardID) (*models.EmailForward, error) {
+func (s *EmailForwardsService) DisableEmailForward(ctx context.Context, emailForwardID models.EmailForwardID) error {
 	path := s.client.http.BuildPath("email-forwards", string(emailForwardID), "disable")
 
-	resp, err := s.client.http.Post(ctx, path, nil)
+	resp, err := s.client.http.Patch(ctx, path, nil)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	var emailForward models.EmailForward
-	if err := s.client.http.DecodeResponse(resp, &emailForward); err != nil {
-		return nil, err
-	}
-
-	return &emailForward, nil
+	return s.client.http.DecodeResponse(resp, nil)
 }
 
 // CreateAlias creates a new email alias.
