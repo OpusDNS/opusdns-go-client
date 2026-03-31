@@ -39,6 +39,12 @@ type Client struct {
 
 	// Events provides access to event and audit log data.
 	Events *EventsService
+
+	// Jobs provides access to async job batch management.
+	Jobs *JobsService
+
+	// Reports provides access to report generation and download.
+	Reports *ReportsService
 }
 
 // NewClient creates a new OpusDNS client with the given options.
@@ -77,6 +83,8 @@ func NewClient(opts ...Option) (*Client, error) {
 	client.Organizations = &OrganizationsService{client: client}
 	client.Users = &UsersService{client: client}
 	client.Events = &EventsService{client: client}
+	client.Jobs = &JobsService{client: client}
+	client.Reports = &ReportsService{client: client}
 
 	return client, nil
 }
@@ -108,6 +116,8 @@ func NewClientWithConfig(config *Config) (*Client, error) {
 	client.Organizations = &OrganizationsService{client: client}
 	client.Users = &UsersService{client: client}
 	client.Events = &EventsService{client: client}
+	client.Jobs = &JobsService{client: client}
+	client.Reports = &ReportsService{client: client}
 
 	return client, nil
 }

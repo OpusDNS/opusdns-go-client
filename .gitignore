@@ -6,7 +6,7 @@
 *.dylib
 
 # CLI binaries (built from cmd/)
-opusdns
+opusdns/opusdns
 create-zone
 list-domains
 list-zones

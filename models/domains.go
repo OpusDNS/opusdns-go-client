@@ -256,6 +256,16 @@ type ContactHandle struct {
 	Attributes map[string]string `json:"attributes,omitempty"`
 }
 
+// StatusChanges represents add/remove semantics for domain client statuses.
+// Cannot be used together with Statuses in DomainUpdateRequest.
+type StatusChanges struct {
+	// Add is a list of client statuses to add.
+	Add []string `json:"add,omitempty"`
+
+	// Remove is a list of client statuses to remove.
+	Remove []string `json:"remove,omitempty"`
+}
+
 // DomainUpdateRequest represents a request to update a domain.
 type DomainUpdateRequest struct {
 	// Contacts maps contact types to contact handles to update.
@@ -267,9 +277,14 @@ type DomainUpdateRequest struct {
 	// RenewalMode updates the renewal mode (renew or expire).
 	RenewalMode *RenewalMode `json:"renewal_mode,omitempty"`
 
-	// ClientStatuses is the complete list of client statuses to set on the domain.
+	// Statuses is the complete list of client statuses to set on the domain.
 	// This replaces the entire client status list.
-	Statuses []string `json:"statuses"`
+	// Mutually exclusive with StatusChanges.
+	Statuses []string `json:"statuses,omitempty"`
+
+	// StatusChanges provides add/remove semantics for client statuses.
+	// Mutually exclusive with Statuses.
+	StatusChanges *StatusChanges `json:"status_changes,omitempty"`
 }
 
 // DomainTransferRequest represents a request to transfer a domain.

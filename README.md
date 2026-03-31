@@ -125,6 +125,8 @@ The client provides access to the following services:
 | `client.Organizations` | Organization and billing management |
 | `client.Users` | User management |
 | `client.Events` | Event and audit log access |
+| `client.Jobs` | Async job batch management |
+| `client.Reports` | Report generation and download |
 
 ## DNS Management
 
@@ -348,6 +350,89 @@ forward, err := client.DomainForwards.CreateDomainForward(ctx, &models.DomainFor
         },
     },
 })
+```
+
+## Jobs (Async Batch Operations)
+
+### Create a Job Batch
+
+```go
+batch, err := client.Jobs.CreateBatch(ctx, &models.JobBatchRequest{
+    Label: models.StringPtr("Bulk domain registration"),
+    Commands: []models.CommandPayload{
+        {
+            Command: "domain_create",
+            Payload: map[string]interface{}{
+                "name":   "example1.com",
+                "period": map[string]interface{}{"value": 1, "unit": "y"},
+            },
+        },
+        {
+            Command: "domain_create",
+            Payload: map[string]interface{}{
+                "name":   "example2.com",
+                "period": map[string]interface{}{"value": 1, "unit": "y"},
+            },
+        },
+    },
+})
+fmt.Printf("Batch %s: %d jobs created\n", batch.BatchID, batch.JobsCreated)
+```
+
+### Monitor Batch Progress
+
+```go
+status, err := client.Jobs.GetBatchStatus(ctx, batchID)
+fmt.Printf("Progress: %.1f%% (%d/%d succeeded)\n",
+    status.ProgressPercentage, status.Succeeded, status.Total)
+```
+
+### List Jobs in a Batch
+
+```go
+// List failed jobs
+jobs, err := client.Jobs.ListBatchJobs(ctx, batchID, &models.ListBatchJobsOptions{
+    Status: []models.JobStatus{models.JobStatusFailed, models.JobStatusDeadLetter},
+})
+```
+
+### Pause/Resume a Batch
+
+```go
+err := client.Jobs.PauseBatch(ctx, batchID)
+err = client.Jobs.ResumeBatch(ctx, batchID)
+```
+
+## Reports
+
+### Generate a Report
+
+```go
+report, err := client.Reports.CreateReport(ctx, &models.CreateReportRequest{
+    ReportType: models.ReportTypeDomainInventory,
+})
+fmt.Printf("Report %s queued (status: %s)\n", report.ReportID, report.Status)
+```
+
+### List Reports
+
+```go
+reports, err := client.Reports.ListReports(ctx, &models.ListReportsOptions{
+    ReportType: []models.ReportType{models.ReportTypeDomainInventory},
+    Status:     []models.ReportStatus{models.ReportStatusCompleted},
+})
+```
+
+### Download a Report
+
+```go
+data, err := client.Reports.DownloadReport(ctx, reportID)
+os.WriteFile("report.zip", data, 0644)
+
+// Or stream to a writer
+f, _ := os.Create("report.zip")
+defer f.Close()
+err = client.Reports.DownloadReportToWriter(ctx, reportID, f)
 ```
 
 ## Error Handling

@@ -29,7 +29,11 @@ type Pagination struct {
 	HasPreviousPage bool `json:"has_previous_page"`
 
 	// TotalCount is the total number of items across all pages.
+	// Deprecated: Use TotalItems instead.
 	TotalCount int `json:"total_count,omitempty"`
+
+	// TotalItems is the total number of items across all pages.
+	TotalItems int `json:"total_items,omitempty"`
 
 	// PageSize is the number of items per page.
 	PageSize int `json:"page_size,omitempty"`
