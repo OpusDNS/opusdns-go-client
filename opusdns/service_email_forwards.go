@@ -174,7 +174,7 @@ func (s *EmailForwardsService) CreateAlias(ctx context.Context, emailForwardID m
 func (s *EmailForwardsService) UpdateAlias(ctx context.Context, emailForwardID models.EmailForwardID, aliasID models.EmailForwardAliasID, req *models.EmailForwardAliasUpdate) (*models.EmailForwardAlias, error) {
 	path := s.client.http.BuildPath("email-forwards", string(emailForwardID), "aliases", string(aliasID))
 
-	resp, err := s.client.http.Patch(ctx, path, req)
+	resp, err := s.client.http.Put(ctx, path, req)
 	if err != nil {
 		return nil, err
 	}

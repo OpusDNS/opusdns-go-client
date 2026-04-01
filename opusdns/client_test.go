@@ -527,3 +527,125 @@ func TestUsersService_GetCurrentUser(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "user@example.com", user.Email)
 }
+
+func TestDomainForwardsService_UpdateDomainForwardConfig(t *testing.T) {
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+
+		switch requests {
+		case 1:
+			assert.Equal(t, "PUT", r.Method)
+			assert.Equal(t, "/v1/domain-forwards/adaenemark.de/http", r.URL.Path)
+
+			var req models.DomainForwardProtocolSetRequest
+			err := json.NewDecoder(r.Body).Decode(&req)
+			require.NoError(t, err)
+			require.Len(t, req.Redirects, 1)
+			assert.Equal(t, "/shop", req.Redirects[0].RequestPath)
+
+			_ = json.NewEncoder(w).Encode(models.DomainForwardProtocolSet{
+				Redirects: []models.HttpRedirect{
+					{
+						RequestProtocol: models.HttpProtocolHTTP,
+						RequestHostname: "adaenemark.de",
+						RequestPath:     "/shop",
+						TargetProtocol:  models.HttpProtocolHTTPS,
+						TargetHostname:  "www.adaenemark.de",
+						TargetPath:      "/store",
+						RedirectCode:    models.RedirectCodePermanent,
+					},
+				},
+			})
+		case 2:
+			assert.Equal(t, "GET", r.Method)
+			assert.Equal(t, "/v1/domain-forwards/adaenemark.de", r.URL.Path)
+
+			_ = json.NewEncoder(w).Encode(models.DomainForward{
+				Hostname: "adaenemark.de",
+				Enabled:  true,
+				HTTP: &models.DomainForwardProtocolSet{
+					Redirects: []models.HttpRedirect{
+						{
+							RequestProtocol: models.HttpProtocolHTTP,
+							RequestHostname: "adaenemark.de",
+							RequestPath:     "/shop",
+							TargetProtocol:  models.HttpProtocolHTTPS,
+							TargetHostname:  "www.adaenemark.de",
+							TargetPath:      "/store",
+							RedirectCode:    models.RedirectCodePermanent,
+						},
+					},
+				},
+			})
+		default:
+			t.Fatalf("unexpected request %d: %s %s", requests, r.Method, r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+	require.NoError(t, err)
+
+	forward, err := client.DomainForwards.UpdateDomainForwardConfig(
+		context.Background(),
+		"adaenemark.de",
+		models.HttpProtocolHTTP,
+		&models.DomainForwardProtocolSetRequest{
+			Redirects: []models.HttpRedirectRequest{
+				{
+					RequestPath:    "/shop",
+					TargetProtocol: models.HttpProtocolHTTPS,
+					TargetHostname: "www.adaenemark.de",
+					TargetPath:     "/store",
+					RedirectCode:   models.RedirectCodePermanent,
+				},
+			},
+		},
+	)
+
+	require.NoError(t, err)
+	require.NotNil(t, forward)
+	assert.Equal(t, "adaenemark.de", forward.Hostname)
+	require.NotNil(t, forward.HTTP)
+	require.Len(t, forward.HTTP.Redirects, 1)
+	assert.Equal(t, "/store", forward.HTTP.Redirects[0].TargetPath)
+	assert.Equal(t, 2, requests)
+}
+
+func TestEmailForwardsService_UpdateAlias(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "PUT", r.Method)
+		assert.Equal(t, "/v1/email-forwards/email_forward_123/aliases/email_forward_alias_456", r.URL.Path)
+
+		var req models.EmailForwardAliasUpdate
+		err := json.NewDecoder(r.Body).Decode(&req)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"new@adaenemark.de"}, req.ForwardTo)
+
+		_ = json.NewEncoder(w).Encode(models.EmailForwardAlias{
+			EmailForwardAliasID: models.EmailForwardAliasID("email_forward_alias_456"),
+			Alias:               "info",
+			ForwardTo:           []string{"new@adaenemark.de"},
+		})
+	}))
+	defer server.Close()
+
+	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+	require.NoError(t, err)
+
+	alias, err := client.EmailForwards.UpdateAlias(
+		context.Background(),
+		models.EmailForwardID("email_forward_123"),
+		models.EmailForwardAliasID("email_forward_alias_456"),
+		&models.EmailForwardAliasUpdate{
+			ForwardTo: []string{"new@adaenemark.de"},
+		},
+	)
+
+	require.NoError(t, err)
+	require.NotNil(t, alias)
+	assert.Equal(t, models.EmailForwardAliasID("email_forward_alias_456"), alias.EmailForwardAliasID)
+	assert.Equal(t, "info", alias.Alias)
+	assert.Equal(t, []string{"new@adaenemark.de"}, alias.ForwardTo)
+}
