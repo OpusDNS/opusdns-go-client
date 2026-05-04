@@ -191,6 +191,12 @@ func (s *DomainForwardsService) ListDomainForwardsByZone(ctx context.Context, zo
 		return nil, err
 	}
 
+	var zone models.DomainForwardZone
+	if err := s.client.http.DecodeResponse(resp, &zone); err == nil {
+		return zone.DomainForwards, nil
+	}
+
+	// Backwards-compatible fallback in case older API variants still return a raw list.
 	var result []models.DomainForward
 	if err := s.client.http.DecodeResponse(resp, &result); err != nil {
 		return nil, err
