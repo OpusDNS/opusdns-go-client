@@ -613,6 +613,39 @@ func TestDomainForwardsService_UpdateDomainForwardConfig(t *testing.T) {
 	assert.Equal(t, 2, requests)
 }
 
+func TestDomainForwardsService_ListDomainForwardsByZone(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "GET", r.Method)
+		assert.Equal(t, "/v1/dns/example.com/domain-forwards", r.URL.Path)
+
+		_ = json.NewEncoder(w).Encode(models.DomainForwardZone{
+			ZoneID:   "zone_123",
+			ZoneName: "example.com.",
+			DomainForwards: []models.DomainForward{
+				{
+					Hostname: "example.com.",
+					Enabled:  true,
+				},
+				{
+					Hostname: "www.example.com.",
+					Enabled:  true,
+				},
+			},
+		})
+	}))
+	defer server.Close()
+
+	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+	require.NoError(t, err)
+
+	forwards, err := client.DomainForwards.ListDomainForwardsByZone(context.Background(), "example.com")
+
+	require.NoError(t, err)
+	require.Len(t, forwards, 2)
+	assert.Equal(t, "example.com.", forwards[0].Hostname)
+	assert.Equal(t, "www.example.com.", forwards[1].Hostname)
+}
+
 func TestEmailForwardsService_UpdateAlias(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "PUT", r.Method)

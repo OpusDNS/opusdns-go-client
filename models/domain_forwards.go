@@ -45,7 +45,12 @@ const (
 type DomainForwardZoneSortField string
 
 const (
-	DomainForwardZoneSortByHostname DomainForwardZoneSortField = "hostname"
+	DomainForwardZoneSortByName      DomainForwardZoneSortField = "name"
+	DomainForwardZoneSortByCreatedOn DomainForwardZoneSortField = "created_on"
+	DomainForwardZoneSortByUpdatedOn DomainForwardZoneSortField = "updated_on"
+
+	// DomainForwardZoneSortByHostname is kept as a backwards-compatible alias.
+	DomainForwardZoneSortByHostname DomainForwardZoneSortField = DomainForwardZoneSortByName
 )
 
 // DomainForward represents a domain forwarding configuration.
@@ -119,17 +124,14 @@ type DomainForwardListResponse struct {
 
 // DomainForwardZone represents domain forwards associated with a DNS zone.
 type DomainForwardZone struct {
-	// Hostname is the zone hostname.
-	Hostname string `json:"hostname"`
+	// ZoneID is the ID of the associated zone.
+	ZoneID TypeID `json:"zone_id"`
 
-	// Forwards contains the domain forwards for this zone.
-	Forwards []DomainForward `json:"forwards,omitempty"`
+	// ZoneName is the zone hostname.
+	ZoneName string `json:"zone_name"`
 
-	// CreatedOn is when the zone was created.
-	CreatedOn time.Time `json:"created_on"`
-
-	// UpdatedOn is when the zone was last updated.
-	UpdatedOn time.Time `json:"updated_on"`
+	// DomainForwards contains the domain forwards for this zone.
+	DomainForwards []DomainForward `json:"domain_forwards"`
 }
 
 // DomainForwardZoneListResponse represents the paginated response when listing domain forward zones.
