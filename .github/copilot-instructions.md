@@ -12,7 +12,7 @@ golangci-lint run
 go mod tidy && git diff --exit-code go.mod go.sum
 ```
 
-CI and the README are standardized on **Go 1.25** (`.github/workflows/ci.yml`, `README.md`), even though `go.mod` still declares `go 1.21`. Prefer matching CI when validating changes.
+CI, the README, and the module toolchain are standardized on **Go 1.26.2** (`.github/workflows/ci.yml`, `README.md`, `go.mod`). Prefer matching CI when validating changes.
 
 ## High-level architecture
 

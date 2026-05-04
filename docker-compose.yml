@@ -12,7 +12,7 @@ services:
 
   # Development environment with live reload
   dev:
-    image: golang:1.25-alpine
+    image: golang:1.26.2-alpine
     working_dir: /app
     volumes:
       - .:/app
@@ -28,7 +28,7 @@ services:
 
   # Integration test runner
   integration-test:
-    image: golang:1.25-alpine
+    image: golang:1.26.2-alpine
     working_dir: /app
     volumes:
       - .:/app

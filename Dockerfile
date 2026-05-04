@@ -1,5 +1,5 @@
 # Build stage
-FROM golang:1.25-alpine AS builder
+FROM golang:1.26.2-alpine AS builder
 
 WORKDIR /app
 
@@ -22,7 +22,7 @@ RUN go test -v ./...
 RUN go build -o /dev/null ./...
 
 # Final stage - Go runtime for tests
-FROM golang:1.25-alpine
+FROM golang:1.26.2-alpine
 
 RUN apk --no-cache add ca-certificates
 
