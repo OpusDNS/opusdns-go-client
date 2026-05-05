@@ -20,10 +20,7 @@ func (s *DomainsService) ListDomains(ctx context.Context, opts *models.ListDomai
 	page := 1
 
 	for {
-		pageOpts := opts
-		if pageOpts == nil {
-			pageOpts = &models.ListDomainsOptions{}
-		}
+		pageOpts := cloneOptions(opts)
 		pageOpts.Page = page
 		if pageOpts.PageSize == 0 {
 			pageOpts.PageSize = DefaultPageSize
@@ -63,6 +60,12 @@ func (s *DomainsService) ListDomainsPage(ctx context.Context, opts *models.ListD
 		if opts.SortOrder != "" {
 			query.Set("sort_order", string(opts.SortOrder))
 		}
+		for _, tagID := range opts.TagIDs {
+			query.Add("tag_ids", string(tagID))
+		}
+		if opts.TagMode != "" {
+			query.Set("tag_mode", string(opts.TagMode))
+		}
 		if opts.Search != "" {
 			query.Set("search", opts.Search)
 		}
@@ -78,14 +81,50 @@ func (s *DomainsService) ListDomainsPage(ctx context.Context, opts *models.ListD
 		if opts.TransferLock != nil {
 			query.Set("transfer_lock", strconv.FormatBool(*opts.TransferLock))
 		}
+		if opts.IsPremium != nil {
+			query.Set("is_premium", strconv.FormatBool(*opts.IsPremium))
+		}
 		if opts.RenewalMode != nil {
 			query.Set("renewal_mode", string(*opts.RenewalMode))
+		}
+		if opts.CreatedAfter != nil {
+			query.Set("created_after", opts.CreatedAfter.Format(time.RFC3339))
+		}
+		if opts.CreatedBefore != nil {
+			query.Set("created_before", opts.CreatedBefore.Format(time.RFC3339))
+		}
+		if opts.UpdatedAfter != nil {
+			query.Set("updated_after", opts.UpdatedAfter.Format(time.RFC3339))
+		}
+		if opts.UpdatedBefore != nil {
+			query.Set("updated_before", opts.UpdatedBefore.Format(time.RFC3339))
 		}
 		if opts.ExpiresAfter != nil {
 			query.Set("expires_after", opts.ExpiresAfter.Format(time.RFC3339))
 		}
 		if opts.ExpiresBefore != nil {
 			query.Set("expires_before", opts.ExpiresBefore.Format(time.RFC3339))
+		}
+		if opts.ExpiresIn30Days != nil {
+			query.Set("expires_in_30_days", strconv.FormatBool(*opts.ExpiresIn30Days))
+		}
+		if opts.ExpiresIn60Days != nil {
+			query.Set("expires_in_60_days", strconv.FormatBool(*opts.ExpiresIn60Days))
+		}
+		if opts.ExpiresIn90Days != nil {
+			query.Set("expires_in_90_days", strconv.FormatBool(*opts.ExpiresIn90Days))
+		}
+		if opts.RegisteredAfter != nil {
+			query.Set("registered_after", opts.RegisteredAfter.Format(time.RFC3339))
+		}
+		if opts.RegisteredBefore != nil {
+			query.Set("registered_before", opts.RegisteredBefore.Format(time.RFC3339))
+		}
+		for _, status := range opts.RegistryStatuses {
+			query.Add("registry_statuses", status)
+		}
+		for _, include := range opts.Include {
+			query.Add("include", string(include))
 		}
 		if opts.Status != "" {
 			query.Set("status", string(opts.Status))
@@ -107,9 +146,21 @@ func (s *DomainsService) ListDomainsPage(ctx context.Context, opts *models.ListD
 
 // GetDomain retrieves a specific domain by ID or name.
 func (s *DomainsService) GetDomain(ctx context.Context, domainRef string) (*models.Domain, error) {
+	return s.GetDomainWithOptions(ctx, domainRef, nil)
+}
+
+// GetDomainWithOptions retrieves a specific domain by ID or name with optional response expansions.
+func (s *DomainsService) GetDomainWithOptions(ctx context.Context, domainRef string, opts *models.GetDomainOptions) (*models.Domain, error) {
 	path := s.client.http.BuildPath("domains", url.PathEscape(domainRef))
 
-	resp, err := s.client.http.Get(ctx, path, nil)
+	query := url.Values{}
+	if opts != nil {
+		for _, include := range opts.Include {
+			query.Add("include", string(include))
+		}
+	}
+
+	resp, err := s.client.http.Get(ctx, path, query)
 	if err != nil {
 		return nil, err
 	}
@@ -237,7 +288,7 @@ func (s *DomainsService) GetSummary(ctx context.Context) (*models.DomainSummary,
 }
 
 // GetDNSSEC retrieves DNSSEC information for a domain.
-func (s *DomainsService) GetDNSSEC(ctx context.Context, domainRef string) (*models.DomainDNSSECRequest, error) {
+func (s *DomainsService) GetDNSSEC(ctx context.Context, domainRef string) ([]models.DomainDNSSECDataResponse, error) {
 	path := s.client.http.BuildPath("domains", url.PathEscape(domainRef), "dnssec")
 
 	resp, err := s.client.http.Get(ctx, path, nil)
@@ -245,63 +296,70 @@ func (s *DomainsService) GetDNSSEC(ctx context.Context, domainRef string) (*mode
 		return nil, err
 	}
 
-	var dnssec models.DomainDNSSECRequest
+	var dnssec []models.DomainDNSSECDataResponse
 	if err := s.client.http.DecodeResponse(resp, &dnssec); err != nil {
 		return nil, err
 	}
 
-	return &dnssec, nil
+	return dnssec, nil
 }
 
-// EnableDNSSEC enables DNSSEC for a domain at the registry.
-func (s *DomainsService) EnableDNSSEC(ctx context.Context, domainRef string, req *models.DomainDNSSECRequest) (*models.Domain, error) {
-	path := s.client.http.BuildPath("domains", url.PathEscape(domainRef), "dnssec", "enable")
+// PutDNSSEC replaces all DNSSEC data for a domain.
+func (s *DomainsService) PutDNSSEC(ctx context.Context, domainRef string, data []models.DomainDNSSECDataCreate) ([]models.DomainDNSSECDataResponse, error) {
+	path := s.client.http.BuildPath("domains", url.PathEscape(domainRef), "dnssec")
 
-	resp, err := s.client.http.Post(ctx, path, req)
+	resp, err := s.client.http.Put(ctx, path, data)
 	if err != nil {
 		return nil, err
 	}
 
-	var domain models.Domain
-	if err := s.client.http.DecodeResponse(resp, &domain); err != nil {
+	var result []models.DomainDNSSECDataResponse
+	if err := s.client.http.DecodeResponse(resp, &result); err != nil {
 		return nil, err
 	}
 
-	return &domain, nil
+	return result, nil
 }
 
-// DisableDNSSEC disables DNSSEC for a domain at the registry.
-func (s *DomainsService) DisableDNSSEC(ctx context.Context, domainRef string) (*models.Domain, error) {
-	path := s.client.http.BuildPath("domains", url.PathEscape(domainRef), "dnssec", "disable")
+// DeleteDNSSEC removes all DNSSEC data for a domain.
+func (s *DomainsService) DeleteDNSSEC(ctx context.Context, domainRef string) error {
+	path := s.client.http.BuildPath("domains", url.PathEscape(domainRef), "dnssec")
+
+	resp, err := s.client.http.Delete(ctx, path)
+	if err != nil {
+		return err
+	}
+
+	return s.client.http.DecodeResponse(resp, nil)
+}
+
+// EnableDNSSEC enables DNSSEC for a domain at the registry.
+func (s *DomainsService) EnableDNSSEC(ctx context.Context, domainRef string) ([]models.DomainDNSSECDataResponse, error) {
+	path := s.client.http.BuildPath("domains", url.PathEscape(domainRef), "dnssec", "enable")
 
 	resp, err := s.client.http.Post(ctx, path, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	var domain models.Domain
-	if err := s.client.http.DecodeResponse(resp, &domain); err != nil {
+	var result []models.DomainDNSSECDataResponse
+	if err := s.client.http.DecodeResponse(resp, &result); err != nil {
 		return nil, err
 	}
 
-	return &domain, nil
+	return result, nil
 }
 
-// GetTransferStatus retrieves the transfer status for a domain.
-func (s *DomainsService) GetTransferStatus(ctx context.Context, domainRef string) (*models.Domain, error) {
-	path := s.client.http.BuildPath("domains", url.PathEscape(domainRef), "transfer")
+// DisableDNSSEC disables DNSSEC for a domain at the registry.
+func (s *DomainsService) DisableDNSSEC(ctx context.Context, domainRef string) error {
+	path := s.client.http.BuildPath("domains", url.PathEscape(domainRef), "dnssec", "disable")
 
-	resp, err := s.client.http.Get(ctx, path, nil)
+	resp, err := s.client.http.Post(ctx, path, nil)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	var domain models.Domain
-	if err := s.client.http.DecodeResponse(resp, &domain); err != nil {
-		return nil, err
-	}
-
-	return &domain, nil
+	return s.client.http.DecodeResponse(resp, nil)
 }
 
 // CheckDomains checks if domains are available for registration (simple check).

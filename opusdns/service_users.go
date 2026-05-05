@@ -36,10 +36,7 @@ func (s *UsersService) ListUsers(ctx context.Context, opts *models.ListUsersOpti
 	page := 1
 
 	for {
-		pageOpts := opts
-		if pageOpts == nil {
-			pageOpts = &models.ListUsersOptions{}
-		}
+		pageOpts := cloneOptions(opts)
 		pageOpts.Page = page
 		if pageOpts.PageSize == 0 {
 			pageOpts.PageSize = DefaultPageSize
@@ -74,22 +71,13 @@ func (s *UsersService) ListUsersPage(ctx context.Context, opts *models.ListUsers
 			query.Set("page_size", strconv.Itoa(opts.PageSize))
 		}
 		if opts.SortBy != "" {
-			query.Set("sort_by", opts.SortBy)
+			query.Set("sort_by", string(opts.SortBy))
 		}
 		if opts.SortOrder != "" {
 			query.Set("sort_order", string(opts.SortOrder))
 		}
 		if opts.Search != "" {
 			query.Set("search", opts.Search)
-		}
-		if opts.Email != "" {
-			query.Set("email", opts.Email)
-		}
-		if opts.Username != "" {
-			query.Set("username", opts.Username)
-		}
-		if opts.Status != "" {
-			query.Set("status", string(opts.Status))
 		}
 	}
 
@@ -108,9 +96,19 @@ func (s *UsersService) ListUsersPage(ctx context.Context, opts *models.ListUsers
 
 // GetUser retrieves a specific user by ID.
 func (s *UsersService) GetUser(ctx context.Context, userID models.UserID) (*models.User, error) {
+	return s.GetUserWithAttributes(ctx, userID, nil)
+}
+
+// GetUserWithAttributes retrieves a user and optional user attributes.
+func (s *UsersService) GetUserWithAttributes(ctx context.Context, userID models.UserID, attributes []string) (*models.User, error) {
 	path := s.client.http.BuildPath("users", string(userID))
 
-	resp, err := s.client.http.Get(ctx, path, nil)
+	query := url.Values{}
+	for _, attribute := range attributes {
+		query.Add("attributes", attribute)
+	}
+
+	resp, err := s.client.http.Get(ctx, path, query)
 	if err != nil {
 		return nil, err
 	}
@@ -121,6 +119,40 @@ func (s *UsersService) GetUser(ctx context.Context, userID models.UserID) (*mode
 	}
 
 	return &user, nil
+}
+
+// GetUserPermissions retrieves permissions for a user.
+func (s *UsersService) GetUserPermissions(ctx context.Context, userID models.UserID) (*models.PermissionSet, error) {
+	path := s.client.http.BuildPath("users", string(userID), "permissions")
+
+	resp, err := s.client.http.Get(ctx, path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var result models.PermissionSet
+	if err := s.client.http.DecodeResponse(resp, &result); err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
+// GetUserRoles retrieves roles for a user.
+func (s *UsersService) GetUserRoles(ctx context.Context, userID models.UserID) (*models.RelationSet, error) {
+	path := s.client.http.BuildPath("users", string(userID), "roles")
+
+	resp, err := s.client.http.Get(ctx, path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var result models.RelationSet
+	if err := s.client.http.DecodeResponse(resp, &result); err != nil {
+		return nil, err
+	}
+
+	return &result, nil
 }
 
 // CreateUser creates a new user.

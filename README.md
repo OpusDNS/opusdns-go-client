@@ -127,6 +127,7 @@ The client provides access to the following services:
 | `client.Events` | Event and audit log access |
 | `client.Jobs` | Async job batch management |
 | `client.Reports` | Report generation and download |
+| `client.Tags` | Tag management and bulk tag assignment |
 
 ## DNS Management
 
@@ -211,6 +212,29 @@ err := client.DNS.PatchRecords(ctx, "example.com", []models.RecordOperation{
             Type:  models.RRSetTypeCNAME,
             TTL:   3600,
             RData: "legacy.example.com.",
+        },
+    },
+})
+
+// Replace all RRsets for a zone
+err = client.DNS.PutRRSets(ctx, "example.com", []models.RRSetCreate{
+    {
+        Name:    "@",
+        Type:    models.RRSetTypeA,
+        TTL:     300,
+        Records: []models.RecordCreate{{RData: "192.0.2.1"}},
+    },
+})
+
+// Patch RRsets atomically
+err = client.DNS.PatchRRSets(ctx, "example.com", []models.RRSetPatchOp{
+    {
+        Op: models.RecordOpUpsert,
+        RRSet: models.RRSetPatch{
+            Name:    "_443._https",
+            Type:    models.RRSetTypeHTTPS,
+            TTL:     300,
+            Records: []models.RecordCreate{{RData: "1 . alpn=h2,h3"}},
         },
     },
 })
@@ -530,7 +554,7 @@ go run main.go
 ## Requirements
 
 - Go 1.26.2 or later
-- OpusDNS API key ([Get one here](https://opusdns.com))
+- OpusDNS API key ([Get one here](https://app.opusdns.com))
 
 ## API Documentation
 

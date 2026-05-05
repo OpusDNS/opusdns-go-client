@@ -19,10 +19,7 @@ func (s *JobsService) ListBatches(ctx context.Context, opts *models.ListBatchesO
 	page := 1
 
 	for {
-		pageOpts := opts
-		if pageOpts == nil {
-			pageOpts = &models.ListBatchesOptions{}
-		}
+		pageOpts := cloneOptions(opts)
 		pageOpts.Page = page
 		if pageOpts.PageSize == 0 {
 			pageOpts.PageSize = DefaultPageSize
@@ -156,10 +153,7 @@ func (s *JobsService) ListBatchJobs(ctx context.Context, batchID models.BatchID,
 	page := 1
 
 	for {
-		pageOpts := opts
-		if pageOpts == nil {
-			pageOpts = &models.ListBatchJobsOptions{}
-		}
+		pageOpts := cloneOptions(opts)
 		pageOpts.Page = page
 		if pageOpts.PageSize == 0 {
 			pageOpts.PageSize = DefaultPageSize

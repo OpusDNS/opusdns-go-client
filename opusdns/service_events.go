@@ -20,10 +20,7 @@ func (s *EventsService) ListEvents(ctx context.Context, opts *models.ListEventsO
 	page := 1
 
 	for {
-		pageOpts := opts
-		if pageOpts == nil {
-			pageOpts = &models.ListEventsOptions{}
-		}
+		pageOpts := cloneOptions(opts)
 		pageOpts.Page = page
 		if pageOpts.PageSize == 0 {
 			pageOpts.PageSize = DefaultPageSize
@@ -68,6 +65,9 @@ func (s *EventsService) ListEventsPage(ctx context.Context, opts *models.ListEve
 		}
 		if opts.Subtype != "" {
 			query.Set("subtype", string(opts.Subtype))
+		}
+		if opts.Acknowledged != nil {
+			query.Set("acknowledged", strconv.FormatBool(*opts.Acknowledged))
 		}
 		if opts.ObjectType != "" {
 			query.Set("object_type", string(opts.ObjectType))
@@ -198,6 +198,45 @@ func (s *EventsService) ListRequestHistory(ctx context.Context, opts *models.Lis
 		}
 		if opts.SortOrder != "" {
 			query.Set("sort_order", string(opts.SortOrder))
+		}
+		if opts.Method != "" {
+			query.Set("method", string(opts.Method))
+		}
+		if opts.Path != "" {
+			query.Set("path", opts.Path)
+		}
+		if opts.StatusCode != nil {
+			query.Set("status_code", strconv.Itoa(*opts.StatusCode))
+		}
+		if opts.MinStatusCode != nil {
+			query.Set("min_status_code", strconv.Itoa(*opts.MinStatusCode))
+		}
+		if opts.MaxStatusCode != nil {
+			query.Set("max_status_code", strconv.Itoa(*opts.MaxStatusCode))
+		}
+		if opts.MinDuration != nil {
+			query.Set("min_duration", strconv.FormatFloat(*opts.MinDuration, 'f', -1, 64))
+		}
+		if opts.MaxDuration != nil {
+			query.Set("max_duration", strconv.FormatFloat(*opts.MaxDuration, 'f', -1, 64))
+		}
+		if opts.ClientIP != "" {
+			query.Set("client_ip", opts.ClientIP)
+		}
+		if opts.ServerRequestID != "" {
+			query.Set("server_request_id", opts.ServerRequestID)
+		}
+		if opts.PerformedByType != "" {
+			query.Set("performed_by_type", string(opts.PerformedByType))
+		}
+		if opts.PerformedByID != "" {
+			query.Set("performed_by_id", opts.PerformedByID)
+		}
+		if opts.RequestStartedBefore != nil {
+			query.Set("request_started_before", opts.RequestStartedBefore.Format(time.RFC3339))
+		}
+		if opts.RequestStartedAfter != nil {
+			query.Set("request_started_after", opts.RequestStartedAfter.Format(time.RFC3339))
 		}
 	}
 

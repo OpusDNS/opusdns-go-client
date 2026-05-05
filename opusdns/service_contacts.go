@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/url"
 	"strconv"
+	"time"
 
 	"github.com/opusdns/opusdns-go-client/models"
 )
@@ -19,10 +20,7 @@ func (s *ContactsService) ListContacts(ctx context.Context, opts *models.ListCon
 	page := 1
 
 	for {
-		pageOpts := opts
-		if pageOpts == nil {
-			pageOpts = &models.ListContactsOptions{}
-		}
+		pageOpts := cloneOptions(opts)
 		pageOpts.Page = page
 		if pageOpts.PageSize == 0 {
 			pageOpts.PageSize = DefaultPageSize
@@ -62,6 +60,12 @@ func (s *ContactsService) ListContactsPage(ctx context.Context, opts *models.Lis
 		if opts.SortOrder != "" {
 			query.Set("sort_order", string(opts.SortOrder))
 		}
+		for _, tagID := range opts.TagIDs {
+			query.Add("tag_ids", string(tagID))
+		}
+		if opts.TagMode != "" {
+			query.Set("tag_mode", string(opts.TagMode))
+		}
 		if opts.Search != "" {
 			query.Set("search", opts.Search)
 		}
@@ -79,6 +83,15 @@ func (s *ContactsService) ListContactsPage(ctx context.Context, opts *models.Lis
 		}
 		if opts.Verified != nil {
 			query.Set("verified", strconv.FormatBool(*opts.Verified))
+		}
+		if opts.CreatedAfter != nil {
+			query.Set("created_after", opts.CreatedAfter.Format(time.RFC3339))
+		}
+		if opts.CreatedBefore != nil {
+			query.Set("created_before", opts.CreatedBefore.Format(time.RFC3339))
+		}
+		for _, include := range opts.Include {
+			query.Add("include", string(include))
 		}
 	}
 
@@ -117,23 +130,6 @@ func (s *ContactsService) CreateContact(ctx context.Context, req *models.Contact
 	path := s.client.http.BuildPath("contacts")
 
 	resp, err := s.client.http.Post(ctx, path, req)
-	if err != nil {
-		return nil, err
-	}
-
-	var contact models.Contact
-	if err := s.client.http.DecodeResponse(resp, &contact); err != nil {
-		return nil, err
-	}
-
-	return &contact, nil
-}
-
-// UpdateContact updates an existing contact.
-func (s *ContactsService) UpdateContact(ctx context.Context, contactID models.ContactID, req *models.ContactUpdateRequest) (*models.Contact, error) {
-	path := s.client.http.BuildPath("contacts", string(contactID))
-
-	resp, err := s.client.http.Patch(ctx, path, req)
 	if err != nil {
 		return nil, err
 	}
@@ -194,9 +190,16 @@ func (s *ContactsService) GetVerificationStatus(ctx context.Context, contactID m
 
 // VerifyContact verifies a contact with the provided token.
 func (s *ContactsService) VerifyContact(ctx context.Context, req *models.ContactVerificationRequest) error {
+	if req == nil || req.Token == "" {
+		return &ValidationError{Field: "token", Message: "verification token is required"}
+	}
+
 	path := s.client.http.BuildPath("contacts", "verify")
 
-	resp, err := s.client.http.Post(ctx, path, req)
+	query := url.Values{}
+	query.Set("token", req.Token)
+
+	resp, err := s.client.http.Get(ctx, path, query)
 	if err != nil {
 		return err
 	}

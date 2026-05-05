@@ -165,48 +165,6 @@ type ContactCreateRequest struct {
 	Disclose bool `json:"disclose"`
 }
 
-// ContactUpdateRequest represents a request to update an existing contact.
-type ContactUpdateRequest struct {
-	// FirstName is the contact's first name.
-	FirstName *string `json:"first_name,omitempty"`
-
-	// LastName is the contact's last name.
-	LastName *string `json:"last_name,omitempty"`
-
-	// Org is the contact's organization.
-	Org *string `json:"org,omitempty"`
-
-	// Title is the contact's title.
-	Title *string `json:"title,omitempty"`
-
-	// Email is the contact's email address.
-	Email *string `json:"email,omitempty"`
-
-	// Phone is the contact's phone number.
-	Phone *string `json:"phone,omitempty"`
-
-	// Fax is the contact's fax number.
-	Fax *string `json:"fax,omitempty"`
-
-	// Street is the street address.
-	Street *string `json:"street,omitempty"`
-
-	// City is the city.
-	City *string `json:"city,omitempty"`
-
-	// State is the state or province.
-	State *string `json:"state,omitempty"`
-
-	// PostalCode is the postal or ZIP code.
-	PostalCode *string `json:"postal_code,omitempty"`
-
-	// Country is the two-letter country code.
-	Country *string `json:"country,omitempty"`
-
-	// Disclose indicates whether contact information should be publicly disclosed.
-	Disclose *bool `json:"disclose,omitempty"`
-}
-
 // ContactVerification represents a contact verification request/response.
 type ContactVerification struct {
 	// ContactID is the ID of the contact being verified.
@@ -245,6 +203,12 @@ type ListContactsOptions struct {
 	// SortOrder is the sort direction.
 	SortOrder SortOrder
 
+	// TagIDs filters by tag IDs. Multiple values are sent as repeated tag_ids params.
+	TagIDs []TagID
+
+	// TagMode controls whether any or all tag IDs must match.
+	TagMode TagFilterMode
+
 	// Search is an optional search query to filter contacts.
 	Search string
 
@@ -262,7 +226,27 @@ type ListContactsOptions struct {
 
 	// Verified filters by verification status.
 	Verified *bool
+
+	// CreatedAfter filters contacts created after this time.
+	CreatedAfter *time.Time
+
+	// CreatedBefore filters contacts created before this time.
+	CreatedBefore *time.Time
+
+	// Include requests additional response data.
+	Include []ContactIncludeField
 }
+
+// ContactIncludeField represents optional contact response expansions.
+type ContactIncludeField string
+
+const (
+	// ContactIncludeAttributeSets includes linked contact attribute sets.
+	ContactIncludeAttributeSets ContactIncludeField = "attribute_sets"
+
+	// ContactIncludeTags includes tags assigned to the contact when supported by the API.
+	ContactIncludeTags ContactIncludeField = "tags"
+)
 
 // ContactAttributeDefinition defines a TLD-specific contact attribute.
 type ContactAttributeDefinition struct {

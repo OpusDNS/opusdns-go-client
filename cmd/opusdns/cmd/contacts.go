@@ -11,7 +11,7 @@ import (
 var contactsCmd = &cobra.Command{
 	Use:   "contacts",
 	Short: "Manage contacts",
-	Long:  `List, create, update, delete, and verify contacts for domain registrations.`,
+	Long:  `List, create, delete, and verify contacts for domain registrations.`,
 }
 
 var contactsListCmd = &cobra.Command{
@@ -171,111 +171,6 @@ Examples:
 	},
 }
 
-var contactsUpdateCmd = &cobra.Command{
-	Use:   "update <contact-id>",
-	Short: "Update an existing contact",
-	Long: `Update an existing contact's information.
-
-Examples:
-  opusdns contacts update ct_abc123 --email newemail@example.com
-  opusdns contacts update ct_abc123 --phone "+1.2125559999" --city "Los Angeles"`,
-	Args: cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		ctx, cancel := getContext()
-		defer cancel()
-
-		contactID := models.ContactID(args[0])
-
-		req := &models.ContactUpdateRequest{}
-		hasChanges := false
-
-		if cmd.Flags().Changed("first-name") {
-			firstName, _ := cmd.Flags().GetString("first-name")
-			req.FirstName = &firstName
-			hasChanges = true
-		}
-		if cmd.Flags().Changed("last-name") {
-			lastName, _ := cmd.Flags().GetString("last-name")
-			req.LastName = &lastName
-			hasChanges = true
-		}
-		if cmd.Flags().Changed("org") {
-			org, _ := cmd.Flags().GetString("org")
-			req.Org = &org
-			hasChanges = true
-		}
-		if cmd.Flags().Changed("title") {
-			title, _ := cmd.Flags().GetString("title")
-			req.Title = &title
-			hasChanges = true
-		}
-		if cmd.Flags().Changed("email") {
-			email, _ := cmd.Flags().GetString("email")
-			req.Email = &email
-			hasChanges = true
-		}
-		if cmd.Flags().Changed("phone") {
-			phone, _ := cmd.Flags().GetString("phone")
-			req.Phone = &phone
-			hasChanges = true
-		}
-		if cmd.Flags().Changed("fax") {
-			fax, _ := cmd.Flags().GetString("fax")
-			req.Fax = &fax
-			hasChanges = true
-		}
-		if cmd.Flags().Changed("street") {
-			street, _ := cmd.Flags().GetString("street")
-			req.Street = &street
-			hasChanges = true
-		}
-		if cmd.Flags().Changed("city") {
-			city, _ := cmd.Flags().GetString("city")
-			req.City = &city
-			hasChanges = true
-		}
-		if cmd.Flags().Changed("state") {
-			state, _ := cmd.Flags().GetString("state")
-			req.State = &state
-			hasChanges = true
-		}
-		if cmd.Flags().Changed("postal-code") {
-			postalCode, _ := cmd.Flags().GetString("postal-code")
-			req.PostalCode = &postalCode
-			hasChanges = true
-		}
-		if cmd.Flags().Changed("country") {
-			country, _ := cmd.Flags().GetString("country")
-			req.Country = &country
-			hasChanges = true
-		}
-		if cmd.Flags().Changed("disclose") {
-			disclose, _ := cmd.Flags().GetBool("disclose")
-			req.Disclose = &disclose
-			hasChanges = true
-		}
-
-		if !hasChanges {
-			return fmt.Errorf("no changes specified, use flags like --email, --phone, etc")
-		}
-
-		contact, err := getClient().Contacts.UpdateContact(ctx, contactID, req)
-		if err != nil {
-			return fmt.Errorf("failed to update contact: %w", err)
-		}
-
-		fmt.Printf("✓ Contact '%s' updated successfully!\n\n", contact.ContactID)
-
-		data, err := json.MarshalIndent(contact, "", "  ")
-		if err != nil {
-			return fmt.Errorf("failed to format contact: %w", err)
-		}
-
-		fmt.Println(string(data))
-		return nil
-	},
-}
-
 var contactsDeleteCmd = &cobra.Command{
 	Use:   "delete <contact-id>",
 	Short: "Delete a contact",
@@ -422,22 +317,6 @@ func init() {
 	_ = contactsCreateCmd.MarkFlagRequired("city")
 	_ = contactsCreateCmd.MarkFlagRequired("postal-code")
 	_ = contactsCreateCmd.MarkFlagRequired("country")
-
-	// Update subcommand
-	contactsCmd.AddCommand(contactsUpdateCmd)
-	contactsUpdateCmd.Flags().String("first-name", "", "Contact's first name")
-	contactsUpdateCmd.Flags().String("last-name", "", "Contact's last name")
-	contactsUpdateCmd.Flags().String("org", "", "Organization name")
-	contactsUpdateCmd.Flags().String("title", "", "Title (e.g., Mr., Dr.)")
-	contactsUpdateCmd.Flags().String("email", "", "Email address")
-	contactsUpdateCmd.Flags().String("phone", "", "Phone number in E.164 format")
-	contactsUpdateCmd.Flags().String("fax", "", "Fax number")
-	contactsUpdateCmd.Flags().String("street", "", "Street address")
-	contactsUpdateCmd.Flags().String("city", "", "City")
-	contactsUpdateCmd.Flags().String("state", "", "State or province")
-	contactsUpdateCmd.Flags().String("postal-code", "", "Postal/ZIP code")
-	contactsUpdateCmd.Flags().String("country", "", "Two-letter country code")
-	contactsUpdateCmd.Flags().Bool("disclose", false, "Publicly disclose contact information")
 
 	// Delete subcommand
 	contactsCmd.AddCommand(contactsDeleteCmd)
