@@ -551,34 +551,10 @@ cd examples/basic
 go run main.go
 ```
 
-## Real API Integration Tests
-
-Integration tests are opt-in and excluded from normal `go test ./...` runs by the `integration` build tag. The runner defaults to `https://api.preview1.opusdns.dev` and uses the same `OPUSDNS_API_KEY`, `OPUSDNS_API_ENDPOINT`, `OPUSDNS_API_VERSION`, and `OPUSDNS_DEBUG` environment variables as the client.
-
-Run read-only smoke checks against the real API:
-
-```bash
-OPUSDNS_API_KEY="opk_your_api_key" ./scripts/integration-test.sh
-```
-
-Use a preview1-issued raw API key value. A production key, placeholder value, `Bearer ...` header value, or value copied with literal quotes can fail with `401 Invalid API key format`.
-
-To also run the DNS write lifecycle, set `OPUSDNS_INTEGRATION_ZONE` to a unique disposable zone name. The test refuses to run if that zone already exists, then creates it, upserts and deletes an A record, and deletes only the zone it created.
-
-```bash
-OPUSDNS_API_KEY="opk_your_api_key" \
-OPUSDNS_INTEGRATION_ZONE="go-client-it.example.com" \
-./scripts/integration-test.sh
-```
-
-Set `OPUSDNS_INTEGRATION_TIMEOUT` to override the default `2m` test timeout.
-
-The runner uses verbose test output and prints a result summary for each individual API call.
-
 ## Requirements
 
 - Go 1.26.2 or later
-- OpusDNS API key ([Get one here](https://opusdns.com))
+- OpusDNS API key ([Get one here](https://app.opusdns.com))
 
 ## API Documentation
 
