@@ -20,6 +20,15 @@ const (
 	UserStatusPending UserStatus = "pending"
 )
 
+// UserSortField represents fields that can be used for sorting users.
+type UserSortField string
+
+const (
+	UserSortByCreatedOn UserSortField = "created_on"
+	UserSortByUsername  UserSortField = "username"
+	UserSortByEmail     UserSortField = "email"
+)
+
 // User represents a user in the OpusDNS system.
 type User struct {
 	// UserID is the unique identifier for the user.
@@ -60,6 +69,9 @@ type User struct {
 
 	// DeletedOn is when the user was deleted.
 	DeletedOn *time.Time `json:"deleted_on,omitempty"`
+
+	// UserAttributes contains requested user attributes.
+	UserAttributes map[string]interface{} `json:"user_attributes,omitempty"`
 }
 
 // FullName returns the user's full name.
@@ -121,6 +133,22 @@ type UserUpdateRequest struct {
 	Locale *string `json:"locale,omitempty"`
 }
 
+// Permission is a user permission identifier.
+type Permission string
+
+// PermissionSet represents the permissions assigned to a user.
+type PermissionSet struct {
+	Permissions []Permission `json:"permissions"`
+}
+
+// Relation is a user relation/role identifier.
+type Relation string
+
+// RelationSet represents the roles assigned to a user.
+type RelationSet struct {
+	Relations []Relation `json:"relations"`
+}
+
 // ListUsersOptions contains options for listing users.
 type ListUsersOptions struct {
 	// Page is the page number to retrieve (1-indexed).
@@ -130,7 +158,7 @@ type ListUsersOptions struct {
 	PageSize int
 
 	// SortBy is the field to sort by.
-	SortBy string
+	SortBy UserSortField
 
 	// SortOrder is the sort direction.
 	SortOrder SortOrder
@@ -139,11 +167,17 @@ type ListUsersOptions struct {
 	Search string
 
 	// Email filters by email address.
+	//
+	// Deprecated: the current API only supports Search for organization user lists.
 	Email string
 
 	// Username filters by username.
+	//
+	// Deprecated: the current API only supports Search for organization user lists.
 	Username string
 
 	// Status filters by user status.
+	//
+	// Deprecated: the current API only supports Search for organization user lists.
 	Status UserStatus
 }

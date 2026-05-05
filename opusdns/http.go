@@ -4,10 +4,12 @@ package opusdns
 import (
 	"bytes"
 	"context"
+	cryptorand "crypto/rand"
 	"encoding/json"
 	"fmt"
 	"io"
 	"math"
+	"math/big"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -89,6 +91,10 @@ func (c *HTTPClient) Do(ctx context.Context, req *Request) (*Response, error) {
 	var lastErr error
 
 	for attempt := 0; attempt <= c.config.MaxRetries; attempt++ {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+
 		// Check if we should wait due to rate limiting
 		if err := c.waitForRateLimit(ctx); err != nil {
 			return nil, err
@@ -104,6 +110,10 @@ func (c *HTTPClient) Do(ctx context.Context, req *Request) (*Response, error) {
 				return nil, ctx.Err()
 			case <-time.After(delay):
 			}
+		}
+
+		if err := ctx.Err(); err != nil {
+			return nil, err
 		}
 
 		// Execute the request
@@ -302,10 +312,18 @@ func (c *HTTPClient) calculateBackoff(attempt int) time.Duration {
 	}
 
 	// Add jitter (±20%)
-	jitter := backoff * 0.2 * (0.5 - float64(time.Now().UnixNano()%100)/100)
+	jitter := backoff * c.calculateJitterFactor()
 	backoff += jitter
 
 	return time.Duration(backoff)
+}
+
+func (c *HTTPClient) calculateJitterFactor() float64 {
+	n, err := cryptorand.Int(cryptorand.Reader, big.NewInt(1_000_000))
+	if err != nil {
+		return 0
+	}
+	return (float64(n.Int64())/999_999 - 0.5) * 0.4
 }
 
 // handleRateLimit processes a 429 rate limit response.
@@ -348,7 +366,9 @@ func (c *HTTPClient) waitForRateLimit(ctx context.Context) error {
 		return ctx.Err()
 	case <-time.After(waitDuration):
 		c.mu.Lock()
-		c.rateLimited = false
+		if !time.Now().Before(c.retryAfter) {
+			c.rateLimited = false
+		}
 		c.mu.Unlock()
 		return nil
 	}

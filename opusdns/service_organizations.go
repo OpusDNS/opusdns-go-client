@@ -14,6 +14,73 @@ type OrganizationsService struct {
 	client *Client
 }
 
+// ListOrganizations retrieves all child organizations with automatic pagination.
+func (s *OrganizationsService) ListOrganizations(ctx context.Context, opts *models.ListOrganizationsOptions) ([]models.Organization, error) {
+	var all []models.Organization
+	page := 1
+
+	for {
+		pageOpts := cloneOptions(opts)
+		pageOpts.Page = page
+		if pageOpts.PageSize == 0 {
+			pageOpts.PageSize = DefaultPageSize
+		}
+
+		resp, err := s.ListOrganizationsPage(ctx, pageOpts)
+		if err != nil {
+			return nil, err
+		}
+
+		all = append(all, resp.Results...)
+
+		if !resp.Pagination.HasNextPage {
+			break
+		}
+		page++
+	}
+
+	return all, nil
+}
+
+// ListOrganizationsPage retrieves a single page of child organizations.
+func (s *OrganizationsService) ListOrganizationsPage(ctx context.Context, opts *models.ListOrganizationsOptions) (*models.OrganizationListResponse, error) {
+	path := s.client.http.BuildPath("organizations")
+
+	query := url.Values{}
+	if opts != nil {
+		if opts.Page > 0 {
+			query.Set("page", strconv.Itoa(opts.Page))
+		}
+		if opts.PageSize > 0 {
+			query.Set("page_size", strconv.Itoa(opts.PageSize))
+		}
+		if opts.SortBy != "" {
+			query.Set("sort_by", string(opts.SortBy))
+		}
+		if opts.SortOrder != "" {
+			query.Set("sort_order", string(opts.SortOrder))
+		}
+		if opts.Search != "" {
+			query.Set("search", opts.Search)
+		}
+		if opts.CountryCode != "" {
+			query.Set("country_code", opts.CountryCode)
+		}
+	}
+
+	resp, err := s.client.http.Get(ctx, path, query)
+	if err != nil {
+		return nil, err
+	}
+
+	var result models.OrganizationListResponse
+	if err := s.client.http.DecodeResponse(resp, &result); err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
 // GetOrganization retrieves an organization by ID.
 func (s *OrganizationsService) GetOrganization(ctx context.Context, orgID models.OrganizationID) (*models.Organization, error) {
 	path := s.client.http.BuildPath("organizations", string(orgID))

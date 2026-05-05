@@ -19,10 +19,7 @@ func (s *DomainForwardsService) ListDomainForwards(ctx context.Context, opts *mo
 	page := 1
 
 	for {
-		pageOpts := opts
-		if pageOpts == nil {
-			pageOpts = &models.ListDomainForwardsOptions{}
-		}
+		pageOpts := cloneOptions(opts)
 		pageOpts.Page = page
 		if pageOpts.PageSize == 0 {
 			pageOpts.PageSize = DefaultPageSize
@@ -203,4 +200,40 @@ func (s *DomainForwardsService) ListDomainForwardsByZone(ctx context.Context, zo
 	}
 
 	return result, nil
+}
+
+// GetMetrics retrieves aggregate domain-forward metrics.
+func (s *DomainForwardsService) GetMetrics(ctx context.Context, opts *models.DomainForwardMetricsOptions) (*models.DomainForwardMetrics, error) {
+	path := s.client.http.BuildPath("domain-forwards", "metrics")
+
+	query := url.Values{}
+	if opts != nil {
+		if opts.Hostname != "" {
+			query.Set("hostname", opts.Hostname)
+		}
+		if opts.Domain != "" {
+			query.Set("domain", opts.Domain)
+		}
+		if opts.Protocol != "" {
+			query.Set("protocol", string(opts.Protocol))
+		}
+		if opts.TimeRange != "" {
+			query.Set("time_range", string(opts.TimeRange))
+		}
+		if opts.ExcludeBots != nil {
+			query.Set("exclude_bots", strconv.FormatBool(*opts.ExcludeBots))
+		}
+	}
+
+	resp, err := s.client.http.Get(ctx, path, query)
+	if err != nil {
+		return nil, err
+	}
+
+	var result models.DomainForwardMetrics
+	if err := s.client.http.DecodeResponse(resp, &result); err != nil {
+		return nil, err
+	}
+
+	return &result, nil
 }

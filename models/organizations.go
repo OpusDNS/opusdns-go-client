@@ -20,6 +20,15 @@ const (
 	OrganizationStatusDeleted OrganizationStatus = "deleted"
 )
 
+// OrganizationSortField represents fields that can be used for sorting organizations.
+type OrganizationSortField string
+
+const (
+	OrganizationSortByCreatedOn   OrganizationSortField = "created_on"
+	OrganizationSortByName        OrganizationSortField = "name"
+	OrganizationSortByCountryCode OrganizationSortField = "country_code"
+)
+
 // Organization represents an organization (account) in OpusDNS.
 type Organization struct {
 	// OrganizationID is the unique identifier for the organization.
@@ -114,6 +123,16 @@ type OrganizationListResponse struct {
 
 	// Pagination contains the pagination metadata.
 	Pagination Pagination `json:"pagination"`
+}
+
+// ListOrganizationsOptions contains options for listing organizations.
+type ListOrganizationsOptions struct {
+	Page        int
+	PageSize    int
+	SortBy      OrganizationSortField
+	SortOrder   SortOrder
+	Search      string
+	CountryCode string
 }
 
 // OrganizationUpdateRequest represents a request to update an organization.

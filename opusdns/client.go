@@ -45,6 +45,9 @@ type Client struct {
 
 	// Reports provides access to report generation and download.
 	Reports *ReportsService
+
+	// Tags provides access to tag management.
+	Tags *TagsService
 }
 
 // NewClient creates a new OpusDNS client with the given options.
@@ -85,6 +88,7 @@ func NewClient(opts ...Option) (*Client, error) {
 	client.Events = &EventsService{client: client}
 	client.Jobs = &JobsService{client: client}
 	client.Reports = &ReportsService{client: client}
+	client.Tags = &TagsService{client: client}
 
 	return client, nil
 }
@@ -118,6 +122,7 @@ func NewClientWithConfig(config *Config) (*Client, error) {
 	client.Events = &EventsService{client: client}
 	client.Jobs = &JobsService{client: client}
 	client.Reports = &ReportsService{client: client}
+	client.Tags = &TagsService{client: client}
 
 	return client, nil
 }

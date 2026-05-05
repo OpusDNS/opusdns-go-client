@@ -22,15 +22,20 @@ const (
 	RRSetTypeAAAA   RRSetType = "AAAA"
 	RRSetTypeALIAS  RRSetType = "ALIAS"
 	RRSetTypeCAA    RRSetType = "CAA"
+	RRSetTypeCERT   RRSetType = "CERT"
 	RRSetTypeCNAME  RRSetType = "CNAME"
 	RRSetTypeDNSKEY RRSetType = "DNSKEY"
 	RRSetTypeDS     RRSetType = "DS"
+	RRSetTypeHTTPS  RRSetType = "HTTPS"
 	RRSetTypeMX     RRSetType = "MX"
+	RRSetTypeNAPTR  RRSetType = "NAPTR"
 	RRSetTypeNS     RRSetType = "NS"
 	RRSetTypePTR    RRSetType = "PTR"
 	RRSetTypeTXT    RRSetType = "TXT"
 	RRSetTypeSOA    RRSetType = "SOA"
+	RRSetTypeSSHFP  RRSetType = "SSHFP"
 	RRSetTypeSRV    RRSetType = "SRV"
+	RRSetTypeSVCB   RRSetType = "SVCB"
 	RRSetTypeSMIMEA RRSetType = "SMIMEA"
 	RRSetTypeTLSA   RRSetType = "TLSA"
 	RRSetTypeURI    RRSetType = "URI"
@@ -48,6 +53,9 @@ const (
 
 // Zone represents a DNS zone managed by OpusDNS.
 type Zone struct {
+	// ZoneID is the unique identifier for the zone.
+	ZoneID TypeID `json:"dns_zone_id,omitempty"`
+
 	// Name is the domain name of the zone (e.g., "example.com").
 	Name string `json:"name"`
 
@@ -60,6 +68,9 @@ type Zone struct {
 	// RRSets contains the resource record sets for this zone.
 	// This field is populated when fetching a single zone with records.
 	RRSets []RRSet `json:"rrsets,omitempty"`
+
+	// Tags contains tags assigned to this zone when requested via include=tags.
+	Tags []TagEnriched `json:"tags,omitempty"`
 
 	// CreatedOn is the timestamp when the zone was created.
 	CreatedOn *time.Time `json:"created_on,omitempty"`
@@ -111,6 +122,12 @@ type RRSet struct {
 
 	// Records contains the individual record data.
 	Records []RecordData `json:"records,omitempty"`
+
+	// Protected indicates whether the RRset is protected from modification.
+	Protected bool `json:"protected,omitempty"`
+
+	// ProtectedReason describes why the RRset is protected.
+	ProtectedReason *string `json:"protected_reason,omitempty"`
 }
 
 // RecordData represents the data portion of a DNS record.
@@ -187,11 +204,8 @@ type RecordPatchRequest struct {
 	Ops []RecordOperation `json:"ops"`
 }
 
-// RRSetPatchOp represents an operation for patching RRSets.
-type RRSetPatchOp struct {
-	// Op is the operation type.
-	Op RecordPatchOp `json:"op"`
-
+// RRSetPatch represents an RRset used in patch operations.
+type RRSetPatch struct {
 	// Name is the RRSet name.
 	Name string `json:"name"`
 
@@ -199,19 +213,31 @@ type RRSetPatchOp struct {
 	Type RRSetType `json:"type"`
 
 	// TTL is the time-to-live in seconds.
-	TTL int `json:"ttl,omitempty"`
+	TTL int `json:"ttl"`
 
-	// RData is the record data (for single-record operations).
-	RData string `json:"rdata,omitempty"`
+	// Records contains the record data values.
+	Records []RecordCreate `json:"records"`
+}
 
-	// Records is the list of record data (for multi-record operations).
-	Records []string `json:"records,omitempty"`
+// RRSetPatchOp represents an operation for patching RRSets.
+type RRSetPatchOp struct {
+	// Op is the operation type.
+	Op RecordPatchOp `json:"op"`
+
+	// RRSet is the RRset to upsert or remove.
+	RRSet RRSetPatch `json:"rrset"`
 }
 
 // RRSetPatchRequest represents a request to patch RRSets in a zone.
 type RRSetPatchRequest struct {
 	// Ops is the list of operations to perform.
 	Ops []RRSetPatchOp `json:"ops"`
+}
+
+// RRSetUpdateRequest represents a request to replace all RRSets in a zone.
+type RRSetUpdateRequest struct {
+	// RRSets is the complete set of RRsets to keep for the zone.
+	RRSets []RRSetCreate `json:"rrsets,omitempty"`
 }
 
 // DNSChanges represents the response from operations that modify DNS records.
@@ -303,6 +329,12 @@ type ListZonesOptions struct {
 	// SortOrder is the sort direction.
 	SortOrder SortOrder
 
+	// TagIDs filters by tag IDs. Multiple values are sent as repeated tag_ids params.
+	TagIDs []TagID
+
+	// TagMode controls whether any or all tag IDs must match.
+	TagMode TagFilterMode
+
 	// Search is an optional search query to filter zones by name.
 	Search string
 
@@ -320,4 +352,27 @@ type ListZonesOptions struct {
 
 	// CreatedBefore filters zones created before this time.
 	CreatedBefore *time.Time
+
+	// UpdatedAfter filters zones updated after this time.
+	UpdatedAfter *time.Time
+
+	// UpdatedBefore filters zones updated before this time.
+	UpdatedBefore *time.Time
+
+	// Include requests additional response data.
+	Include []ZoneIncludeField
+}
+
+// ZoneIncludeField represents optional zone response expansions.
+type ZoneIncludeField string
+
+const (
+	// ZoneIncludeTags includes tags assigned to the zone.
+	ZoneIncludeTags ZoneIncludeField = "tags"
+)
+
+// GetZoneOptions contains options for retrieving a zone.
+type GetZoneOptions struct {
+	// Include requests additional response data.
+	Include []ZoneIncludeField
 }

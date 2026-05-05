@@ -21,10 +21,7 @@ func (s *DNSService) ListZones(ctx context.Context, opts *models.ListZonesOption
 	page := 1
 
 	for {
-		pageOpts := opts
-		if pageOpts == nil {
-			pageOpts = &models.ListZonesOptions{}
-		}
+		pageOpts := cloneOptions(opts)
 		pageOpts.Page = page
 		if pageOpts.PageSize == 0 {
 			pageOpts.PageSize = DefaultPageSize
@@ -64,6 +61,12 @@ func (s *DNSService) ListZonesPage(ctx context.Context, opts *models.ListZonesOp
 		if opts.SortOrder != "" {
 			query.Set("sort_order", string(opts.SortOrder))
 		}
+		for _, tagID := range opts.TagIDs {
+			query.Add("tag_ids", string(tagID))
+		}
+		if opts.TagMode != "" {
+			query.Set("tag_mode", string(opts.TagMode))
+		}
 		if opts.Search != "" {
 			query.Set("search", opts.Search)
 		}
@@ -82,6 +85,15 @@ func (s *DNSService) ListZonesPage(ctx context.Context, opts *models.ListZonesOp
 		if opts.CreatedBefore != nil {
 			query.Set("created_before", opts.CreatedBefore.Format(time.RFC3339))
 		}
+		if opts.UpdatedAfter != nil {
+			query.Set("updated_after", opts.UpdatedAfter.Format(time.RFC3339))
+		}
+		if opts.UpdatedBefore != nil {
+			query.Set("updated_before", opts.UpdatedBefore.Format(time.RFC3339))
+		}
+		for _, include := range opts.Include {
+			query.Add("include", string(include))
+		}
 	}
 
 	resp, err := s.client.http.Get(ctx, path, query)
@@ -99,10 +111,22 @@ func (s *DNSService) ListZonesPage(ctx context.Context, opts *models.ListZonesOp
 
 // GetZone retrieves a specific zone by name.
 func (s *DNSService) GetZone(ctx context.Context, name string) (*models.Zone, error) {
+	return s.GetZoneWithOptions(ctx, name, nil)
+}
+
+// GetZoneWithOptions retrieves a specific zone by name with optional response expansions.
+func (s *DNSService) GetZoneWithOptions(ctx context.Context, name string, opts *models.GetZoneOptions) (*models.Zone, error) {
 	name = strings.TrimSuffix(name, ".")
 	path := s.client.http.BuildPath("dns", url.PathEscape(name))
 
-	resp, err := s.client.http.Get(ctx, path, nil)
+	query := url.Values{}
+	if opts != nil {
+		for _, include := range opts.Include {
+			query.Add("include", string(include))
+		}
+	}
+
+	resp, err := s.client.http.Get(ctx, path, query)
 	if err != nil {
 		return nil, err
 	}
@@ -162,22 +186,34 @@ func (s *DNSService) GetSummary(ctx context.Context) (*models.ZoneSummary, error
 	return &summary, nil
 }
 
-// GetRRSets retrieves all resource record sets for a zone.
-func (s *DNSService) GetRRSets(ctx context.Context, zoneName string) ([]models.RRSet, error) {
+// PutRRSets replaces all resource record sets for a zone.
+func (s *DNSService) PutRRSets(ctx context.Context, zoneName string, rrsets []models.RRSetCreate) error {
 	zoneName = strings.TrimSuffix(zoneName, ".")
 	path := s.client.http.BuildPath("dns", url.PathEscape(zoneName), "rrsets")
 
-	resp, err := s.client.http.Get(ctx, path, nil)
+	req := models.RRSetUpdateRequest{RRSets: rrsets}
+
+	resp, err := s.client.http.Put(ctx, path, req)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	var rrsets []models.RRSet
-	if err := s.client.http.DecodeResponse(resp, &rrsets); err != nil {
-		return nil, err
+	return s.client.http.DecodeResponse(resp, nil)
+}
+
+// PatchRRSets applies multiple RRset operations atomically.
+func (s *DNSService) PatchRRSets(ctx context.Context, zoneName string, ops []models.RRSetPatchOp) error {
+	zoneName = strings.TrimSuffix(zoneName, ".")
+	path := s.client.http.BuildPath("dns", url.PathEscape(zoneName), "rrsets")
+
+	req := models.RRSetPatchRequest{Ops: ops}
+
+	resp, err := s.client.http.Patch(ctx, path, req)
+	if err != nil {
+		return err
 	}
 
-	return rrsets, nil
+	return s.client.http.DecodeResponse(resp, nil)
 }
 
 // PatchRecords applies multiple record operations atomically.

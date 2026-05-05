@@ -41,6 +41,16 @@ const (
 	DomainForwardSortByHostname DomainForwardSortField = "hostname"
 )
 
+// TimeRange represents a domain-forward metrics time range.
+type TimeRange string
+
+const (
+	TimeRange1H  TimeRange = "1h"
+	TimeRange1D  TimeRange = "1d"
+	TimeRange7D  TimeRange = "7d"
+	TimeRange30D TimeRange = "30d"
+)
+
 // DomainForwardZoneSortField represents fields that can be used for sorting domain forward zones.
 type DomainForwardZoneSortField string
 
@@ -278,6 +288,15 @@ type ListDomainForwardsOptions struct {
 
 	// Enabled filters by enabled status.
 	Enabled *bool
+}
+
+// DomainForwardMetricsOptions contains options for domain-forward metrics.
+type DomainForwardMetricsOptions struct {
+	Hostname    string
+	Domain      string
+	Protocol    HttpProtocol
+	TimeRange   TimeRange
+	ExcludeBots *bool
 }
 
 // DomainForwardMetrics represents metrics for domain forwards.

@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/url"
 	"strconv"
+	"time"
 
 	"github.com/opusdns/opusdns-go-client/models"
 )
@@ -19,10 +20,7 @@ func (s *EmailForwardsService) ListEmailForwards(ctx context.Context, opts *mode
 	page := 1
 
 	for {
-		pageOpts := opts
-		if pageOpts == nil {
-			pageOpts = &models.ListEmailForwardsOptions{}
-		}
+		pageOpts := cloneOptions(opts)
 		pageOpts.Page = page
 		if pageOpts.PageSize == 0 {
 			pageOpts.PageSize = DefaultPageSize
@@ -214,4 +212,31 @@ func (s *EmailForwardsService) ListEmailForwardsByZone(ctx context.Context, zone
 	}
 
 	return result, nil
+}
+
+// GetMetrics retrieves metrics for a specific email forward.
+func (s *EmailForwardsService) GetMetrics(ctx context.Context, emailForwardID models.EmailForwardID, opts *models.EmailForwardMetricsOptions) (*models.EmailForwardMetrics, error) {
+	path := s.client.http.BuildPath("email-forwards", string(emailForwardID), "metrics")
+
+	query := url.Values{}
+	if opts != nil {
+		if opts.StartTime != nil {
+			query.Set("start_time", opts.StartTime.Format(time.RFC3339))
+		}
+		if opts.EndTime != nil {
+			query.Set("end_time", opts.EndTime.Format(time.RFC3339))
+		}
+	}
+
+	resp, err := s.client.http.Get(ctx, path, query)
+	if err != nil {
+		return nil, err
+	}
+
+	var result models.EmailForwardMetrics
+	if err := s.client.http.DecodeResponse(resp, &result); err != nil {
+		return nil, err
+	}
+
+	return &result, nil
 }

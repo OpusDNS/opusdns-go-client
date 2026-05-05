@@ -14,6 +14,44 @@ const (
 	SortDesc SortOrder = "desc"
 )
 
+// TagID is a TypeID for tags.
+type TagID = TypeID
+
+// TagFilterMode controls whether all or any selected tags must match.
+type TagFilterMode string
+
+const (
+	// TagFilterModeMatchAny matches resources with any of the selected tags.
+	TagFilterModeMatchAny TagFilterMode = "match_any"
+
+	// TagFilterModeMatchAll matches resources with all selected tags.
+	TagFilterModeMatchAll TagFilterMode = "match_all"
+)
+
+// HTTPMethod represents an HTTP method in request-history filters.
+type HTTPMethod string
+
+const (
+	HTTPMethodConnect HTTPMethod = "CONNECT"
+	HTTPMethodDelete  HTTPMethod = "DELETE"
+	HTTPMethodGet     HTTPMethod = "GET"
+	HTTPMethodHead    HTTPMethod = "HEAD"
+	HTTPMethodOptions HTTPMethod = "OPTIONS"
+	HTTPMethodPatch   HTTPMethod = "PATCH"
+	HTTPMethodPost    HTTPMethod = "POST"
+	HTTPMethodPut     HTTPMethod = "PUT"
+	HTTPMethodTrace   HTTPMethod = "TRACE"
+)
+
+// ExecutingEntity represents the actor type in request-history filters.
+type ExecutingEntity string
+
+const (
+	ExecutingEntityUser         ExecutingEntity = "user"
+	ExecutingEntityOrganization ExecutingEntity = "organization"
+	ExecutingEntitySystem       ExecutingEntity = "system"
+)
+
 // Pagination represents pagination metadata in API responses.
 type Pagination struct {
 	// TotalPages is the total number of pages available.
@@ -55,6 +93,45 @@ type ListOptions struct {
 
 	// Search is an optional search query to filter results.
 	Search string
+
+	// Method filters request history by HTTP method.
+	Method HTTPMethod
+
+	// Path filters request history by request path.
+	Path string
+
+	// StatusCode filters request history by exact status code.
+	StatusCode *int
+
+	// MinStatusCode filters request history by minimum status code.
+	MinStatusCode *int
+
+	// MaxStatusCode filters request history by maximum status code.
+	MaxStatusCode *int
+
+	// MinDuration filters request history by minimum duration.
+	MinDuration *float64
+
+	// MaxDuration filters request history by maximum duration.
+	MaxDuration *float64
+
+	// ClientIP filters request history by client IP.
+	ClientIP string
+
+	// ServerRequestID filters request history by server request ID.
+	ServerRequestID string
+
+	// PerformedByType filters request history by actor type.
+	PerformedByType ExecutingEntity
+
+	// PerformedByID filters request history by actor ID.
+	PerformedByID string
+
+	// RequestStartedBefore filters request history before this time.
+	RequestStartedBefore *time.Time
+
+	// RequestStartedAfter filters request history after this time.
+	RequestStartedAfter *time.Time
 }
 
 // TypeID is a type-safe identifier following the TypeID specification.

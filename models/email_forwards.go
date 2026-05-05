@@ -163,6 +163,12 @@ type ListEmailForwardsOptions struct {
 	Enabled *bool
 }
 
+// EmailForwardMetricsOptions contains options for email-forward metrics.
+type EmailForwardMetricsOptions struct {
+	StartTime *time.Time
+	EndTime   *time.Time
+}
+
 // EmailForwardLog represents a log entry for email forwarding activity.
 type EmailForwardLog struct {
 	// LogID is the unique identifier for the log entry from ImprovMX.

@@ -199,6 +199,9 @@ type ListEventsOptions struct {
 	// Subtype filters by event subtype.
 	Subtype EventSubtype
 
+	// Acknowledged filters events by acknowledgement status.
+	Acknowledged *bool
+
 	// ObjectType filters by object type.
 	ObjectType EventObjectType
 

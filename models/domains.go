@@ -141,6 +141,12 @@ type Domain struct {
 	// RegistryStatuses contains all the domain statuses from the registry.
 	RegistryStatuses []string `json:"registry_statuses,omitempty"`
 
+	// Tags contains tags assigned to this domain when requested via include=tags.
+	Tags []TagEnriched `json:"tags,omitempty"`
+
+	// IsPremium indicates whether the domain has premium pricing.
+	IsPremium bool `json:"is_premium,omitempty"`
+
 	// AuthCode is the authorization code for transfers.
 	AuthCode *string `json:"auth_code,omitempty"`
 
@@ -323,13 +329,57 @@ type DomainRestoreRequest struct {
 	Period int `json:"period,omitempty"`
 }
 
-// DomainDNSSECRequest represents a request to configure DNSSEC for a domain.
+// DomainDNSSECRequest represents a legacy request to configure DNSSEC for a domain.
+//
+// Deprecated: Use DomainDNSSECDataCreate with DomainsService.PutDNSSEC.
 type DomainDNSSECRequest struct {
 	// DSRecords contains DS records to add.
 	DSRecords []DSRecord `json:"ds_records,omitempty"`
 
 	// DNSKEYRecords contains DNSKEY records to add.
 	DNSKEYRecords []DNSKEYRecord `json:"dnskey_records,omitempty"`
+}
+
+// DNSSECRecordType represents a domain DNSSEC record type.
+type DNSSECRecordType string
+
+const (
+	DNSSECRecordTypeDSData  DNSSECRecordType = "ds_data"
+	DNSSECRecordTypeKeyData DNSSECRecordType = "key_data"
+)
+
+// DNSSECAlgorithm represents a DNSSEC algorithm number.
+type DNSSECAlgorithm int
+
+// DNSSECDigestType represents a DNSSEC digest type.
+type DNSSECDigestType int
+
+// DomainDNSSECDataCreate represents DNSSEC data for create/update requests.
+type DomainDNSSECDataCreate struct {
+	RecordType DNSSECRecordType  `json:"record_type"`
+	Algorithm  DNSSECAlgorithm   `json:"algorithm"`
+	Digest     *string           `json:"digest,omitempty"`
+	DigestType *DNSSECDigestType `json:"digest_type,omitempty"`
+	Flags      *int              `json:"flags,omitempty"`
+	KeyTag     *int              `json:"key_tag,omitempty"`
+	Protocol   *int              `json:"protocol,omitempty"`
+	PublicKey  *string           `json:"public_key,omitempty"`
+}
+
+// DomainDNSSECDataResponse represents DNSSEC data returned by the API.
+type DomainDNSSECDataResponse struct {
+	DomainDNSSECDataID TypeID            `json:"domain_dnssec_data_id,omitempty"`
+	DomainID           DomainID          `json:"domain_id,omitempty"`
+	RecordType         DNSSECRecordType  `json:"record_type"`
+	Algorithm          DNSSECAlgorithm   `json:"algorithm"`
+	Digest             *string           `json:"digest,omitempty"`
+	DigestType         *DNSSECDigestType `json:"digest_type,omitempty"`
+	Flags              *int              `json:"flags,omitempty"`
+	KeyTag             *int              `json:"key_tag,omitempty"`
+	Protocol           *int              `json:"protocol,omitempty"`
+	PublicKey          *string           `json:"public_key,omitempty"`
+	CreatedOn          *time.Time        `json:"created_on,omitempty"`
+	UpdatedOn          *time.Time        `json:"updated_on,omitempty"`
 }
 
 // ListDomainsOptions contains options for listing domains.
@@ -346,6 +396,12 @@ type ListDomainsOptions struct {
 	// SortOrder is the sort direction.
 	SortOrder SortOrder
 
+	// TagIDs filters by tag IDs. Multiple values are sent as repeated tag_ids params.
+	TagIDs []TagID
+
+	// TagMode controls whether any or all tag IDs must match.
+	TagMode TagFilterMode
+
 	// Search is an optional search query to filter domains.
 	Search string
 
@@ -361,8 +417,23 @@ type ListDomainsOptions struct {
 	// TransferLock filters by transfer lock status.
 	TransferLock *bool
 
+	// IsPremium filters by premium status.
+	IsPremium *bool
+
 	// RenewalMode filters by renewal mode.
 	RenewalMode *RenewalMode
+
+	// CreatedAfter filters domains created after this date.
+	CreatedAfter *time.Time
+
+	// CreatedBefore filters domains created before this date.
+	CreatedBefore *time.Time
+
+	// UpdatedAfter filters domains updated after this date.
+	UpdatedAfter *time.Time
+
+	// UpdatedBefore filters domains updated before this date.
+	UpdatedBefore *time.Time
 
 	// ExpiresAfter filters domains expiring after this date.
 	ExpiresAfter *time.Time
@@ -370,6 +441,41 @@ type ListDomainsOptions struct {
 	// ExpiresBefore filters domains expiring before this date.
 	ExpiresBefore *time.Time
 
+	// ExpiresIn30Days filters domains expiring within 30 days.
+	ExpiresIn30Days *bool
+
+	// ExpiresIn60Days filters domains expiring within 60 days.
+	ExpiresIn60Days *bool
+
+	// ExpiresIn90Days filters domains expiring within 90 days.
+	ExpiresIn90Days *bool
+
+	// RegisteredAfter filters domains registered after this date.
+	RegisteredAfter *time.Time
+
+	// RegisteredBefore filters domains registered before this date.
+	RegisteredBefore *time.Time
+
+	// RegistryStatuses filters by registry statuses.
+	RegistryStatuses []string
+
+	// Include requests additional response data.
+	Include []DomainIncludeField
+
 	// Status filters by domain status.
 	Status DomainStatus
+}
+
+// DomainIncludeField represents optional domain response expansions.
+type DomainIncludeField string
+
+const (
+	// DomainIncludeTags includes tags assigned to the domain.
+	DomainIncludeTags DomainIncludeField = "tags"
+)
+
+// GetDomainOptions contains options for retrieving a domain.
+type GetDomainOptions struct {
+	// Include requests additional response data.
+	Include []DomainIncludeField
 }
