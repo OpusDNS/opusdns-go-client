@@ -2,7 +2,7 @@ module github.com/opusdns/opusdns-go-client
 
 go 1.26.0
 
-toolchain go1.26.2
+toolchain go1.26.3
 
 require (
 	github.com/spf13/cobra v1.10.2
