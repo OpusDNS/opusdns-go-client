@@ -135,6 +135,58 @@ type ListOrganizationsOptions struct {
 	CountryCode string
 }
 
+// OrganizationCreateRequest represents a request to create an organization.
+type OrganizationCreateRequest struct {
+	// Name is the organization name.
+	Name string `json:"name"`
+
+	// ParentOrganizationID is the optional parent organization ID.
+	// The public API derives this from the authenticated caller when omitted.
+	ParentOrganizationID *OrganizationID `json:"parent_organization_id,omitempty"`
+
+	// Address1 is the first line of the organization's address.
+	Address1 *string `json:"address_1,omitempty"`
+
+	// Address2 is the second line of the organization's address.
+	Address2 *string `json:"address_2,omitempty"`
+
+	// City is the city of the organization's address.
+	City *string `json:"city,omitempty"`
+
+	// State is the state or province of the organization's address.
+	State *string `json:"state,omitempty"`
+
+	// PostalCode is the postal code of the organization's address.
+	PostalCode *string `json:"postal_code,omitempty"`
+
+	// CountryCode is the ISO 3166-1 alpha-2 country code.
+	CountryCode *string `json:"country_code,omitempty"`
+
+	// BusinessNumber is the government issued business identifier.
+	BusinessNumber *string `json:"business_number,omitempty"`
+
+	// TaxID is the tax ID of the organization.
+	TaxID *string `json:"tax_id,omitempty"`
+
+	// TaxIDType is the type of tax ID.
+	TaxIDType *string `json:"tax_id_type,omitempty"`
+
+	// TaxRate is the tax rate for the organization.
+	TaxRate *string `json:"tax_rate,omitempty"`
+
+	// Currency is the currency used by the organization.
+	Currency *Currency `json:"currency,omitempty"`
+
+	// DefaultLocale is the default locale for the organization.
+	DefaultLocale *string `json:"default_locale,omitempty"`
+
+	// Users contains optional initial users to create with the organization.
+	Users []UserCreateRequest `json:"users,omitempty"`
+
+	// Attributes contains optional organization attributes.
+	Attributes []OrganizationAttributeCreate `json:"attributes,omitempty"`
+}
+
 // OrganizationUpdateRequest represents a request to update an organization.
 type OrganizationUpdateRequest struct {
 	// Name is the organization name.

@@ -206,6 +206,11 @@ func (s *EmailForwardsService) ListEmailForwardsByZone(ctx context.Context, zone
 		return nil, err
 	}
 
+	var zone models.EmailForwardZone
+	if err := s.client.http.DecodeResponse(resp, &zone); err == nil {
+		return zone.EmailForwards, nil
+	}
+
 	var result []models.EmailForward
 	if err := s.client.http.DecodeResponse(resp, &result); err != nil {
 		return nil, err

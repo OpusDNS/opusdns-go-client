@@ -116,6 +116,13 @@ type UserCreateRequest struct {
 
 	// Locale is the user's locale.
 	Locale string `json:"locale"`
+
+	// Password is the user's plaintext password.
+	// When omitted, the API can provision the user without an initial password.
+	Password *string `json:"password,omitempty"`
+
+	// UserAttributes contains optional custom user attributes.
+	UserAttributes map[string]interface{} `json:"user_attributes,omitempty"`
 }
 
 // UserUpdateRequest represents a request to update an existing user.

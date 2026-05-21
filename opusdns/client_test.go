@@ -785,6 +785,78 @@ func TestOrganizationsService_ListOrganizations(t *testing.T) {
 	assert.Equal(t, "Example", orgs[0].Name)
 }
 
+func TestOrganizationsService_CreateOrganization(t *testing.T) {
+	password := "secret-password"
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "POST", r.Method)
+		assert.Equal(t, "/v1/organizations", r.URL.Path)
+
+		var req models.OrganizationCreateRequest
+		err := json.NewDecoder(r.Body).Decode(&req)
+		require.NoError(t, err)
+		assert.Equal(t, "Example Child", req.Name)
+		require.Len(t, req.Users, 1)
+		assert.Equal(t, "owner@example.com", req.Users[0].Username)
+		require.NotNil(t, req.Users[0].Password)
+		assert.Equal(t, password, *req.Users[0].Password)
+		require.Len(t, req.Attributes, 1)
+		assert.Equal(t, "plan", req.Attributes[0].Key)
+		assert.Equal(t, "reseller", req.Attributes[0].Value)
+
+		w.WriteHeader(http.StatusCreated)
+		_ = json.NewEncoder(w).Encode(models.Organization{
+			OrganizationID: "organization_123",
+			Name:           "Example Child",
+		})
+	}))
+	defer server.Close()
+
+	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+	require.NoError(t, err)
+
+	org, err := client.Organizations.CreateOrganization(context.Background(), &models.OrganizationCreateRequest{
+		Name: "Example Child",
+		Users: []models.UserCreateRequest{
+			{
+				Username:  "owner@example.com",
+				FirstName: "Owner",
+				LastName:  "User",
+				Email:     "owner@example.com",
+				Locale:    "en-US",
+				Password:  &password,
+				UserAttributes: map[string]interface{}{
+					"department": "sales",
+				},
+			},
+		},
+		Attributes: []models.OrganizationAttributeCreate{
+			{Key: "plan", Value: "reseller"},
+		},
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, org)
+	assert.Equal(t, models.OrganizationID("organization_123"), org.OrganizationID)
+	assert.Equal(t, "Example Child", org.Name)
+}
+
+func TestOrganizationsService_DeleteOrganization(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "DELETE", r.Method)
+		assert.Equal(t, "/v1/organizations/organization_123", r.URL.Path)
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+
+	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+	require.NoError(t, err)
+
+	err = client.Organizations.DeleteOrganization(context.Background(), models.OrganizationID("organization_123"))
+
+	require.NoError(t, err)
+}
+
 func TestTagsService(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "GET", r.Method)
@@ -928,6 +1000,56 @@ func TestDomainForwardsService_ListDomainForwardsByZone(t *testing.T) {
 	require.Len(t, forwards, 2)
 	assert.Equal(t, "example.com.", forwards[0].Hostname)
 	assert.Equal(t, "www.example.com.", forwards[1].Hostname)
+}
+
+func TestEmailForwardsService_ListEmailForwardsByZone(t *testing.T) {
+	t.Run("decodes zone wrapper response", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assert.Equal(t, "GET", r.Method)
+			assert.Equal(t, "/v1/dns/example.com/email-forwards", r.URL.Path)
+
+			_ = json.NewEncoder(w).Encode(models.EmailForwardZone{
+				ZoneID:   "zone_123",
+				ZoneName: "example.com.",
+				EmailForwards: []models.EmailForward{
+					{EmailForwardID: "email_forward_123", Hostname: "example.com.", Enabled: true},
+					{EmailForwardID: "email_forward_456", Hostname: "www.example.com.", Enabled: false},
+				},
+			})
+		}))
+		defer server.Close()
+
+		client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+		require.NoError(t, err)
+
+		forwards, err := client.EmailForwards.ListEmailForwardsByZone(context.Background(), "example.com")
+
+		require.NoError(t, err)
+		require.Len(t, forwards, 2)
+		assert.Equal(t, models.EmailForwardID("email_forward_123"), forwards[0].EmailForwardID)
+		assert.Equal(t, "www.example.com.", forwards[1].Hostname)
+	})
+
+	t.Run("falls back to bare list response", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assert.Equal(t, "GET", r.Method)
+			assert.Equal(t, "/v1/dns/example.com/email-forwards", r.URL.Path)
+
+			_ = json.NewEncoder(w).Encode([]models.EmailForward{
+				{EmailForwardID: "email_forward_123", Hostname: "example.com.", Enabled: true},
+			})
+		}))
+		defer server.Close()
+
+		client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+		require.NoError(t, err)
+
+		forwards, err := client.EmailForwards.ListEmailForwardsByZone(context.Background(), "example.com")
+
+		require.NoError(t, err)
+		require.Len(t, forwards, 1)
+		assert.Equal(t, "example.com.", forwards[0].Hostname)
+	})
 }
 
 func TestEmailForwardsService_UpdateAlias(t *testing.T) {

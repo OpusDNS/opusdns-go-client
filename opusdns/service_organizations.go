@@ -98,6 +98,23 @@ func (s *OrganizationsService) GetOrganization(ctx context.Context, orgID models
 	return &org, nil
 }
 
+// CreateOrganization creates a child organization under the authenticated organization.
+func (s *OrganizationsService) CreateOrganization(ctx context.Context, req *models.OrganizationCreateRequest) (*models.Organization, error) {
+	path := s.client.http.BuildPath("organizations")
+
+	resp, err := s.client.http.Post(ctx, path, req)
+	if err != nil {
+		return nil, err
+	}
+
+	var org models.Organization
+	if err := s.client.http.DecodeResponse(resp, &org); err != nil {
+		return nil, err
+	}
+
+	return &org, nil
+}
+
 // UpdateOrganization updates an organization.
 func (s *OrganizationsService) UpdateOrganization(ctx context.Context, orgID models.OrganizationID, req *models.OrganizationUpdateRequest) (*models.Organization, error) {
 	path := s.client.http.BuildPath("organizations", string(orgID))
@@ -113,6 +130,18 @@ func (s *OrganizationsService) UpdateOrganization(ctx context.Context, orgID mod
 	}
 
 	return &org, nil
+}
+
+// DeleteOrganization deletes an organization.
+func (s *OrganizationsService) DeleteOrganization(ctx context.Context, orgID models.OrganizationID) error {
+	path := s.client.http.BuildPath("organizations", string(orgID))
+
+	resp, err := s.client.http.Delete(ctx, path)
+	if err != nil {
+		return err
+	}
+
+	return s.client.http.DecodeResponse(resp, nil)
 }
 
 // ListIPRestrictions retrieves IP restrictions for the organization.
