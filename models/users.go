@@ -140,20 +140,13 @@ type UserUpdateRequest struct {
 	Locale *string `json:"locale,omitempty"`
 }
 
-// Permission is a user permission identifier.
+// Permission is a user permission identifier, in "resource:scope" form
+// (e.g. "domains:read").
 type Permission string
 
-// PermissionSet represents the permissions assigned to a user.
+// PermissionSet represents the resolved permissions assigned to a user.
 type PermissionSet struct {
 	Permissions []Permission `json:"permissions"`
-}
-
-// Relation is a user relation/role identifier.
-type Relation string
-
-// RelationSet represents the roles assigned to a user.
-type RelationSet struct {
-	Relations []Relation `json:"relations"`
 }
 
 // ListUsersOptions contains options for listing users.

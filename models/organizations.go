@@ -289,35 +289,8 @@ type IPRestrictionUpdateRequest struct {
 	LastUsedOn *time.Time `json:"last_used_on,omitempty"`
 }
 
-// Role represents a user role within an organization.
-type Role struct {
-	// RoleID is the unique identifier for the role.
-	RoleID TypeID `json:"role_id"`
-
-	// Name is the role name.
-	Name string `json:"name"`
-
-	// Description is the role description.
-	Description *string `json:"description,omitempty"`
-
-	// Permissions is the list of permissions for the role.
-	Permissions []string `json:"permissions,omitempty"`
-
-	// IsSystem indicates if this is a system-defined role.
-	IsSystem bool `json:"is_system,omitempty"`
-
-	// CreatedOn is when the role was created.
-	CreatedOn *time.Time `json:"created_on,omitempty"`
-
-	// UpdatedOn is when the role was last updated.
-	UpdatedOn *time.Time `json:"updated_on,omitempty"`
-}
-
-// RoleListResponse represents the response when listing roles.
-type RoleListResponse struct {
-	// Results contains the list of roles.
-	Results []Role `json:"results"`
-}
+// Role and RoleListResponse moved to rbac.go and were replaced by RoleDefinition to
+// match the new public RBAC role model (label/built_in/"resource:scope" permissions).
 
 // OrganizationAttributesResponse represents the response when getting organization attributes.
 type OrganizationAttributesResponse struct {

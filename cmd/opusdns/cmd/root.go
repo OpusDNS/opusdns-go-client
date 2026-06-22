@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"time"
@@ -93,4 +94,14 @@ func getContext() (context.Context, context.CancelFunc) {
 // getClient returns the initialized client
 func getClient() *opusdns.Client {
 	return client
+}
+
+// printJSON marshals v as indented JSON and prints it to stdout.
+func printJSON(v interface{}) error {
+	data, err := json.MarshalIndent(v, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to format output: %w", err)
+	}
+	fmt.Println(string(data))
+	return nil
 }

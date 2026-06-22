@@ -122,8 +122,11 @@ The client provides access to the following services:
 | `client.DomainForwards` | Domain/URL forwarding (redirects) |
 | `client.TLDs` | TLD information and pricing |
 | `client.Availability` | Domain availability checking |
-| `client.Organizations` | Organization and billing management |
-| `client.Users` | User management |
+| `client.Organizations` | Organization, billing, and role (RBAC) management |
+| `client.Users` | User management and role assignment |
+| `client.Auth` | Authentication (API key introspection) |
+| `client.VanityNameservers` | Vanity nameserver set management |
+| `client.Hosts` | Host object management |
 | `client.Events` | Event and audit log access |
 | `client.Jobs` | Async job batch management |
 | `client.Reports` | Report generation and download |
@@ -457,6 +460,120 @@ os.WriteFile("report.zip", data, 0644)
 f, _ := os.Create("report.zip")
 defer f.Close()
 err = client.Reports.DownloadReportToWriter(ctx, reportID, f)
+```
+
+## Roles (RBAC)
+
+Roles are identified by a URL-safe `label`. The API exposes built-in roles
+(`admin`, `viewer`, `domain_manager`, `dns_manager`, `billing_manager`) plus any
+organization-owned custom roles. Permissions are `resource:scope` strings such as
+`domains:read` or `dns:manage`.
+
+### List and inspect roles
+
+```go
+// All roles assignable in the organization (built-in + custom).
+roles, err := client.Organizations.ListRoles(ctx)
+for _, role := range roles {
+    fmt.Printf("%s (built-in: %v): %v\n", role.Label, role.BuiltIn, role.Permissions)
+}
+
+// The catalog of permissions a custom role may grant.
+catalog, err := client.Organizations.ListRolePermissions(ctx)
+fmt.Println(catalog.Permissions)
+```
+
+### Create, update, and delete a custom role
+
+```go
+role, err := client.Organizations.CreateRole(ctx, &models.CustomRoleCreateRequest{
+    Name:        "Support Staff",
+    Description: models.StringPtr("Read-only support access"),
+    Permissions: []string{"domains:read", "dns:read"},
+})
+
+// Update is a partial patch; Permissions is a full replacement set when provided.
+perms := []string{"domains:read", "dns:read", "dns:manage"}
+role, err = client.Organizations.UpdateRole(ctx, role.Label, &models.CustomRoleUpdateRequest{
+    Permissions: &perms,
+})
+
+// Deletion is refused while the role is still assigned to any subject.
+err = client.Organizations.DeleteRole(ctx, role.Label)
+```
+
+### Assign a role to a user
+
+```go
+// Get a user's current role.
+assignment, err := client.Users.GetUserRole(ctx, userID)
+
+// Set a role (built-in name or custom role label).
+_, err = client.Users.SetUserRole(ctx, userID, models.StringPtr("domain_manager"))
+
+// Clear the role by passing nil.
+_, err = client.Users.SetUserRole(ctx, userID, nil)
+```
+
+### Inspect the current API key's role
+
+```go
+cred, err := client.Auth.IntrospectAPIKey(ctx)
+fmt.Printf("API key %s has role %v\n", cred.APIKeyID, models.Deref(cred.Role))
+```
+
+## Vanity Nameservers
+
+A vanity nameserver set brands DNS zones with your own nameserver hostnames.
+Creation and deletion are asynchronous — a newly created set starts with status
+`provisioning` until the provisioning chain finalizes it.
+
+```go
+// Create a set (returns status "provisioning").
+set, err := client.VanityNameservers.CreateSet(ctx, &models.VanityNameserverSetCreateRequest{
+    Name:             "Primary",
+    ParentDomainName: "example.com",
+    SOARName:         "hostmaster.example.com",
+    Hostnames:        []string{"ns1.example.com", "ns2.example.com"},
+})
+
+// List all sets (handles pagination automatically).
+sets, err := client.VanityNameservers.ListSets(ctx, nil)
+
+// Run a read-only diagnostic.
+report, err := client.VanityNameservers.CheckSet(ctx, set.SetID)
+fmt.Println(report.Summary.State) // ready | propagating | action_required | degraded
+
+// Manage the org default and list zones that use the set.
+_, err = client.VanityNameservers.SetDefault(ctx, set.SetID)
+_, err = client.VanityNameservers.ClearDefault(ctx)
+zones, err := client.VanityNameservers.ListZonesReferencingSet(ctx, set.SetID, nil)
+
+// Delete (asynchronous) and restore a suspended set.
+err = client.VanityNameservers.DeleteSet(ctx, set.SetID)
+_, err = client.VanityNameservers.RestoreSet(ctx, set.SetID)
+```
+
+## Host Objects
+
+Host objects are nameserver hosts identified by either their ID or their hostname.
+
+```go
+host, err := client.Hosts.CreateHost(ctx, &models.HostCreateRequest{
+    Hostname:    "ns1.example.com",
+    IPAddresses: []string{"192.0.2.53", "2001:db8::53"},
+})
+
+// Get by ID or hostname.
+host, err = client.Hosts.GetHost(ctx, "ns1.example.com")
+
+// Update the IP addresses.
+host, err = client.Hosts.UpdateHost(ctx, host.HostID.String(), &models.HostUpdateRequest{
+    IPAddresses: []string{"198.51.100.53"},
+})
+
+// Delete (only possible when the host is not in use).
+err = client.Hosts.DeleteHost(ctx, host.HostID.String())
 ```
 
 ## Error Handling

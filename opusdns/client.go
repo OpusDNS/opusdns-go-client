@@ -37,6 +37,15 @@ type Client struct {
 	// Users provides access to user management.
 	Users *UsersService
 
+	// Auth provides access to authentication-related operations.
+	Auth *AuthService
+
+	// VanityNameservers provides access to vanity nameserver set management.
+	VanityNameservers *VanityNameserversService
+
+	// Hosts provides access to host object management.
+	Hosts *HostsService
+
 	// Events provides access to event and audit log data.
 	Events *EventsService
 
@@ -85,6 +94,9 @@ func NewClient(opts ...Option) (*Client, error) {
 	client.Availability = &AvailabilityService{client: client}
 	client.Organizations = &OrganizationsService{client: client}
 	client.Users = &UsersService{client: client}
+	client.Auth = &AuthService{client: client}
+	client.VanityNameservers = &VanityNameserversService{client: client}
+	client.Hosts = &HostsService{client: client}
 	client.Events = &EventsService{client: client}
 	client.Jobs = &JobsService{client: client}
 	client.Reports = &ReportsService{client: client}
@@ -119,6 +131,9 @@ func NewClientWithConfig(config *Config) (*Client, error) {
 	client.Availability = &AvailabilityService{client: client}
 	client.Organizations = &OrganizationsService{client: client}
 	client.Users = &UsersService{client: client}
+	client.Auth = &AuthService{client: client}
+	client.VanityNameservers = &VanityNameserversService{client: client}
+	client.Hosts = &HostsService{client: client}
 	client.Events = &EventsService{client: client}
 	client.Jobs = &JobsService{client: client}
 	client.Reports = &ReportsService{client: client}

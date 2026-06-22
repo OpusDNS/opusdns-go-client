@@ -224,8 +224,9 @@ func (s *OrganizationsService) DeleteIPRestriction(ctx context.Context, restrict
 	return s.client.http.DecodeResponse(resp, nil)
 }
 
-// ListRoles retrieves available roles.
-func (s *OrganizationsService) ListRoles(ctx context.Context) (*models.RoleListResponse, error) {
+// ListRoles retrieves all roles assignable in the organization: the built-in roles
+// plus the organization's custom roles.
+func (s *OrganizationsService) ListRoles(ctx context.Context) ([]models.RoleDefinition, error) {
 	path := s.client.http.BuildPath("organizations", "roles")
 
 	resp, err := s.client.http.Get(ctx, path, nil)
@@ -233,7 +234,90 @@ func (s *OrganizationsService) ListRoles(ctx context.Context) (*models.RoleListR
 		return nil, err
 	}
 
-	var result models.RoleListResponse
+	var roles []models.RoleDefinition
+	if err := s.client.http.DecodeResponse(resp, &roles); err != nil {
+		return nil, err
+	}
+
+	return roles, nil
+}
+
+// GetRole retrieves a single role (built-in or custom) by its label.
+func (s *OrganizationsService) GetRole(ctx context.Context, label string) (*models.RoleDefinition, error) {
+	path := s.client.http.BuildPath("organizations", "roles", label)
+
+	resp, err := s.client.http.Get(ctx, path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var role models.RoleDefinition
+	if err := s.client.http.DecodeResponse(resp, &role); err != nil {
+		return nil, err
+	}
+
+	return &role, nil
+}
+
+// CreateRole creates an organization-owned custom role.
+func (s *OrganizationsService) CreateRole(ctx context.Context, req *models.CustomRoleCreateRequest) (*models.RoleDefinition, error) {
+	path := s.client.http.BuildPath("organizations", "roles")
+
+	resp, err := s.client.http.Post(ctx, path, req)
+	if err != nil {
+		return nil, err
+	}
+
+	var role models.RoleDefinition
+	if err := s.client.http.DecodeResponse(resp, &role); err != nil {
+		return nil, err
+	}
+
+	return &role, nil
+}
+
+// UpdateRole updates a custom role's name, description and/or permission set.
+// Built-in roles are immutable.
+func (s *OrganizationsService) UpdateRole(ctx context.Context, label string, req *models.CustomRoleUpdateRequest) (*models.RoleDefinition, error) {
+	path := s.client.http.BuildPath("organizations", "roles", label)
+
+	resp, err := s.client.http.Patch(ctx, path, req)
+	if err != nil {
+		return nil, err
+	}
+
+	var role models.RoleDefinition
+	if err := s.client.http.DecodeResponse(resp, &role); err != nil {
+		return nil, err
+	}
+
+	return &role, nil
+}
+
+// DeleteRole deletes a custom role. The request is refused while the role is still
+// assigned to any subject, and for built-in roles.
+func (s *OrganizationsService) DeleteRole(ctx context.Context, label string) error {
+	path := s.client.http.BuildPath("organizations", "roles", label)
+
+	resp, err := s.client.http.Delete(ctx, path)
+	if err != nil {
+		return err
+	}
+
+	return s.client.http.DecodeResponse(resp, nil)
+}
+
+// ListRolePermissions retrieves the catalog of "resource:scope" permissions a custom
+// role may grant.
+func (s *OrganizationsService) ListRolePermissions(ctx context.Context) (*models.PermissionCatalogResponse, error) {
+	path := s.client.http.BuildPath("organizations", "role-permissions")
+
+	resp, err := s.client.http.Get(ctx, path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var result models.PermissionCatalogResponse
 	if err := s.client.http.DecodeResponse(resp, &result); err != nil {
 		return nil, err
 	}

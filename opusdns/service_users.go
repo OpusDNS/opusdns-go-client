@@ -138,16 +138,35 @@ func (s *UsersService) GetUserPermissions(ctx context.Context, userID models.Use
 	return &result, nil
 }
 
-// GetUserRoles retrieves roles for a user.
-func (s *UsersService) GetUserRoles(ctx context.Context, userID models.UserID) (*models.RelationSet, error) {
-	path := s.client.http.BuildPath("users", string(userID), "roles")
+// GetUserRole retrieves the role assigned to a user.
+func (s *UsersService) GetUserRole(ctx context.Context, userID models.UserID) (*models.RoleAssignment, error) {
+	path := s.client.http.BuildPath("users", string(userID), "role")
 
 	resp, err := s.client.http.Get(ctx, path, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	var result models.RelationSet
+	var result models.RoleAssignment
+	if err := s.client.http.DecodeResponse(resp, &result); err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
+// SetUserRole sets the role for a user, replacing any existing role. The role may be a
+// built-in role name or the label of a custom role owned by the user's organization;
+// pass nil to clear the role.
+func (s *UsersService) SetUserRole(ctx context.Context, userID models.UserID, role *string) (*models.RoleAssignment, error) {
+	path := s.client.http.BuildPath("users", string(userID), "role")
+
+	resp, err := s.client.http.Put(ctx, path, &models.RoleAssignmentRequest{Role: role})
+	if err != nil {
+		return nil, err
+	}
+
+	var result models.RoleAssignment
 	if err := s.client.http.DecodeResponse(resp, &result); err != nil {
 		return nil, err
 	}
