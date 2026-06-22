@@ -237,6 +237,38 @@ var domainsCheckCmd = &cobra.Command{
 	},
 }
 
+var domainsCancelTransferCmd = &cobra.Command{
+	Use:   "cancel-transfer <domain-name>",
+	Short: "Cancel an in-progress domain transfer",
+	Long:  `Cancel an in-progress domain transfer. This deletes the domain object.`,
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx, cancel := getContext()
+		defer cancel()
+
+		domain := args[0]
+
+		force, _ := cmd.Flags().GetBool("force")
+		if !force {
+			fmt.Printf("Are you sure you want to cancel the transfer of '%s'? This deletes the domain object.\n", domain)
+			fmt.Print("Type 'yes' to confirm: ")
+			var confirm string
+			_, _ = fmt.Scanln(&confirm)
+			if confirm != "yes" {
+				fmt.Println("Aborted.")
+				return nil
+			}
+		}
+
+		if err := getClient().Domains.CancelTransfer(ctx, domain); err != nil {
+			return fmt.Errorf("failed to cancel transfer: %w", err)
+		}
+
+		fmt.Printf("✓ Transfer of '%s' cancelled!\n", domain)
+		return nil
+	},
+}
+
 func init() {
 	rootCmd.AddCommand(domainsCmd)
 
@@ -262,4 +294,8 @@ func init() {
 
 	// Check availability subcommand
 	domainsCmd.AddCommand(domainsCheckCmd)
+
+	// Cancel transfer subcommand
+	domainsCmd.AddCommand(domainsCancelTransferCmd)
+	domainsCancelTransferCmd.Flags().BoolP("force", "f", false, "Skip confirmation prompt")
 }

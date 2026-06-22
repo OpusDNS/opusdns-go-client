@@ -481,3 +481,35 @@ func TestHostsService_DeleteHost(t *testing.T) {
 	err = client.Hosts.DeleteHost(context.Background(), "host_1")
 	require.NoError(t, err)
 }
+
+// --- Domain transfer cancellation & event acknowledgement ---
+
+func TestDomainsService_CancelTransfer(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "DELETE", r.Method)
+		assert.Equal(t, "/v1/domains/example.com/transfer", r.URL.Path)
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+
+	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+	require.NoError(t, err)
+
+	err = client.Domains.CancelTransfer(context.Background(), "example.com")
+	require.NoError(t, err)
+}
+
+func TestEventsService_AcknowledgeEvent(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "PATCH", r.Method)
+		assert.Equal(t, "/v1/events/evt_1", r.URL.Path)
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+
+	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+	require.NoError(t, err)
+
+	err = client.Events.AcknowledgeEvent(context.Background(), "evt_1")
+	require.NoError(t, err)
+}

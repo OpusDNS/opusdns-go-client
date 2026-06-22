@@ -113,6 +113,18 @@ func (s *EventsService) GetEvent(ctx context.Context, eventID models.EventID) (*
 	return &event, nil
 }
 
+// AcknowledgeEvent acknowledges an event by ID.
+func (s *EventsService) AcknowledgeEvent(ctx context.Context, eventID models.EventID) error {
+	path := s.client.http.BuildPath("events", string(eventID))
+
+	resp, err := s.client.http.Patch(ctx, path, nil)
+	if err != nil {
+		return err
+	}
+
+	return s.client.http.DecodeResponse(resp, nil)
+}
+
 // ListObjectLogs retrieves object logs.
 func (s *EventsService) ListObjectLogs(ctx context.Context, opts *models.ListObjectLogsOptions) (*models.ObjectLogListResponse, error) {
 	path := s.client.http.BuildPath("archive", "object-logs")
