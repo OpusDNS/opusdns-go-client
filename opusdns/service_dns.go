@@ -263,6 +263,28 @@ func (s *DNSService) EnableDNSSEC(ctx context.Context, zoneName string) (*models
 	return &changes, nil
 }
 
+// SetZoneVanitySet assigns a vanity nameserver set to a zone (branding its apex NS and
+// SOA), or clears it when setID is nil (restamping the apex back to system defaults).
+func (s *DNSService) SetZoneVanitySet(ctx context.Context, zoneName string, setID *models.VanityNameserverSetID) (*models.Zone, error) {
+	zoneName = strings.TrimSuffix(zoneName, ".")
+	path := s.client.http.BuildPath("dns", url.PathEscape(zoneName), "vanity-set")
+
+	resp, err := s.client.http.Patch(ctx, path, &models.ZoneVanitySetUpdateRequest{VanityNameserverSetID: setID})
+	if err != nil {
+		return nil, err
+	}
+
+	// The endpoint returns {"zone": {...}}.
+	var result struct {
+		Zone models.Zone `json:"zone"`
+	}
+	if err := s.client.http.DecodeResponse(resp, &result); err != nil {
+		return nil, err
+	}
+
+	return &result.Zone, nil
+}
+
 // DisableDNSSEC disables DNSSEC for a zone.
 func (s *DNSService) DisableDNSSEC(ctx context.Context, zoneName string) (*models.DNSChanges, error) {
 	zoneName = strings.TrimSuffix(zoneName, ".")

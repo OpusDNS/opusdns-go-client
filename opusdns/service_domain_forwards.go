@@ -179,6 +179,53 @@ func (s *DomainForwardsService) DisableDomainForward(ctx context.Context, hostna
 	return s.client.http.DecodeResponse(resp, nil)
 }
 
+// GetDomainForwardSet retrieves all redirects for a specific protocol of a hostname.
+func (s *DomainForwardsService) GetDomainForwardSet(ctx context.Context, hostname string, protocol models.HttpProtocol) (*models.DomainForwardSetResponse, error) {
+	path := s.client.http.BuildPath("domain-forwards", url.PathEscape(hostname), string(protocol))
+
+	resp, err := s.client.http.Get(ctx, path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var set models.DomainForwardSetResponse
+	if err := s.client.http.DecodeResponse(resp, &set); err != nil {
+		return nil, err
+	}
+
+	return &set, nil
+}
+
+// CreateDomainForwardSet creates a domain forward set for a specific protocol of a hostname.
+func (s *DomainForwardsService) CreateDomainForwardSet(ctx context.Context, hostname string, req *models.DomainForwardSetCreateRequest) (*models.DomainForwardSetResponse, error) {
+	path := s.client.http.BuildPath("domain-forwards", url.PathEscape(hostname))
+
+	resp, err := s.client.http.Post(ctx, path, req)
+	if err != nil {
+		return nil, err
+	}
+
+	var set models.DomainForwardSetResponse
+	if err := s.client.http.DecodeResponse(resp, &set); err != nil {
+		return nil, err
+	}
+
+	return &set, nil
+}
+
+// PatchRedirects applies patch operations to update or remove redirects across
+// hostnames and protocols.
+func (s *DomainForwardsService) PatchRedirects(ctx context.Context, req *models.DomainForwardPatchOps) error {
+	path := s.client.http.BuildPath("domain-forwards")
+
+	resp, err := s.client.http.Patch(ctx, path, req)
+	if err != nil {
+		return err
+	}
+
+	return s.client.http.DecodeResponse(resp, nil)
+}
+
 // ListDomainForwardsByZone retrieves domain forwards for a specific DNS zone.
 func (s *DomainForwardsService) ListDomainForwardsByZone(ctx context.Context, zoneName string) ([]models.DomainForward, error) {
 	path := s.client.http.BuildPath("dns", url.PathEscape(zoneName), "domain-forwards")

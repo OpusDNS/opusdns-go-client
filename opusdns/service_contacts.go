@@ -206,3 +206,188 @@ func (s *ContactsService) VerifyContact(ctx context.Context, req *models.Contact
 
 	return s.client.http.DecodeResponse(resp, nil)
 }
+
+// ListContactAttributeSets retrieves all contact attribute sets with automatic pagination.
+func (s *ContactsService) ListContactAttributeSets(ctx context.Context, opts *models.ListContactAttributeSetsOptions) ([]models.ContactAttributeSet, error) {
+	var all []models.ContactAttributeSet
+	page := 1
+
+	for {
+		pageOpts := models.ListContactAttributeSetsOptions{PageSize: DefaultPageSize}
+		if opts != nil {
+			pageOpts = *opts
+		}
+		pageOpts.Page = page
+		if pageOpts.PageSize == 0 {
+			pageOpts.PageSize = DefaultPageSize
+		}
+
+		resp, err := s.ListContactAttributeSetsPage(ctx, &pageOpts)
+		if err != nil {
+			return nil, err
+		}
+
+		all = append(all, resp.Results...)
+
+		if !resp.Pagination.HasNextPage {
+			break
+		}
+		page++
+	}
+
+	return all, nil
+}
+
+// ListContactAttributeSetsPage retrieves a single page of contact attribute sets.
+func (s *ContactsService) ListContactAttributeSetsPage(ctx context.Context, opts *models.ListContactAttributeSetsOptions) (*models.ContactAttributeSetListResponse, error) {
+	path := s.client.http.BuildPath("contacts", "attribute-sets")
+
+	query := url.Values{}
+	if opts != nil {
+		if opts.Page > 0 {
+			query.Set("page", strconv.Itoa(opts.Page))
+		}
+		if opts.PageSize > 0 {
+			query.Set("page_size", strconv.Itoa(opts.PageSize))
+		}
+	}
+
+	resp, err := s.client.http.Get(ctx, path, query)
+	if err != nil {
+		return nil, err
+	}
+
+	var result models.ContactAttributeSetListResponse
+	if err := s.client.http.DecodeResponse(resp, &result); err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
+// GetContactAttributeSet retrieves a contact attribute set by ID.
+func (s *ContactsService) GetContactAttributeSet(ctx context.Context, setID models.ContactAttributeSetID) (*models.ContactAttributeSet, error) {
+	path := s.client.http.BuildPath("contacts", "attribute-sets", string(setID))
+
+	resp, err := s.client.http.Get(ctx, path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var set models.ContactAttributeSet
+	if err := s.client.http.DecodeResponse(resp, &set); err != nil {
+		return nil, err
+	}
+
+	return &set, nil
+}
+
+// CreateContactAttributeSet creates a contact attribute set.
+func (s *ContactsService) CreateContactAttributeSet(ctx context.Context, req *models.ContactAttributeSetCreateRequest) (*models.ContactAttributeSet, error) {
+	path := s.client.http.BuildPath("contacts", "attribute-sets")
+
+	resp, err := s.client.http.Post(ctx, path, req)
+	if err != nil {
+		return nil, err
+	}
+
+	var set models.ContactAttributeSet
+	if err := s.client.http.DecodeResponse(resp, &set); err != nil {
+		return nil, err
+	}
+
+	return &set, nil
+}
+
+// UpdateContactAttributeSet updates a contact attribute set.
+func (s *ContactsService) UpdateContactAttributeSet(ctx context.Context, setID models.ContactAttributeSetID, req *models.ContactAttributeSetUpdateRequest) (*models.ContactAttributeSet, error) {
+	path := s.client.http.BuildPath("contacts", "attribute-sets", string(setID))
+
+	resp, err := s.client.http.Patch(ctx, path, req)
+	if err != nil {
+		return nil, err
+	}
+
+	var set models.ContactAttributeSet
+	if err := s.client.http.DecodeResponse(resp, &set); err != nil {
+		return nil, err
+	}
+
+	return &set, nil
+}
+
+// DeleteContactAttributeSet deletes a contact attribute set.
+func (s *ContactsService) DeleteContactAttributeSet(ctx context.Context, setID models.ContactAttributeSetID) error {
+	path := s.client.http.BuildPath("contacts", "attribute-sets", string(setID))
+
+	resp, err := s.client.http.Delete(ctx, path)
+	if err != nil {
+		return err
+	}
+
+	return s.client.http.DecodeResponse(resp, nil)
+}
+
+// LinkContactAttributeSet links a contact to a contact attribute set.
+func (s *ContactsService) LinkContactAttributeSet(ctx context.Context, contactID models.ContactID, setID models.ContactAttributeSetID) (*models.ContactAttributeLink, error) {
+	path := s.client.http.BuildPath("contacts", string(contactID), "link", string(setID))
+
+	resp, err := s.client.http.Patch(ctx, path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var link models.ContactAttributeLink
+	if err := s.client.http.DecodeResponse(resp, &link); err != nil {
+		return nil, err
+	}
+
+	return &link, nil
+}
+
+// AttestContactVerification submits one or more contact-verification attestations and
+// returns the per-claim verification state.
+func (s *ContactsService) AttestContactVerification(ctx context.Context, contactID models.ContactID, req *models.ContactAttestRequest) (*models.ContactAttestResponse, error) {
+	path := s.client.http.BuildPath("contacts", string(contactID), "verifications", "attest")
+
+	resp, err := s.client.http.Post(ctx, path, req)
+	if err != nil {
+		return nil, err
+	}
+
+	var result models.ContactAttestResponse
+	if err := s.client.http.DecodeResponse(resp, &result); err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
+// GetContactVerifications retrieves the current verification state for a contact.
+func (s *ContactsService) GetContactVerifications(ctx context.Context, contactID models.ContactID) (*models.ContactAttestResponse, error) {
+	path := s.client.http.BuildPath("contacts", string(contactID), "verifications")
+
+	resp, err := s.client.http.Get(ctx, path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var result models.ContactAttestResponse
+	if err := s.client.http.DecodeResponse(resp, &result); err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
+// CancelContactVerification deletes a contact's verification.
+func (s *ContactsService) CancelContactVerification(ctx context.Context, contactID models.ContactID) error {
+	path := s.client.http.BuildPath("contacts", string(contactID), "verification")
+
+	resp, err := s.client.http.Delete(ctx, path)
+	if err != nil {
+		return err
+	}
+
+	return s.client.http.DecodeResponse(resp, nil)
+}

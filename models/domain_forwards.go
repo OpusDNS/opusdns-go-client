@@ -121,6 +121,27 @@ type HttpRedirect struct {
 
 	// RedirectCode is the HTTP redirect status code.
 	RedirectCode RedirectCode `json:"redirect_code"`
+
+	// Protected indicates whether the redirect is protected.
+	Protected *bool `json:"protected,omitempty"`
+}
+
+// DomainForwardSetResponse represents a protocol-specific domain forward set.
+type DomainForwardSetResponse struct {
+	// Hostname is the source hostname.
+	Hostname string `json:"hostname"`
+
+	// Protocol is the protocol (http or https) of this set.
+	Protocol HttpProtocol `json:"protocol"`
+
+	// Redirects contains the list of redirect configurations.
+	Redirects []HttpRedirect `json:"redirects"`
+
+	// CreatedOn is when the set was created.
+	CreatedOn time.Time `json:"created_on"`
+
+	// UpdatedOn is when the set was last updated.
+	UpdatedOn time.Time `json:"updated_on"`
 }
 
 // DomainForwardListResponse represents the paginated response when listing domain forwards.

@@ -325,6 +325,40 @@ func (s *OrganizationsService) ListRolePermissions(ctx context.Context) (*models
 	return &result, nil
 }
 
+// GetCurrentAttributes retrieves the authenticated organization's attributes.
+func (s *OrganizationsService) GetCurrentAttributes(ctx context.Context) (*models.OrganizationAttributesResponse, error) {
+	path := s.client.http.BuildPath("organizations", "attributes")
+
+	resp, err := s.client.http.Get(ctx, path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var result models.OrganizationAttributesResponse
+	if err := s.client.http.DecodeResponse(resp, &result); err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
+// UpdateCurrentAttributes updates the authenticated organization's attributes.
+func (s *OrganizationsService) UpdateCurrentAttributes(ctx context.Context, req *models.OrganizationAttributeUpdateRequest) (*models.OrganizationAttributesResponse, error) {
+	path := s.client.http.BuildPath("organizations", "attributes")
+
+	resp, err := s.client.http.Patch(ctx, path, req)
+	if err != nil {
+		return nil, err
+	}
+
+	var result models.OrganizationAttributesResponse
+	if err := s.client.http.DecodeResponse(resp, &result); err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
 // GetAttributes retrieves organization attributes.
 func (s *OrganizationsService) GetAttributes(ctx context.Context, orgID models.OrganizationID) (*models.OrganizationAttributesResponse, error) {
 	path := s.client.http.BuildPath("organizations", "attributes", string(orgID))

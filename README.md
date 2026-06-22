@@ -554,6 +554,41 @@ err = client.VanityNameservers.DeleteSet(ctx, set.SetID)
 _, err = client.VanityNameservers.RestoreSet(ctx, set.SetID)
 ```
 
+Brand a DNS zone's apex with a vanity NS set (or pass `nil` to clear it and restamp
+back to OpusDNS system defaults):
+
+```go
+zone, err := client.DNS.SetZoneVanitySet(ctx, "example.com", &set.SetID)
+```
+
+## Contact Attribute Sets & Verification
+
+Contact attribute sets hold TLD-specific registry attributes (e.g. DENIC contact
+fields) that can be linked to contacts. Contacts can also carry verification
+attestations.
+
+```go
+// Create a TLD attribute set and link it to a contact.
+set, err := client.Contacts.CreateContactAttributeSet(ctx, &models.ContactAttributeSetCreateRequest{
+    Label:      "DENIC individual",
+    TLD:        "de",
+    Attributes: map[string]string{"denic_type": "individual"},
+})
+sets, err := client.Contacts.ListContactAttributeSets(ctx, nil)
+_, err = client.Contacts.LinkContactAttributeSet(ctx, contactID, set.ContactAttributeSetID)
+
+// Submit verification attestations and read the per-claim state.
+res, err := client.Contacts.AttestContactVerification(ctx, contactID, &models.ContactAttestRequest{
+    Attestations: []models.ContactAttestVerificationRequest{{
+        Claim:  models.ContactVerificationClaimName,
+        Method: models.ContactVerificationMethodAuth,
+        Proof:  models.ContactVerificationProofIDCard,
+    }},
+})
+status, err := client.Contacts.GetContactVerifications(ctx, contactID)
+err = client.Contacts.CancelContactVerification(ctx, contactID)
+```
+
 ## Host Objects
 
 Host objects are nameserver hosts identified by either their ID or their hostname.

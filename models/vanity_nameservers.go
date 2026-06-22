@@ -206,6 +206,14 @@ type VanityNsCheckResponse struct {
 	Checks []VanityNsCheckResult `json:"checks,omitempty"`
 }
 
+// ZoneVanitySetUpdateRequest is the request body for assigning or clearing a zone's
+// vanity NS branding. A nil VanityNameserverSetID unassigns the set and restamps the
+// apex back to OpusDNS system defaults.
+type ZoneVanitySetUpdateRequest struct {
+	// VanityNameserverSetID is the vanity NS set to brand the zone with, or nil to clear.
+	VanityNameserverSetID *VanityNameserverSetID `json:"vanity_nameserver_set_id"`
+}
+
 // ListVanityNameserverSetsOptions contains options for listing vanity NS sets.
 type ListVanityNameserverSetsOptions struct {
 	// Page is the page number to retrieve (1-indexed).
