@@ -28,6 +28,21 @@ const (
 	TagTypeZone    TagType = "ZONE"
 )
 
+// StatusTagType is the status tag type identifier.
+type StatusTagType string
+
+const (
+	StatusTagTypeVerificationRequired StatusTagType = "VERIFICATION_REQUIRED"
+)
+
+// StatusTagResponse represents a system-managed status tag on a resource.
+type StatusTagResponse struct {
+	TagType     StatusTagType `json:"tag_type"`
+	Label       string        `json:"label"`
+	Color       TagColor      `json:"color"`
+	Description *string       `json:"description,omitempty"`
+}
+
 // TagSortField represents fields that can be used for sorting tags.
 type TagSortField string
 
@@ -99,7 +114,7 @@ type BulkObjectTagChanges struct {
 	Objects []string `json:"objects"`
 	Add     []TagID  `json:"add,omitempty"`
 	Remove  []TagID  `json:"remove,omitempty"`
-	Replace []TagID  `json:"replace"`
+	Replace *[]TagID `json:"replace,omitempty"`
 }
 
 // ObjectTagChangesResponse summarizes tag object update results.

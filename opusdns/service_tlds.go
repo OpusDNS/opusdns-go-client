@@ -165,8 +165,8 @@ func (s *AvailabilityService) GetSuggestions(ctx context.Context, query string, 
 		if opts.Limit > 0 {
 			urlQuery.Set("limit", strconv.Itoa(opts.Limit))
 		}
-		if opts.IncludeUnavailable {
-			urlQuery.Set("include_unavailable", "true")
+		if opts.Premium != nil {
+			urlQuery.Set("premium", strconv.FormatBool(*opts.Premium))
 		}
 	}
 

@@ -2,6 +2,7 @@ package opusdns
 
 import (
 	"context"
+	"net/http"
 	"net/url"
 	"strconv"
 
@@ -147,6 +148,33 @@ func (s *JobsService) ResumeBatch(ctx context.Context, batchID models.BatchID) e
 	return s.client.http.DecodeResponse(resp, nil)
 }
 
+// RetryBatch retries the FAILED and dead-lettered jobs in a batch. When errorClasses
+// is non-empty, only jobs whose error class matches one of the values are retried.
+func (s *JobsService) RetryBatch(ctx context.Context, batchID models.BatchID, errorClasses []string) (*models.JobBatchRetryResponse, error) {
+	path := s.client.http.BuildPath("jobs", string(batchID), "retry")
+
+	query := url.Values{}
+	for _, ec := range errorClasses {
+		query.Add("error_class", ec)
+	}
+
+	resp, err := s.client.http.Do(ctx, &Request{
+		Method: http.MethodPost,
+		Path:   path,
+		Query:  query,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var result models.JobBatchRetryResponse
+	if err := s.client.http.DecodeResponse(resp, &result); err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
 // ListBatchJobs retrieves all jobs within a batch with automatic pagination.
 func (s *JobsService) ListBatchJobs(ctx context.Context, batchID models.BatchID, opts *models.ListBatchJobsOptions) ([]models.JobResponse, error) {
 	var all []models.JobResponse
@@ -243,6 +271,23 @@ func (s *JobsService) PauseJob(ctx context.Context, jobID models.JobID) error {
 // ResumeJob resumes a paused individual job.
 func (s *JobsService) ResumeJob(ctx context.Context, jobID models.JobID) (*models.JobResponse, error) {
 	path := s.client.http.BuildPath("job", string(jobID), "resume")
+
+	resp, err := s.client.http.Post(ctx, path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var result models.JobResponse
+	if err := s.client.http.DecodeResponse(resp, &result); err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
+// RetryJob retries a failed or dead-lettered individual job.
+func (s *JobsService) RetryJob(ctx context.Context, jobID models.JobID) (*models.JobResponse, error) {
+	path := s.client.http.BuildPath("job", string(jobID), "retry")
 
 	resp, err := s.client.http.Post(ctx, path, nil)
 	if err != nil {

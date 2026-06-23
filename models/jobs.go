@@ -240,6 +240,15 @@ type JobListResponse struct {
 	Pagination Pagination `json:"pagination"`
 }
 
+// JobBatchRetryResponse represents the response when retrying failed jobs in a batch.
+type JobBatchRetryResponse struct {
+	// BatchID identifies the batch.
+	BatchID BatchID `json:"batch_id"`
+
+	// RetriedCount is the number of FAILED/DEAD_LETTER jobs reset to QUEUED for retry.
+	RetriedCount int `json:"retried_count"`
+}
+
 // ListBatchesOptions contains options for listing job batches.
 type ListBatchesOptions struct {
 	// Page is the page number to retrieve (1-indexed).

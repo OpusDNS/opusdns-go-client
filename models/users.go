@@ -15,10 +15,16 @@ const (
 
 	// UserStatusInactive indicates the user is inactive.
 	UserStatusInactive UserStatus = "inactive"
-
-	// UserStatusPending indicates the user is pending activation.
-	UserStatusPending UserStatus = "pending"
 )
+
+// UserAttributeBase represents a single user attribute key/value pair.
+type UserAttributeBase struct {
+	// Key is the attribute key.
+	Key string `json:"key"`
+
+	// Value is the attribute value.
+	Value interface{} `json:"value,omitempty"`
+}
 
 // UserSortField represents fields that can be used for sorting users.
 type UserSortField string
@@ -122,38 +128,40 @@ type UserCreateRequest struct {
 	Password *string `json:"password,omitempty"`
 
 	// UserAttributes contains optional custom user attributes.
-	UserAttributes map[string]interface{} `json:"user_attributes,omitempty"`
+	UserAttributes []UserAttributeBase `json:"user_attributes,omitempty"`
 }
 
 // UserUpdateRequest represents a request to update an existing user.
 type UserUpdateRequest struct {
+	// Username is the user's unique username.
+	Username *string `json:"username,omitempty"`
+
 	// FirstName is the user's first name.
 	FirstName *string `json:"first_name,omitempty"`
 
 	// LastName is the user's last name.
 	LastName *string `json:"last_name,omitempty"`
 
+	// Email is the user's email address.
+	Email *string `json:"email,omitempty"`
+
 	// Phone is the user's phone number.
 	Phone *string `json:"phone,omitempty"`
 
 	// Locale is the user's locale.
 	Locale *string `json:"locale,omitempty"`
+
+	// UserAttributes contains optional custom user attributes.
+	UserAttributes []UserAttributeBase `json:"user_attributes,omitempty"`
 }
 
-// Permission is a user permission identifier.
+// Permission is a user permission identifier, in "resource:scope" form
+// (e.g. "domains:read").
 type Permission string
 
-// PermissionSet represents the permissions assigned to a user.
+// PermissionSet represents the resolved permissions assigned to a user.
 type PermissionSet struct {
 	Permissions []Permission `json:"permissions"`
-}
-
-// Relation is a user relation/role identifier.
-type Relation string
-
-// RelationSet represents the roles assigned to a user.
-type RelationSet struct {
-	Relations []Relation `json:"relations"`
 }
 
 // ListUsersOptions contains options for listing users.

@@ -75,12 +75,6 @@ func (s *EventsService) ListEventsPage(ctx context.Context, opts *models.ListEve
 		if opts.ObjectID != "" {
 			query.Set("object_id", opts.ObjectID)
 		}
-		if opts.CreatedAfter != nil {
-			query.Set("created_after", opts.CreatedAfter.Format(time.RFC3339))
-		}
-		if opts.CreatedBefore != nil {
-			query.Set("created_before", opts.CreatedBefore.Format(time.RFC3339))
-		}
 	}
 
 	resp, err := s.client.http.Get(ctx, path, query)
@@ -111,6 +105,18 @@ func (s *EventsService) GetEvent(ctx context.Context, eventID models.EventID) (*
 	}
 
 	return &event, nil
+}
+
+// AcknowledgeEvent acknowledges an event by ID.
+func (s *EventsService) AcknowledgeEvent(ctx context.Context, eventID models.EventID) error {
+	path := s.client.http.BuildPath("events", string(eventID))
+
+	resp, err := s.client.http.Patch(ctx, path, nil)
+	if err != nil {
+		return err
+	}
+
+	return s.client.http.DecodeResponse(resp, nil)
 }
 
 // ListObjectLogs retrieves object logs.

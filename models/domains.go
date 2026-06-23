@@ -102,8 +102,20 @@ type DomainSortField string
 const (
 	DomainSortByName         DomainSortField = "name"
 	DomainSortByCreatedOn    DomainSortField = "created_on"
+	DomainSortByUpdatedOn    DomainSortField = "updated_on"
 	DomainSortByExpiresOn    DomainSortField = "expires_on"
 	DomainSortByRegisteredOn DomainSortField = "registered_on"
+)
+
+// DomainClientStatus represents an EPP client status that can be set on a domain.
+type DomainClientStatus string
+
+const (
+	DomainClientStatusTransferProhibited DomainClientStatus = "clientTransferProhibited"
+	DomainClientStatusUpdateProhibited   DomainClientStatus = "clientUpdateProhibited"
+	DomainClientStatusDeleteProhibited   DomainClientStatus = "clientDeleteProhibited"
+	DomainClientStatusRenewProhibited    DomainClientStatus = "clientRenewProhibited"
+	DomainClientStatusHold               DomainClientStatus = "clientHold"
 )
 
 // Domain represents a registered domain.
@@ -266,10 +278,10 @@ type ContactHandle struct {
 // Cannot be used together with Statuses in DomainUpdateRequest.
 type StatusChanges struct {
 	// Add is a list of client statuses to add.
-	Add []string `json:"add,omitempty"`
+	Add []DomainClientStatus `json:"add,omitempty"`
 
 	// Remove is a list of client statuses to remove.
-	Remove []string `json:"remove,omitempty"`
+	Remove []DomainClientStatus `json:"remove,omitempty"`
 }
 
 // DomainUpdateRequest represents a request to update a domain.
@@ -286,7 +298,7 @@ type DomainUpdateRequest struct {
 	// Statuses is the complete list of client statuses to set on the domain.
 	// This replaces the entire client status list.
 	// Mutually exclusive with StatusChanges.
-	Statuses []string `json:"statuses,omitempty"`
+	Statuses []DomainClientStatus `json:"statuses,omitempty"`
 
 	// StatusChanges provides add/remove semantics for client statuses.
 	// Mutually exclusive with Statuses.

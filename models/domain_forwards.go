@@ -38,7 +38,10 @@ const (
 type DomainForwardSortField string
 
 const (
-	DomainForwardSortByHostname DomainForwardSortField = "hostname"
+	DomainForwardSortByHostname  DomainForwardSortField = "hostname"
+	DomainForwardSortByEnabled   DomainForwardSortField = "enabled"
+	DomainForwardSortByCreatedOn DomainForwardSortField = "created_on"
+	DomainForwardSortByUpdatedOn DomainForwardSortField = "updated_on"
 )
 
 // TimeRange represents a domain-forward metrics time range.
@@ -49,6 +52,7 @@ const (
 	TimeRange1D  TimeRange = "1d"
 	TimeRange7D  TimeRange = "7d"
 	TimeRange30D TimeRange = "30d"
+	TimeRange1Y  TimeRange = "1y"
 )
 
 // DomainForwardZoneSortField represents fields that can be used for sorting domain forward zones.
@@ -65,6 +69,9 @@ const (
 
 // DomainForward represents a domain forwarding configuration.
 type DomainForward struct {
+	// DomainForwardID is the unique identifier of the domain forward.
+	DomainForwardID TypeID `json:"domain_forward_id"`
+
 	// Hostname is the source hostname (e.g., "www.example.com" or "example.com").
 	Hostname string `json:"hostname"`
 
@@ -82,6 +89,9 @@ type DomainForward struct {
 
 	// UpdatedOn is when the domain forward was last updated.
 	UpdatedOn time.Time `json:"updated_on"`
+
+	// ParkingID is the optional ID of the associated parking configuration.
+	ParkingID *TypeID `json:"parking_id,omitempty"`
 }
 
 // DomainForwardProtocolSet represents the forwarding configuration for a specific protocol.
@@ -121,6 +131,27 @@ type HttpRedirect struct {
 
 	// RedirectCode is the HTTP redirect status code.
 	RedirectCode RedirectCode `json:"redirect_code"`
+
+	// Protected indicates whether the redirect is protected.
+	Protected *bool `json:"protected,omitempty"`
+}
+
+// DomainForwardSetResponse represents a protocol-specific domain forward set.
+type DomainForwardSetResponse struct {
+	// Hostname is the source hostname.
+	Hostname string `json:"hostname"`
+
+	// Protocol is the protocol (http or https) of this set.
+	Protocol HttpProtocol `json:"protocol"`
+
+	// Redirects contains the list of redirect configurations.
+	Redirects []HttpRedirect `json:"redirects"`
+
+	// CreatedOn is when the set was created.
+	CreatedOn time.Time `json:"created_on"`
+
+	// UpdatedOn is when the set was last updated.
+	UpdatedOn time.Time `json:"updated_on"`
 }
 
 // DomainForwardListResponse represents the paginated response when listing domain forwards.
@@ -319,8 +350,8 @@ type TimeSeriesBucket struct {
 	// Timestamp is the timestamp for this bucket.
 	Timestamp time.Time `json:"timestamp"`
 
-	// Value is the value for this bucket.
-	Value int `json:"value"`
+	// Total is the value for this bucket.
+	Total int `json:"total"`
 }
 
 // DomainForwardTimeSeriesResponse represents time series metrics for domain forwards.
@@ -331,11 +362,11 @@ type DomainForwardTimeSeriesResponse struct {
 
 // GeoStatsBucket represents geographic statistics.
 type GeoStatsBucket struct {
-	// Country is the country code.
-	Country string `json:"country"`
+	// Key is the country code.
+	Key string `json:"key"`
 
-	// Count is the number of visits from this country.
-	Count int `json:"count"`
+	// Total is the number of visits from this country.
+	Total int `json:"total"`
 }
 
 // DomainForwardGeoStatsResponse represents geographic statistics for domain forwards.
@@ -346,11 +377,14 @@ type DomainForwardGeoStatsResponse struct {
 
 // BrowserStatsBucket represents browser statistics.
 type BrowserStatsBucket struct {
-	// Browser is the browser name.
-	Browser string `json:"browser"`
+	// Key is the browser name.
+	Key string `json:"key"`
 
-	// Count is the number of visits from this browser.
-	Count int `json:"count"`
+	// Total is the number of visits from this browser.
+	Total int `json:"total"`
+
+	// Unique is the number of unique visits from this browser.
+	Unique int `json:"unique"`
 }
 
 // DomainForwardBrowserStatsResponse represents browser statistics for domain forwards.
@@ -361,11 +395,14 @@ type DomainForwardBrowserStatsResponse struct {
 
 // PlatformStatsBucket represents platform/OS statistics.
 type PlatformStatsBucket struct {
-	// Platform is the platform/OS name.
-	Platform string `json:"platform"`
+	// Key is the platform/OS name.
+	Key string `json:"key"`
 
-	// Count is the number of visits from this platform.
-	Count int `json:"count"`
+	// Total is the number of visits from this platform.
+	Total int `json:"total"`
+
+	// Unique is the number of unique visits from this platform.
+	Unique int `json:"unique"`
 }
 
 // DomainForwardPlatformStatsResponse represents platform statistics for domain forwards.
@@ -376,11 +413,14 @@ type DomainForwardPlatformStatsResponse struct {
 
 // ReferrerStatsBucket represents referrer statistics.
 type ReferrerStatsBucket struct {
-	// Referrer is the referrer URL or domain.
-	Referrer string `json:"referrer"`
+	// Key is the referrer URL or domain.
+	Key string `json:"key"`
 
-	// Count is the number of visits from this referrer.
-	Count int `json:"count"`
+	// Total is the number of visits from this referrer.
+	Total int `json:"total"`
+
+	// Unique is the number of unique visits from this referrer.
+	Unique int `json:"unique"`
 }
 
 // DomainForwardReferrerStatsResponse represents referrer statistics for domain forwards.
@@ -391,11 +431,11 @@ type DomainForwardReferrerStatsResponse struct {
 
 // StatusCodeStatsBucket represents HTTP status code statistics.
 type StatusCodeStatsBucket struct {
-	// StatusCode is the HTTP status code.
-	StatusCode int `json:"status_code"`
+	// Key is the HTTP status code.
+	Key string `json:"key"`
 
-	// Count is the number of responses with this status code.
-	Count int `json:"count"`
+	// Total is the number of responses with this status code.
+	Total int `json:"total"`
 }
 
 // DomainForwardStatusCodeStatsResponse represents status code statistics for domain forwards.
@@ -406,11 +446,14 @@ type DomainForwardStatusCodeStatsResponse struct {
 
 // UserAgentStatsBucket represents user agent statistics.
 type UserAgentStatsBucket struct {
-	// UserAgent is the user agent string.
-	UserAgent string `json:"user_agent"`
+	// Key is the user agent string.
+	Key string `json:"key"`
 
-	// Count is the number of visits from this user agent.
-	Count int `json:"count"`
+	// Total is the number of visits from this user agent.
+	Total int `json:"total"`
+
+	// Unique is the number of unique visits from this user agent.
+	Unique int `json:"unique"`
 }
 
 // DomainForwardUserAgentStatsResponse represents user agent statistics for domain forwards.
@@ -424,8 +467,11 @@ type VisitsByKeyBucket struct {
 	// Key is the grouping key.
 	Key string `json:"key"`
 
-	// Count is the number of visits for this key.
-	Count int `json:"count"`
+	// Total is the number of visits for this key.
+	Total int `json:"total"`
+
+	// Unique is the number of unique visits for this key.
+	Unique int `json:"unique"`
 }
 
 // DomainForwardVisitsByKeyResponse represents visits grouped by key for domain forwards.

@@ -236,6 +236,19 @@ func (s *DomainsService) TransferDomain(ctx context.Context, req *models.DomainT
 	return &domain, nil
 }
 
+// CancelTransfer cancels an in-progress domain transfer and deletes the domain object.
+// The domain is referenced by either its ID or its name.
+func (s *DomainsService) CancelTransfer(ctx context.Context, domainRef string) error {
+	path := s.client.http.BuildPath("domains", url.PathEscape(domainRef), "transfer")
+
+	resp, err := s.client.http.Delete(ctx, path)
+	if err != nil {
+		return err
+	}
+
+	return s.client.http.DecodeResponse(resp, nil)
+}
+
 // RenewDomain renews a domain registration.
 func (s *DomainsService) RenewDomain(ctx context.Context, domainRef string, req *models.DomainRenewRequest) (*models.Domain, error) {
 	path := s.client.http.BuildPath("domains", url.PathEscape(domainRef), "renew")

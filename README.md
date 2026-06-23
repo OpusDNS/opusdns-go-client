@@ -122,8 +122,11 @@ The client provides access to the following services:
 | `client.DomainForwards` | Domain/URL forwarding (redirects) |
 | `client.TLDs` | TLD information and pricing |
 | `client.Availability` | Domain availability checking |
-| `client.Organizations` | Organization and billing management |
-| `client.Users` | User management |
+| `client.Organizations` | Organization, billing, and role (RBAC) management |
+| `client.Users` | User management and role assignment |
+| `client.Auth` | Authentication (API key introspection) |
+| `client.VanityNameservers` | Vanity nameserver set management |
+| `client.Hosts` | Host object management |
 | `client.Events` | Event and audit log access |
 | `client.Jobs` | Async job batch management |
 | `client.Reports` | Report generation and download |
@@ -291,19 +294,19 @@ contact, err := client.Contacts.CreateContact(ctx, &models.ContactCreateRequest{
 
 // Then register the domain
 domain, err := client.Domains.CreateDomain(ctx, &models.DomainCreateRequest{
-    Name:   "example.com",
-    Period: 1, // 1 year
-    Contacts: map[models.DomainContactType]models.ContactHandle{
-        models.DomainContactTypeRegistrant: {ContactID: contact.ContactID},
-        models.DomainContactTypeAdmin:      {ContactID: contact.ContactID},
-        models.DomainContactTypeTech:       {ContactID: contact.ContactID},
+    Name:        "example.com",
+    Period:      models.DomainPeriod{Value: 1, Unit: models.PeriodUnitYear},
+    RenewalMode: models.RenewalModeRenew,
+    Contacts: map[models.DomainContactType][]models.ContactHandle{
+        models.DomainContactTypeRegistrant: {{ContactID: contact.ContactID}},
+        models.DomainContactTypeAdmin:      {{ContactID: contact.ContactID}},
+        models.DomainContactTypeTech:       {{ContactID: contact.ContactID}},
     },
     Nameservers: []models.Nameserver{
         {Hostname: "ns1.opusdns.com"},
         {Hostname: "ns2.opusdns.com"},
     },
-    TransferLock: models.BoolPtr(true),
-    RenewMode:    models.RenewModePtr(models.RenewModeRenew),
+    CreateZone: true, // optionally provision a DNS zone on OpusDNS nameservers
 })
 ```
 
@@ -311,12 +314,16 @@ domain, err := client.Domains.CreateDomain(ctx, &models.DomainCreateRequest{
 
 ```go
 domain, err := client.Domains.TransferDomain(ctx, &models.DomainTransferRequest{
-    Name:     "example.com",
-    AuthCode: "abc123xyz",
-    Contacts: map[models.DomainContactType]models.ContactHandle{
-        models.DomainContactTypeRegistrant: {ContactID: contactID},
+    Name:        "example.com",
+    AuthCode:    "abc123xyz",
+    RenewalMode: models.RenewalModeRenew,
+    Contacts: map[models.DomainContactType][]models.ContactHandle{
+        models.DomainContactTypeRegistrant: {{ContactID: contactID}},
     },
 })
+
+// Abort a transfer while it is still pending
+err = client.Domains.CancelTransfer(ctx, "example.com")
 ```
 
 ### Renew a Domain
@@ -325,6 +332,60 @@ domain, err := client.Domains.TransferDomain(ctx, &models.DomainTransferRequest{
 domain, err := client.Domains.RenewDomain(ctx, "example.com", &models.DomainRenewRequest{
     Period: 2, // Renew for 2 years
 })
+```
+
+### Update a Domain
+
+```go
+expire := models.RenewalModeExpire
+domain, err := client.Domains.UpdateDomain(ctx, "example.com", &models.DomainUpdateRequest{
+    Nameservers: []models.Nameserver{
+        {Hostname: "ns1.example.com"},
+        {Hostname: "ns2.example.com"},
+    },
+    RenewalMode: &expire,
+    // Replace the entire client-status set. Use StatusChanges for add/remove
+    // semantics instead (the two fields are mutually exclusive).
+    Statuses: []models.DomainClientStatus{
+        models.DomainClientStatusTransferProhibited,
+        models.DomainClientStatusUpdateProhibited,
+    },
+})
+```
+
+### Delete and Restore a Domain
+
+```go
+// Delete moves the domain into the redemption / pending-delete window
+err := client.Domains.DeleteDomain(ctx, "example.com")
+
+// Restore is valid while the domain is still in the redemption grace period
+domain, err := client.Domains.RestoreDomain(ctx, "example.com", &models.DomainRestoreRequest{
+    Period: 1,
+})
+```
+
+### Domain DNSSEC
+
+```go
+// Enable signing for an OpusDNS-hosted zone (returns the DS/DNSKEY data)
+data, err := client.Domains.GetDNSSEC(ctx, "example.com")
+data, err = client.Domains.EnableDNSSEC(ctx, "example.com")
+
+// Or push your own DS data for an externally-signed domain
+digestType := models.DNSSECDigestType(2) // SHA-256
+data, err = client.Domains.PutDNSSEC(ctx, "example.com", []models.DomainDNSSECDataCreate{
+    {
+        RecordType: models.DNSSECRecordTypeDSData,
+        Algorithm:  13, // ECDSAP256SHA256
+        KeyTag:     models.IntPtr(12345),
+        DigestType: &digestType,
+        Digest:     models.StringPtr("ABCDEF0123456789..."),
+    },
+})
+
+// Disable DNSSEC
+err = client.Domains.DisableDNSSEC(ctx, "example.com")
 ```
 
 ## Email Forwarding
@@ -459,6 +520,155 @@ defer f.Close()
 err = client.Reports.DownloadReportToWriter(ctx, reportID, f)
 ```
 
+## Roles (RBAC)
+
+Roles are identified by a URL-safe `label`. The API exposes built-in roles
+(`admin`, `viewer`, `domain_manager`, `dns_manager`, `billing_manager`) plus any
+organization-owned custom roles. Permissions are `resource:scope` strings such as
+`domains:read` or `dns:manage`.
+
+### List and inspect roles
+
+```go
+// All roles assignable in the organization (built-in + custom).
+roles, err := client.Organizations.ListRoles(ctx)
+for _, role := range roles {
+    fmt.Printf("%s (built-in: %v): %v\n", role.Label, role.BuiltIn, role.Permissions)
+}
+
+// The catalog of permissions a custom role may grant.
+catalog, err := client.Organizations.ListRolePermissions(ctx)
+fmt.Println(catalog.Permissions)
+```
+
+### Create, update, and delete a custom role
+
+```go
+role, err := client.Organizations.CreateRole(ctx, &models.CustomRoleCreateRequest{
+    Name:        "Support Staff",
+    Description: models.StringPtr("Read-only support access"),
+    Permissions: []string{"domains:read", "dns:read"},
+})
+
+// Update is a partial patch; Permissions is a full replacement set when provided.
+perms := []string{"domains:read", "dns:read", "dns:manage"}
+role, err = client.Organizations.UpdateRole(ctx, role.Label, &models.CustomRoleUpdateRequest{
+    Permissions: &perms,
+})
+
+// Deletion is refused while the role is still assigned to any subject.
+err = client.Organizations.DeleteRole(ctx, role.Label)
+```
+
+### Assign a role to a user
+
+```go
+// Get a user's current role.
+assignment, err := client.Users.GetUserRole(ctx, userID)
+
+// Set a role (built-in name or custom role label).
+_, err = client.Users.SetUserRole(ctx, userID, models.StringPtr("domain_manager"))
+
+// Clear the role by passing nil.
+_, err = client.Users.SetUserRole(ctx, userID, nil)
+```
+
+### Inspect the current API key's role
+
+```go
+cred, err := client.Auth.IntrospectAPIKey(ctx)
+fmt.Printf("API key %s has role %v\n", cred.APIKeyID, models.Deref(cred.Role))
+```
+
+## Vanity Nameservers
+
+A vanity nameserver set brands DNS zones with your own nameserver hostnames.
+Creation and deletion are asynchronous — a newly created set starts with status
+`provisioning` until the provisioning chain finalizes it.
+
+```go
+// Create a set (returns status "provisioning").
+set, err := client.VanityNameservers.CreateSet(ctx, &models.VanityNameserverSetCreateRequest{
+    Name:             "Primary",
+    ParentDomainName: "example.com",
+    SOARName:         "hostmaster.example.com",
+    Hostnames:        []string{"ns1.example.com", "ns2.example.com"},
+})
+
+// List all sets (handles pagination automatically).
+sets, err := client.VanityNameservers.ListSets(ctx, nil)
+
+// Run a read-only diagnostic.
+report, err := client.VanityNameservers.CheckSet(ctx, set.SetID)
+fmt.Println(report.Summary.State) // ready | propagating | action_required | degraded
+
+// Manage the org default and list zones that use the set.
+_, err = client.VanityNameservers.SetDefault(ctx, set.SetID)
+_, err = client.VanityNameservers.ClearDefault(ctx)
+zones, err := client.VanityNameservers.ListZonesReferencingSet(ctx, set.SetID, nil)
+
+// Delete (asynchronous) and restore a suspended set.
+err = client.VanityNameservers.DeleteSet(ctx, set.SetID)
+_, err = client.VanityNameservers.RestoreSet(ctx, set.SetID)
+```
+
+Brand a DNS zone's apex with a vanity NS set (or pass `nil` to clear it and restamp
+back to OpusDNS system defaults):
+
+```go
+zone, err := client.DNS.SetZoneVanitySet(ctx, "example.com", &set.SetID)
+```
+
+## Contact Attribute Sets & Verification
+
+Contact attribute sets hold TLD-specific registry attributes (e.g. DENIC contact
+fields) that can be linked to contacts. Contacts can also carry verification
+attestations.
+
+```go
+// Create a TLD attribute set and link it to a contact.
+set, err := client.Contacts.CreateContactAttributeSet(ctx, &models.ContactAttributeSetCreateRequest{
+    Label:      "DENIC individual",
+    TLD:        "de",
+    Attributes: map[string]string{"denic_type": "individual"},
+})
+sets, err := client.Contacts.ListContactAttributeSets(ctx, nil)
+_, err = client.Contacts.LinkContactAttributeSet(ctx, contactID, set.ContactAttributeSetID)
+
+// Submit verification attestations and read the per-claim state.
+res, err := client.Contacts.AttestContactVerification(ctx, contactID, &models.ContactAttestRequest{
+    Attestations: []models.ContactAttestVerificationRequest{{
+        Claim:  models.ContactVerificationClaimName,
+        Method: models.ContactVerificationMethodAuth,
+        Proof:  models.ContactVerificationProofIDCard,
+    }},
+})
+status, err := client.Contacts.GetContactVerifications(ctx, contactID)
+err = client.Contacts.CancelContactVerification(ctx, contactID)
+```
+
+## Host Objects
+
+Host objects are nameserver hosts identified by either their ID or their hostname.
+
+```go
+host, err := client.Hosts.CreateHost(ctx, &models.HostCreateRequest{
+    Hostname:    "ns1.example.com",
+    IPAddresses: []string{"192.0.2.53", "2001:db8::53"},
+})
+
+// Get by ID or hostname.
+host, err = client.Hosts.GetHost(ctx, "ns1.example.com")
+
+// Update the IP addresses.
+host, err = client.Hosts.UpdateHost(ctx, host.HostID.String(), &models.HostUpdateRequest{
+    IPAddresses: []string{"198.51.100.53"},
+})
+
+// Delete (only possible when the host is not in use).
+err = client.Hosts.DeleteHost(ctx, host.HostID.String())
+```
+
 ## Error Handling
 
 The client provides detailed error types for different failure scenarios:
@@ -541,7 +751,12 @@ wg.Wait()
 See the [examples](examples/) directory for complete working examples:
 
 - [Basic Usage](examples/basic/) - DNS zone management, availability checking
-- [Domain Registration](examples/domains/) - Domain registration workflow
+- [Domains](examples/domains/) - Listing, summary, availability, TLD info
+- [Register a Domain](examples/register-domain/) - Create a contact and register a domain
+- [Renew a Domain](examples/renew-domain/) - Renew a domain for N years
+- [Transfer a Domain](examples/transfer-domain/) - Start an inbound transfer with an auth code
+- [Delete a Domain](examples/delete-domain/) - Delete a domain into redemption
+- [Restore a Domain](examples/restore-domain/) - Restore a domain from redemption
 
 Run examples:
 
