@@ -10,6 +10,10 @@ jobs:
   test:
     name: Test
     runs-on: self-hosted
+    strategy:
+      fail-fast: false
+      matrix:
+        go: ['1.21', '1.23', '1.26']
 
     steps:
       - name: Checkout code
@@ -18,7 +22,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
-          go-version: '1.26.4'
+          go-version: ${{ matrix.go }}
 
       - name: Download dependencies
         run: go mod download
@@ -46,7 +50,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
-          go-version: '1.26.4'
+          go-version: 'stable'
 
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v9
@@ -54,6 +58,10 @@ jobs:
   build:
     name: Build
     runs-on: self-hosted
+    strategy:
+      fail-fast: false
+      matrix:
+        go: ['1.21', '1.23', '1.26']
 
     steps:
       - name: Checkout code
@@ -62,7 +70,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
-          go-version: '1.26.4'
+          go-version: ${{ matrix.go }}
 
       - name: Build
         run: go build -v ./...
@@ -83,7 +91,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
-          go-version: '1.26.4'
+          go-version: 'stable'
 
       - name: Run govulncheck
         run: |
