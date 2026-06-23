@@ -75,12 +75,6 @@ func (s *EventsService) ListEventsPage(ctx context.Context, opts *models.ListEve
 		if opts.ObjectID != "" {
 			query.Set("object_id", opts.ObjectID)
 		}
-		if opts.CreatedAfter != nil {
-			query.Set("created_after", opts.CreatedAfter.Format(time.RFC3339))
-		}
-		if opts.CreatedBefore != nil {
-			query.Set("created_before", opts.CreatedBefore.Format(time.RFC3339))
-		}
 	}
 
 	resp, err := s.client.http.Get(ctx, path, query)

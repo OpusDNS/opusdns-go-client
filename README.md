@@ -294,19 +294,19 @@ contact, err := client.Contacts.CreateContact(ctx, &models.ContactCreateRequest{
 
 // Then register the domain
 domain, err := client.Domains.CreateDomain(ctx, &models.DomainCreateRequest{
-    Name:   "example.com",
-    Period: 1, // 1 year
-    Contacts: map[models.DomainContactType]models.ContactHandle{
-        models.DomainContactTypeRegistrant: {ContactID: contact.ContactID},
-        models.DomainContactTypeAdmin:      {ContactID: contact.ContactID},
-        models.DomainContactTypeTech:       {ContactID: contact.ContactID},
+    Name:        "example.com",
+    Period:      models.DomainPeriod{Value: 1, Unit: models.PeriodUnitYear},
+    RenewalMode: models.RenewalModeRenew,
+    Contacts: map[models.DomainContactType][]models.ContactHandle{
+        models.DomainContactTypeRegistrant: {{ContactID: contact.ContactID}},
+        models.DomainContactTypeAdmin:      {{ContactID: contact.ContactID}},
+        models.DomainContactTypeTech:       {{ContactID: contact.ContactID}},
     },
     Nameservers: []models.Nameserver{
         {Hostname: "ns1.opusdns.com"},
         {Hostname: "ns2.opusdns.com"},
     },
-    TransferLock: models.BoolPtr(true),
-    RenewMode:    models.RenewModePtr(models.RenewModeRenew),
+    CreateZone: true, // optionally provision a DNS zone on OpusDNS nameservers
 })
 ```
 
@@ -314,12 +314,16 @@ domain, err := client.Domains.CreateDomain(ctx, &models.DomainCreateRequest{
 
 ```go
 domain, err := client.Domains.TransferDomain(ctx, &models.DomainTransferRequest{
-    Name:     "example.com",
-    AuthCode: "abc123xyz",
-    Contacts: map[models.DomainContactType]models.ContactHandle{
-        models.DomainContactTypeRegistrant: {ContactID: contactID},
+    Name:        "example.com",
+    AuthCode:    "abc123xyz",
+    RenewalMode: models.RenewalModeRenew,
+    Contacts: map[models.DomainContactType][]models.ContactHandle{
+        models.DomainContactTypeRegistrant: {{ContactID: contactID}},
     },
 })
+
+// Abort a transfer while it is still pending
+err = client.Domains.CancelTransfer(ctx, "example.com")
 ```
 
 ### Renew a Domain
@@ -328,6 +332,60 @@ domain, err := client.Domains.TransferDomain(ctx, &models.DomainTransferRequest{
 domain, err := client.Domains.RenewDomain(ctx, "example.com", &models.DomainRenewRequest{
     Period: 2, // Renew for 2 years
 })
+```
+
+### Update a Domain
+
+```go
+expire := models.RenewalModeExpire
+domain, err := client.Domains.UpdateDomain(ctx, "example.com", &models.DomainUpdateRequest{
+    Nameservers: []models.Nameserver{
+        {Hostname: "ns1.example.com"},
+        {Hostname: "ns2.example.com"},
+    },
+    RenewalMode: &expire,
+    // Replace the entire client-status set. Use StatusChanges for add/remove
+    // semantics instead (the two fields are mutually exclusive).
+    Statuses: []models.DomainClientStatus{
+        models.DomainClientStatusTransferProhibited,
+        models.DomainClientStatusUpdateProhibited,
+    },
+})
+```
+
+### Delete and Restore a Domain
+
+```go
+// Delete moves the domain into the redemption / pending-delete window
+err := client.Domains.DeleteDomain(ctx, "example.com")
+
+// Restore is valid while the domain is still in the redemption grace period
+domain, err := client.Domains.RestoreDomain(ctx, "example.com", &models.DomainRestoreRequest{
+    Period: 1,
+})
+```
+
+### Domain DNSSEC
+
+```go
+// Enable signing for an OpusDNS-hosted zone (returns the DS/DNSKEY data)
+data, err := client.Domains.GetDNSSEC(ctx, "example.com")
+data, err = client.Domains.EnableDNSSEC(ctx, "example.com")
+
+// Or push your own DS data for an externally-signed domain
+digestType := models.DNSSECDigestType(2) // SHA-256
+data, err = client.Domains.PutDNSSEC(ctx, "example.com", []models.DomainDNSSECDataCreate{
+    {
+        RecordType: models.DNSSECRecordTypeDSData,
+        Algorithm:  13, // ECDSAP256SHA256
+        KeyTag:     models.IntPtr(12345),
+        DigestType: &digestType,
+        Digest:     models.StringPtr("ABCDEF0123456789..."),
+    },
+})
+
+// Disable DNSSEC
+err = client.Domains.DisableDNSSEC(ctx, "example.com")
 ```
 
 ## Email Forwarding
@@ -693,7 +751,12 @@ wg.Wait()
 See the [examples](examples/) directory for complete working examples:
 
 - [Basic Usage](examples/basic/) - DNS zone management, availability checking
-- [Domain Registration](examples/domains/) - Domain registration workflow
+- [Domains](examples/domains/) - Listing, summary, availability, TLD info
+- [Register a Domain](examples/register-domain/) - Create a contact and register a domain
+- [Renew a Domain](examples/renew-domain/) - Renew a domain for N years
+- [Transfer a Domain](examples/transfer-domain/) - Start an inbound transfer with an auth code
+- [Delete a Domain](examples/delete-domain/) - Delete a domain into redemption
+- [Restore a Domain](examples/restore-domain/) - Restore a domain from redemption
 
 Run examples:
 

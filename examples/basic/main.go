@@ -98,7 +98,7 @@ func zoneManagementExample(ctx context.Context, client *opusdns.Client, zoneName
 				Name:    "www",
 				Type:    models.RRSetTypeA,
 				TTL:     3600,
-				Records: []string{"192.0.2.1"},
+				Records: []models.RecordCreate{{RData: "192.0.2.1"}},
 			},
 		},
 	})

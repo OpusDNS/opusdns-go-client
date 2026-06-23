@@ -3,16 +3,22 @@ package models
 
 import "time"
 
+// NOTE: The structs in this file (TLD, TLDDetails, TLDPricing, etc.) are a
+// simplified convenience view of the TLD data. The spec's TldSpecificationResponse
+// is significantly larger and more deeply nested than what is modeled here; the
+// fields below cover common cases but do not fully represent every nested
+// TLD-specification sub-object. Extend as needed.
+
 // TLDInfo represents the basic TLD name and type information.
 type TLDInfo struct {
 	// Name is the TLD name without the leading dot (e.g., "com", "de", "io").
 	Name string `json:"name"`
 
-	// Type is the TLD type (e.g., "gTLD", "ccTLD", "newGTLD").
+	// Type is the TLD type (e.g., "gTLD", "ccTLD").
 	Type TLDType `json:"type,omitempty"`
 
-	// ThirdLevelStructure contains third level domain configurations.
-	ThirdLevelStructure []interface{} `json:"third_level_structure,omitempty"`
+	// ThirdLevelStructure contains third level domain configurations (names).
+	ThirdLevelStructure []string `json:"third_level_structure,omitempty"`
 }
 
 // TLD represents a top-level domain with its configuration.
@@ -21,7 +27,7 @@ type TLD struct {
 	// This is populated from the nested tlds array for convenience.
 	Name string `json:"name"`
 
-	// Type is the TLD type (e.g., "gTLD", "ccTLD", "newGTLD").
+	// Type is the TLD type (e.g., "gTLD", "ccTLD").
 	// This is populated from the nested tlds array for convenience.
 	Type TLDType `json:"type,omitempty"`
 
@@ -80,12 +86,6 @@ const (
 
 	// TLDTypeCCTLD is a country-code top-level domain (e.g., .de, .uk, .fr).
 	TLDTypeCCTLD TLDType = "ccTLD"
-
-	// TLDTypeNewGTLD is a new generic top-level domain (e.g., .app, .dev, .xyz).
-	TLDTypeNewGTLD TLDType = "newGTLD"
-
-	// TLDTypeSponsoredGTLD is a sponsored generic TLD (e.g., .gov, .edu).
-	TLDTypeSponsoredGTLD TLDType = "sponsoredGTLD"
 )
 
 // TLDPricing contains pricing information for a TLD.
@@ -258,10 +258,24 @@ type TLDDetails struct {
 	Phases []TLDPhase `json:"phases,omitempty"`
 }
 
+// LaunchPhaseType represents the type of a TLD launch phase.
+type LaunchPhaseType string
+
+const (
+	// LaunchPhaseSunrise is the sunrise launch phase.
+	LaunchPhaseSunrise LaunchPhaseType = "sunrise"
+
+	// LaunchPhaseLandrush is the landrush launch phase.
+	LaunchPhaseLandrush LaunchPhaseType = "landrush"
+
+	// LaunchPhaseEAP is the Early Access Program launch phase.
+	LaunchPhaseEAP LaunchPhaseType = "eap"
+)
+
 // TLDPhase represents a launch phase for a TLD.
 type TLDPhase struct {
-	// Name is the phase name (e.g., "sunrise", "landrush", "general_availability").
-	Name string `json:"name"`
+	// Name is the phase name (e.g., "sunrise", "landrush", "eap").
+	Name LaunchPhaseType `json:"name"`
 
 	// Status is the phase status (e.g., "active", "completed", "upcoming").
 	Status string `json:"status"`

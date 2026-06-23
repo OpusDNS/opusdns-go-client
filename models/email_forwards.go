@@ -36,6 +36,7 @@ const (
 type EmailForwardLogStatus string
 
 const (
+	EmailForwardLogStatusUnknown    EmailForwardLogStatus = "UNKNOWN"
 	EmailForwardLogStatusQueued     EmailForwardLogStatus = "QUEUED"
 	EmailForwardLogStatusDelivered  EmailForwardLogStatus = "DELIVERED"
 	EmailForwardLogStatusRefused    EmailForwardLogStatus = "REFUSED"
@@ -115,13 +116,18 @@ type EmailForwardZone struct {
 type EmailForwardZoneSortField string
 
 const (
-	EmailForwardZoneSortByZoneName EmailForwardZoneSortField = "zone_name"
+	EmailForwardZoneSortByName      EmailForwardZoneSortField = "name"
+	EmailForwardZoneSortByCreatedOn EmailForwardZoneSortField = "created_on"
+	EmailForwardZoneSortByUpdatedOn EmailForwardZoneSortField = "updated_on"
 )
 
 // EmailForwardCreateRequest represents a request to create email forwarding for a hostname.
 type EmailForwardCreateRequest struct {
 	// Hostname is the domain name to enable email forwarding for.
 	Hostname string `json:"hostname"`
+
+	// Enabled indicates whether email forwarding should be enabled (default false).
+	Enabled *bool `json:"enabled,omitempty"`
 
 	// Aliases is an optional list of initial aliases to create.
 	Aliases []EmailForwardAliasCreate `json:"aliases,omitempty"`
@@ -296,16 +302,22 @@ type EmailForwardMetricsRates struct {
 
 	// RefusedRate is the percentage of refused emails.
 	RefusedRate float64 `json:"refused_rate,omitempty"`
+
+	// QueuedRate is the percentage of queued emails.
+	QueuedRate float64 `json:"queued_rate,omitempty"`
 }
 
 // EmailForwardMetricsFilters contains the filters applied to email forward metrics.
 type EmailForwardMetricsFilters struct {
-	// StartDate is the start date filter.
-	StartDate *time.Time `json:"start_date,omitempty"`
+	// Domain is the domain name filter.
+	Domain string `json:"domain"`
 
-	// EndDate is the end date filter.
-	EndDate *time.Time `json:"end_date,omitempty"`
+	// StartTime is the start time filter (RFC3339).
+	StartTime *string `json:"start_time,omitempty"`
 
-	// Alias is the alias filter.
-	Alias *string `json:"alias,omitempty"`
+	// EndTime is the end time filter (RFC3339).
+	EndTime *string `json:"end_time,omitempty"`
+
+	// IncludeAliases indicates whether an alias breakdown is included.
+	IncludeAliases *bool `json:"include_aliases,omitempty"`
 }

@@ -154,17 +154,15 @@ type Currency string
 const (
 	CurrencyEUR Currency = "EUR"
 	CurrencyUSD Currency = "USD"
-	CurrencyGBP Currency = "GBP"
-	CurrencyCHF Currency = "CHF"
 )
 
 // DomainNameParts represents the parts of a domain name.
 type DomainNameParts struct {
-	// SLD is the second-level domain (e.g., "example" in "example.com").
-	SLD string `json:"sld"`
+	// Domain is the second-level domain (e.g., "example" in "example.com").
+	Domain string `json:"domain"`
 
-	// TLD is the top-level domain (e.g., "com" in "example.com").
-	TLD string `json:"tld"`
+	// Suffix is the top-level domain (e.g., "com" in "example.com").
+	Suffix string `json:"suffix"`
 
 	// Subdomain is the subdomain portion (if any).
 	Subdomain string `json:"subdomain,omitempty"`

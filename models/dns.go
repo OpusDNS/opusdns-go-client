@@ -41,6 +41,26 @@ const (
 	RRSetTypeURI    RRSetType = "URI"
 )
 
+// DnsProtectedReason describes why a DNS RRset or record is protected from modification.
+type DnsProtectedReason string
+
+const (
+	// DnsProtectedReasonSystemManagedSOA indicates a system-managed SOA record.
+	DnsProtectedReasonSystemManagedSOA DnsProtectedReason = "SYSTEM_MANAGED_SOA"
+
+	// DnsProtectedReasonSystemManagedNS indicates a system-managed NS record.
+	DnsProtectedReasonSystemManagedNS DnsProtectedReason = "SYSTEM_MANAGED_NS"
+
+	// DnsProtectedReasonEmailForward indicates the record is managed by email forwarding.
+	DnsProtectedReasonEmailForward DnsProtectedReason = "EMAIL_FORWARD"
+
+	// DnsProtectedReasonDomainForward indicates the record is managed by domain forwarding.
+	DnsProtectedReasonDomainForward DnsProtectedReason = "DOMAIN_FORWARD"
+
+	// DnsProtectedReasonGeneric is a non-specific protection reason.
+	DnsProtectedReasonGeneric DnsProtectedReason = "GENERIC"
+)
+
 // ZoneSortField represents fields that can be used for sorting zones.
 type ZoneSortField string
 
@@ -64,6 +84,10 @@ type Zone struct {
 
 	// DomainParts contains the parsed parts of the domain name.
 	DomainParts *DomainNameParts `json:"domain_parts,omitempty"`
+
+	// VanityNameserverSetID is the vanity NS set whose apex NS + SOA brand this
+	// zone, or nil when the zone uses the system default nameservers.
+	VanityNameserverSetID *VanityNameserverSetID `json:"vanity_nameserver_set_id,omitempty"`
 
 	// RRSets contains the resource record sets for this zone.
 	// This field is populated when fetching a single zone with records.
@@ -107,6 +131,11 @@ type ZoneCreateRequest struct {
 
 	// RRSets is an optional list of initial resource record sets to create with the zone.
 	RRSets []RRSetCreate `json:"rrsets,omitempty"`
+
+	// VanityNameserverSetID optionally brands this zone's apex NS + SOA with the
+	// given vanity NS set. When nil, the org's default active set (if any) is
+	// used; otherwise the system default nameservers are used.
+	VanityNameserverSetID *VanityNameserverSetID `json:"vanity_nameserver_set_id,omitempty"`
 }
 
 // RRSet represents a resource record set (multiple records with same name/type).
@@ -127,7 +156,7 @@ type RRSet struct {
 	Protected bool `json:"protected,omitempty"`
 
 	// ProtectedReason describes why the RRset is protected.
-	ProtectedReason *string `json:"protected_reason,omitempty"`
+	ProtectedReason *DnsProtectedReason `json:"protected_reason,omitempty"`
 }
 
 // RecordData represents the data portion of a DNS record.
@@ -137,6 +166,9 @@ type RecordData struct {
 
 	// Protected indicates if the record is protected from deletion.
 	Protected bool `json:"protected,omitempty"`
+
+	// ProtectedReason describes why the record is protected.
+	ProtectedReason *DnsProtectedReason `json:"protected_reason,omitempty"`
 }
 
 // RecordCreate represents a DNS record for creation.
@@ -255,10 +287,33 @@ type DNSChanges struct {
 	Changes []DNSChange `json:"changes,omitempty"`
 }
 
+// DnsChangeAction represents the action performed in a single DNS changeset entry.
+type DnsChangeAction string
+
+const (
+	// DnsChangeActionCreateZone indicates a zone was created.
+	DnsChangeActionCreateZone DnsChangeAction = "create_zone"
+
+	// DnsChangeActionDeleteZone indicates a zone was deleted.
+	DnsChangeActionDeleteZone DnsChangeAction = "delete_zone"
+
+	// DnsChangeActionCreateRecord indicates a record was created.
+	DnsChangeActionCreateRecord DnsChangeAction = "create_record"
+
+	// DnsChangeActionDeleteRecord indicates a record was deleted.
+	DnsChangeActionDeleteRecord DnsChangeAction = "delete_record"
+
+	// DnsChangeActionEnableDNSSEC indicates DNSSEC was enabled.
+	DnsChangeActionEnableDNSSEC DnsChangeAction = "enable_dnssec"
+
+	// DnsChangeActionDisableDNSSEC indicates DNSSEC was disabled.
+	DnsChangeActionDisableDNSSEC DnsChangeAction = "disable_dnssec"
+)
+
 // DNSChange represents a single change in a DNS changeset.
 type DNSChange struct {
-	// Action is the action performed (e.g., "create", "update", "delete").
-	Action string `json:"action"`
+	// Action is the action performed.
+	Action DnsChangeAction `json:"action"`
 
 	// RRSetName is the name of the affected RRSet.
 	RRSetName string `json:"rrset_name,omitempty"`

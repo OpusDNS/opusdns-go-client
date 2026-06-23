@@ -20,27 +20,50 @@ const (
 type RegistryHandleAttributeType string
 
 const (
-	// Common registry-specific attributes
-	RegistryAttrVATID              RegistryHandleAttributeType = "vat_id"
-	RegistryAttrCompanyNumber      RegistryHandleAttributeType = "company_number"
-	RegistryAttrDateOfBirth        RegistryHandleAttributeType = "date_of_birth"
-	RegistryAttrPlaceOfBirth       RegistryHandleAttributeType = "place_of_birth"
-	RegistryAttrNationality        RegistryHandleAttributeType = "nationality"
-	RegistryAttrIDCardNumber       RegistryHandleAttributeType = "id_card_number"
-	RegistryAttrPassportNumber     RegistryHandleAttributeType = "passport_number"
-	RegistryAttrLanguage           RegistryHandleAttributeType = "language"
-	RegistryAttrEntityType         RegistryHandleAttributeType = "entity_type"
-	RegistryAttrRegistrantType     RegistryHandleAttributeType = "registrant_type"
-	RegistryAttrIntendedUse        RegistryHandleAttributeType = "intended_use"
-	RegistryAttrNexusCategory      RegistryHandleAttributeType = "nexus_category"
-	RegistryAttrNexusCountry       RegistryHandleAttributeType = "nexus_country"
-	RegistryAttrAppPurpose         RegistryHandleAttributeType = "app_purpose"
-	RegistryAttrSIREN              RegistryHandleAttributeType = "siren"
-	RegistryAttrSIRET              RegistryHandleAttributeType = "siret"
-	RegistryAttrTrademarkNumber    RegistryHandleAttributeType = "trademark_number"
-	RegistryAttrTrademarkCountry   RegistryHandleAttributeType = "trademark_country"
-	RegistryAttrAuthID             RegistryHandleAttributeType = "auth_id"
-	RegistryAttrIdentificationForm RegistryHandleAttributeType = "identification_form"
+	RegistryAttrATExtContactType           RegistryHandleAttributeType = "at-ext-contact:type"
+	RegistryAttrDEContactType              RegistryHandleAttributeType = "DE_CONTACT_TYPE"
+	RegistryAttrDNSBEType                  RegistryHandleAttributeType = "dnsbe:type"
+	RegistryAttrEURIDType                  RegistryHandleAttributeType = "eurid:type"
+	RegistryAttrAFNICContactType           RegistryHandleAttributeType = "AFNIC_CONTACT_TYPE"
+	RegistryAttrAFNICPPFirstName           RegistryHandleAttributeType = "AFNIC_PP_FIRST_NAME"
+	RegistryAttrAFNICPMLegalStatus         RegistryHandleAttributeType = "AFNIC_PM_LEGAL_STATUS"
+	RegistryAttrAFNICPMSIREN               RegistryHandleAttributeType = "AFNIC_PM_SIREN"
+	RegistryAttrAFNICPMVAT                 RegistryHandleAttributeType = "AFNIC_PM_VAT"
+	RegistryAttrAFNICPMTrademark           RegistryHandleAttributeType = "AFNIC_PM_TRADEMARK"
+	RegistryAttrAFNICPMAssocWaldec         RegistryHandleAttributeType = "AFNIC_PM_ASSOC_WALDEC"
+	RegistryAttrAFNICPMAssocPublDate       RegistryHandleAttributeType = "AFNIC_PM_ASSOC_PUBL_DATE"
+	RegistryAttrAFNICPMAssocPublAnnounce   RegistryHandleAttributeType = "AFNIC_PM_ASSOC_PUBL_ANNOUNCE"
+	RegistryAttrAFNICPMAssocPublPage       RegistryHandleAttributeType = "AFNIC_PM_ASSOC_PUBL_PAGE"
+	RegistryAttrAFNICPMAssocDecl           RegistryHandleAttributeType = "AFNIC_PM_ASSOC_DECL"
+	RegistryAttrAFNICPMDUNS                RegistryHandleAttributeType = "AFNIC_PM_DUNS"
+	RegistryAttrAFNICPMLocal               RegistryHandleAttributeType = "AFNIC_PM_LOCAL"
+	RegistryAttrAFNICIDStatus              RegistryHandleAttributeType = "AFNIC_ID_STATUS"
+	RegistryAttrAFNICReachableMedia        RegistryHandleAttributeType = "AFNIC_REACHABLE_MEDIA"
+	RegistryAttrAFNICReachableStatus       RegistryHandleAttributeType = "AFNIC_REACHABLE_STATUS"
+	RegistryAttrAFNICRestrictedPublication RegistryHandleAttributeType = "AFNIC_RESTRICTED_PUBLICATION"
+	RegistryAttrROTLDContactType           RegistryHandleAttributeType = "ROTLD_CONTACT_TYPE"
+	RegistryAttrROTLDCNPFiscalCode         RegistryHandleAttributeType = "ROTLD_CNP_FISCAL_CODE"
+	RegistryAttrROTLDIDNumber              RegistryHandleAttributeType = "ROTLD_ID_NUMBER"
+	RegistryAttrROTLDRegistrationNumber    RegistryHandleAttributeType = "ROTLD_REGISTRATION_NUMBER"
+	RegistryAttrROTLDDomainName            RegistryHandleAttributeType = "ROTLD_DOMAIN_NAME"
+	RegistryAttrNOMINETContactType         RegistryHandleAttributeType = "NOMINET_CONTACT_TYPE"
+	RegistryAttrNOMINETCoNo                RegistryHandleAttributeType = "NOMINET_CO_NO"
+	RegistryAttrNOMINETTradName            RegistryHandleAttributeType = "NOMINET_TRAD_NAME"
+	RegistryAttrCIRACPR                    RegistryHandleAttributeType = "CIRA_CPR"
+	RegistryAttrSIDNLegalForm              RegistryHandleAttributeType = "SIDN_LEGAL_FORM"
+	RegistryAttrSIDNLegalRegNo             RegistryHandleAttributeType = "SIDN_LEGAL_REG_NO"
+	RegistryAttrUSNexusCategory            RegistryHandleAttributeType = "US_NEXUS_CATEGORY"
+	RegistryAttrUSNexusCountryCode         RegistryHandleAttributeType = "US_NEXUS_COUNTRY_CODE"
+	RegistryAttrUSAppPurpose               RegistryHandleAttributeType = "US_APP_PURPOSE"
+	RegistryAttrNICITEntityType            RegistryHandleAttributeType = "NIC_IT_ENTITY_TYPE"
+	RegistryAttrNICITRegCode               RegistryHandleAttributeType = "NIC_IT_REG_CODE"
+	RegistryAttrCZNICIdentType             RegistryHandleAttributeType = "CZ_NIC_IDENT_TYPE"
+	RegistryAttrCZNICIdentValue            RegistryHandleAttributeType = "CZ_NIC_IDENT_VALUE"
+	RegistryAttrCZNICVAT                   RegistryHandleAttributeType = "CZ_NIC_VAT"
+	RegistryAttrCZNICNotifyEmail           RegistryHandleAttributeType = "CZ_NIC_NOTIFY_EMAIL"
+	RegistryAttrDNSLUContactRole           RegistryHandleAttributeType = "DNS_LU_CONTACT_ROLE"
+	RegistryAttrSKNICLegalForm             RegistryHandleAttributeType = "SK_NIC_LEGAL_FORM"
+	RegistryAttrSKNICIdentValue            RegistryHandleAttributeType = "SK_NIC_IDENT_VALUE"
 )
 
 // Contact represents a contact in the system.
@@ -89,12 +112,6 @@ type Contact struct {
 
 	// Disclose indicates whether contact information should be publicly disclosed.
 	Disclose bool `json:"disclose"`
-
-	// Verified indicates whether the contact has been verified.
-	Verified bool `json:"verified,omitempty"`
-
-	// VerifiedOn is when the contact was verified.
-	VerifiedOn *time.Time `json:"verified_on,omitempty"`
 
 	// CreatedOn is when the contact was created.
 	CreatedOn *time.Time `json:"created_on,omitempty"`
@@ -165,22 +182,56 @@ type ContactCreateRequest struct {
 	Disclose bool `json:"disclose"`
 }
 
-// ContactVerification represents a contact verification request/response.
+// VerificationType is how the verification token is retrieved.
+type VerificationType string
+
+const (
+	// VerificationTypeAPI retrieves the token via the API.
+	VerificationTypeAPI VerificationType = "api"
+
+	// VerificationTypeEmail retrieves the token via email.
+	VerificationTypeEmail VerificationType = "email"
+)
+
+// EmailVerificationStatus is the current status of a contact email verification.
+type EmailVerificationStatus string
+
+const (
+	EmailVerificationVerified EmailVerificationStatus = "verified"
+	EmailVerificationPending  EmailVerificationStatus = "pending"
+	EmailVerificationCanceled EmailVerificationStatus = "canceled"
+)
+
+// ContactVerification represents a contact verification response.
+// It models both ContactVerificationResponse and ContactVerificationApiResponse;
+// Token is only populated for the API verification type.
 type ContactVerification struct {
+	// ContactVerificationID is the unique identifier for the verification.
+	ContactVerificationID TypeID `json:"contact_verification_id,omitempty"`
+
 	// ContactID is the ID of the contact being verified.
-	ContactID ContactID `json:"contact_id"`
+	ContactID ContactID `json:"contact_id,omitempty"`
+
+	// Type is the type of verification.
+	Type VerificationType `json:"type"`
 
 	// Status is the verification status.
-	Status string `json:"status"`
+	Status EmailVerificationStatus `json:"status,omitempty"`
 
-	// VerificationURL is the URL for the contact to complete verification.
-	VerificationURL *string `json:"verification_url,omitempty"`
+	// Token is the token to verify the email address (API verification only).
+	Token *string `json:"token,omitempty"`
 
-	// ExpiresOn is when the verification request expires.
-	ExpiresOn *time.Time `json:"expires_on,omitempty"`
+	// VerifiedOn is when the verification was verified.
+	VerifiedOn *time.Time `json:"verified_on,omitempty"`
+
+	// CanceledOn is when the verification was cancelled.
+	CanceledOn *time.Time `json:"canceled_on,omitempty"`
 
 	// CreatedOn is when the verification was requested.
 	CreatedOn *time.Time `json:"created_on,omitempty"`
+
+	// UpdatedOn is when the verification was last updated.
+	UpdatedOn *time.Time `json:"updated_on,omitempty"`
 }
 
 // ContactVerificationRequest represents a request to verify a contact.
@@ -241,9 +292,6 @@ type ListContactsOptions struct {
 type ContactIncludeField string
 
 const (
-	// ContactIncludeAttributeSets includes linked contact attribute sets.
-	ContactIncludeAttributeSets ContactIncludeField = "attribute_sets"
-
 	// ContactIncludeTags includes tags assigned to the contact when supported by the API.
 	ContactIncludeTags ContactIncludeField = "tags"
 )

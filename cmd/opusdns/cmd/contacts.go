@@ -53,20 +53,15 @@ var contactsListCmd = &cobra.Command{
 
 		fmt.Printf("Found %d contact(s):\n\n", len(contacts))
 		for _, contact := range contacts {
-			verified := "✗"
-			if contact.Verified {
-				verified = "✓"
-			}
 			org := ""
 			if contact.Org != nil && *contact.Org != "" {
 				org = fmt.Sprintf(" (%s)", *contact.Org)
 			}
-			fmt.Printf("  • %s: %s%s <%s> [verified: %s]\n",
+			fmt.Printf("  • %s: %s%s <%s>\n",
 				contact.ContactID,
 				contact.FullName(),
 				org,
 				contact.Email,
-				verified,
 			)
 		}
 
@@ -226,9 +221,6 @@ var contactsVerifyRequestCmd = &cobra.Command{
 
 		fmt.Printf("✓ Verification requested for contact '%s'\n\n", contactID)
 		fmt.Printf("Status: %s\n", verification.Status)
-		if verification.ExpiresOn != nil {
-			fmt.Printf("Expires: %s\n", verification.ExpiresOn.Format("2006-01-02 15:04:05"))
-		}
 
 		return nil
 	},

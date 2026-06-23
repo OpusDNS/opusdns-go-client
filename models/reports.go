@@ -10,9 +10,15 @@ type ReportID = TypeID
 type ReportType string
 
 const (
-	ReportTypeDomainInventory ReportType = "domain_inventory"
-	ReportTypeDNSZoneSummary  ReportType = "dns_zone_summary"
-	ReportTypeDNSZoneRecords  ReportType = "dns_zone_records"
+	ReportTypeDomainInventory            ReportType = "domain_inventory"
+	ReportTypeDNSZoneSummary             ReportType = "dns_zone_summary"
+	ReportTypeDNSZoneRecords             ReportType = "dns_zone_records"
+	ReportTypeDomainForwards             ReportType = "domain_forwards"
+	ReportTypeExpiringDomains            ReportType = "expiring_domains"
+	ReportTypeEmailForwards              ReportType = "email_forwards"
+	ReportTypeRegistrarPortfolioPDF      ReportType = "registrar_portfolio_pdf"
+	ReportTypeBillingTransactions        ReportType = "billing_transactions"
+	ReportTypeBillingTransactionsMonthly ReportType = "billing_transactions_monthly"
 )
 
 // ReportStatus represents the status of a report.
@@ -70,6 +76,9 @@ type Report struct {
 type CreateReportRequest struct {
 	// ReportType is the type of report to generate (defaults to domain_inventory).
 	ReportType ReportType `json:"report_type,omitempty"`
+
+	// RegistrarCredentialID is the registrar credential to scope the report to.
+	RegistrarCredentialID *TypeID `json:"registrar_credential_id,omitempty"`
 }
 
 // ReportListResponse represents the paginated response when listing reports.

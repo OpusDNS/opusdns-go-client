@@ -19,6 +19,9 @@ const (
 
 	// AvailabilityStatusError indicates an error occurred during the check.
 	AvailabilityStatusError DomainAvailabilityStatus = "error"
+
+	// AvailabilityStatusUnknown indicates the availability could not be determined.
+	AvailabilityStatusUnknown DomainAvailabilityStatus = "unknown"
 )
 
 // IsAvailable returns true if the domain can be registered.
@@ -93,21 +96,63 @@ type DomainAvailabilityResult struct {
 
 	// Reason provides additional context (if not available).
 	Reason *string `json:"reason,omitempty"`
+
+	// IsPremium indicates if the registry classifies this domain as premium.
+	IsPremium *bool `json:"is_premium,omitempty"`
+
+	// ClaimsKey is the trademark claims key returned during a TLD claims phase.
+	ClaimsKey *string `json:"claims_key,omitempty"`
+
+	// PremiumPricing contains premium pricing per action (present only when IsPremium is true).
+	PremiumPricing *PremiumPricingResponse `json:"premium_pricing,omitempty"`
 }
 
-// DomainSuggestion represents a suggested domain name.
+// PremiumPricingResponse contains premium pricing per action for a domain.
+type PremiumPricingResponse struct {
+	// Prices contains the premium prices per action.
+	Prices []PremiumPricingAction `json:"prices"`
+}
+
+// PremiumPricingAction represents the premium price for a single action.
+type PremiumPricingAction struct {
+	// Action is the action this price applies to (e.g., create, renew, transfer).
+	Action string `json:"action"`
+
+	// Price is the price for the action.
+	Price string `json:"price"`
+
+	// Currency is the ISO 4217 currency code.
+	Currency string `json:"currency"`
+}
+
+// DomainSuggestion represents a suggested domain name (DomainSearchSuggestionWithPrice).
 type DomainSuggestion struct {
 	// Domain is the suggested domain name.
 	Domain string `json:"domain"`
 
-	// Status is the availability status.
-	Status DomainAvailabilityStatus `json:"status"`
+	// Available indicates if the domain is available.
+	Available bool `json:"available"`
 
-	// Score is the relevance score (higher is more relevant).
-	Score float64 `json:"score,omitempty"`
+	// Premium indicates if the domain is a premium domain.
+	Premium bool `json:"premium"`
 
-	// Price contains pricing information if available.
-	Price *DomainPrice `json:"price,omitempty"`
+	// Price contains pricing information.
+	Price DomainSearchSuggestionPriceData `json:"price"`
+
+	// RenewalPrice contains renewal pricing information if available.
+	RenewalPrice *DomainSearchSuggestionPriceData `json:"renewal_price,omitempty"`
+}
+
+// DomainSearchSuggestionPriceData represents pricing information for a domain suggestion.
+type DomainSearchSuggestionPriceData struct {
+	// Amount is the price amount.
+	Amount *string `json:"amount"`
+
+	// Currency is the currency code.
+	Currency string `json:"currency"`
+
+	// Period is the registration/renewal period.
+	Period DomainPeriod `json:"period"`
 }
 
 // DomainSuggestRequest represents a request for domain suggestions.
@@ -121,8 +166,8 @@ type DomainSuggestRequest struct {
 	// Limit is the maximum number of suggestions to return.
 	Limit int `json:"limit,omitempty"`
 
-	// IncludeUnavailable includes unavailable suggestions.
-	IncludeUnavailable bool `json:"include_unavailable,omitempty"`
+	// Premium controls whether to include premium domains in the suggestions.
+	Premium *bool `json:"premium,omitempty"`
 }
 
 // DomainSuggestResponse represents the response from a domain suggestion request.

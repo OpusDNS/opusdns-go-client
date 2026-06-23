@@ -13,11 +13,8 @@ const (
 	// OrganizationStatusActive indicates the organization is active.
 	OrganizationStatusActive OrganizationStatus = "active"
 
-	// OrganizationStatusSuspended indicates the organization is suspended.
-	OrganizationStatusSuspended OrganizationStatus = "suspended"
-
-	// OrganizationStatusDeleted indicates the organization is deleted.
-	OrganizationStatusDeleted OrganizationStatus = "deleted"
+	// OrganizationStatusInactive indicates the organization is inactive.
+	OrganizationStatusInactive OrganizationStatus = "inactive"
 )
 
 // OrganizationSortField represents fields that can be used for sorting organizations.
@@ -39,6 +36,9 @@ type Organization struct {
 
 	// ParentOrganizationID is the ID of the parent organization.
 	ParentOrganizationID *OrganizationID `json:"parent_organization_id,omitempty"`
+
+	// KeycloakOrganizationID is the Keycloak organization ID.
+	KeycloakOrganizationID *string `json:"keycloak_organization_id,omitempty"`
 
 	// Status is the status of the organization.
 	Status OrganizationStatus `json:"status,omitempty"`
@@ -318,11 +318,23 @@ type PriceInfo struct {
 	// Currency is the currency code.
 	Currency Currency `json:"currency"`
 
-	// TaxRate is the applicable tax rate.
-	TaxRate *string `json:"tax_rate,omitempty"`
+	// Period is the pricing period (e.g., 1 year, 2 months).
+	Period *PricingPeriod `json:"period,omitempty"`
 
-	// TotalPrice is the price including tax.
-	TotalPrice *string `json:"total_price,omitempty"`
+	// ProductAction is the product action this price applies to.
+	ProductAction *string `json:"product_action,omitempty"`
+
+	// ProductClass is the product class this price applies to.
+	ProductClass *string `json:"product_class,omitempty"`
+}
+
+// PricingPeriod represents a pricing period.
+type PricingPeriod struct {
+	// Value is the amount of time in the unit.
+	Value int `json:"value"`
+
+	// Unit is the unit of the period.
+	Unit PeriodUnit `json:"unit"`
 }
 
 // BillingTransactionID is a TypeID for billing transactions.
@@ -332,11 +344,12 @@ type BillingTransactionID = TypeID
 type BillingTransactionProductType string
 
 const (
-	BillingProductTypeDomain        BillingTransactionProductType = "domain"
-	BillingProductTypeZones         BillingTransactionProductType = "zones"
-	BillingProductTypeEmailForward  BillingTransactionProductType = "email_forward"
-	BillingProductTypeDomainForward BillingTransactionProductType = "domain_forward"
-	BillingProductTypeAccountWallet BillingTransactionProductType = "account_wallet"
+	BillingProductTypeDomain           BillingTransactionProductType = "domain"
+	BillingProductTypeZones            BillingTransactionProductType = "zones"
+	BillingProductTypeEmailForward     BillingTransactionProductType = "email_forward"
+	BillingProductTypeDomainForward    BillingTransactionProductType = "domain_forward"
+	BillingProductTypeAccountWallet    BillingTransactionProductType = "account_wallet"
+	BillingProductTypeVanityNameserver BillingTransactionProductType = "vanity_nameserver"
 )
 
 // BillingTransactionAction represents the action in a transaction.
@@ -379,6 +392,12 @@ type BillingTransaction struct {
 
 	// Status is the transaction status.
 	Status BillingTransactionStatus `json:"status"`
+
+	// Volume is the quantity the transaction covers, expressed in Unit.
+	Volume string `json:"volume"`
+
+	// Unit is the unit for Volume (e.g. 'y' for years); null when not applicable.
+	Unit *string `json:"unit,omitempty"`
 
 	// Price is the base price.
 	Price string `json:"price"`
@@ -464,34 +483,78 @@ type ListTransactionsOptions struct {
 	CreatedBefore *time.Time
 }
 
+// InvoiceResponseStatus represents the status of an invoice.
+type InvoiceResponseStatus string
+
+const (
+	InvoiceStatusDraft     InvoiceResponseStatus = "draft"
+	InvoiceStatusFinalized InvoiceResponseStatus = "finalized"
+	InvoiceStatusFailed    InvoiceResponseStatus = "failed"
+	InvoiceStatusPending   InvoiceResponseStatus = "pending"
+	InvoiceStatusVoided    InvoiceResponseStatus = "voided"
+)
+
+// InvoiceResponseType represents the type of an invoice.
+type InvoiceResponseType string
+
+const (
+	InvoiceTypeSubscription       InvoiceResponseType = "subscription"
+	InvoiceTypeAddOn              InvoiceResponseType = "add_on"
+	InvoiceTypeCredit             InvoiceResponseType = "credit"
+	InvoiceTypeOneOff             InvoiceResponseType = "one_off"
+	InvoiceTypeAdvanceCharges     InvoiceResponseType = "advance_charges"
+	InvoiceTypeProgressiveBilling InvoiceResponseType = "progressive_billing"
+)
+
+// InvoiceResponsePaymentStatus represents the payment status of an invoice.
+type InvoiceResponsePaymentStatus string
+
+const (
+	InvoicePaymentStatusPending   InvoiceResponsePaymentStatus = "pending"
+	InvoicePaymentStatusFailed    InvoiceResponsePaymentStatus = "failed"
+	InvoicePaymentStatusSucceeded InvoiceResponsePaymentStatus = "succeeded"
+)
+
 // Invoice represents a billing invoice.
 type Invoice struct {
-	// InvoiceID is the unique identifier for the invoice.
-	InvoiceID TypeID `json:"invoice_id"`
+	// ExternalID is the Lago (external) ID for this invoice.
+	ExternalID string `json:"external_id"`
 
-	// InvoiceNumber is the human-readable invoice number.
-	InvoiceNumber string `json:"invoice_number"`
+	// Number is the human-readable invoice number.
+	Number string `json:"number"`
+
+	// IssuingDate is when the invoice was issued.
+	IssuingDate *time.Time `json:"issuing_date,omitempty"`
+
+	// PaymentDueDate is when payment is due.
+	PaymentDueDate *time.Time `json:"payment_due_date,omitempty"`
+
+	// InvoiceType is the type of the invoice.
+	InvoiceType InvoiceResponseType `json:"invoice_type"`
 
 	// Status is the invoice status.
-	Status string `json:"status"`
+	Status InvoiceResponseStatus `json:"status"`
 
-	// Amount is the total invoice amount.
-	Amount string `json:"amount"`
+	// PaymentStatus is the payment status.
+	PaymentStatus InvoiceResponsePaymentStatus `json:"payment_status"`
+
+	// PaymentOverdue indicates whether payment is overdue.
+	PaymentOverdue bool `json:"payment_overdue"`
 
 	// Currency is the currency code.
 	Currency Currency `json:"currency"`
 
-	// DueDate is when the invoice is due.
-	DueDate *time.Time `json:"due_date,omitempty"`
+	// Amount is the total invoice amount.
+	Amount string `json:"amount"`
 
-	// PaidOn is when the invoice was paid.
-	PaidOn *time.Time `json:"paid_on,omitempty"`
+	// FeesAmount is the fees amount.
+	FeesAmount string `json:"fees_amount"`
 
-	// CreatedOn is when the invoice was created.
-	CreatedOn *time.Time `json:"created_on,omitempty"`
+	// TaxesAmount is the taxes amount.
+	TaxesAmount string `json:"taxes_amount"`
 
-	// DownloadURL is the URL to download the invoice PDF.
-	DownloadURL *string `json:"download_url,omitempty"`
+	// FileURL is the URL to download the invoice PDF.
+	FileURL *string `json:"file_url,omitempty"`
 }
 
 // InvoiceListResponse represents the paginated response when listing invoices.
