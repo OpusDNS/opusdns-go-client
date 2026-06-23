@@ -23,7 +23,7 @@ The official Go client library for the [OpusDNS](https://opusdns.com) API - a co
 go get github.com/opusdns/opusdns-go-client
 ```
 
-Requires Go 1.26.3 or later.
+Requires Go 1.21 or later.
 
 ## Quick Start
 
@@ -768,7 +768,7 @@ go run main.go
 
 ## Requirements
 
-- Go 1.26.3 or later
+- Go 1.21 or later
 - OpusDNS API key ([Get one here](https://app.opusdns.com))
 
 ## API Documentation
