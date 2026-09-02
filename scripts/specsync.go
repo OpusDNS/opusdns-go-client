@@ -4,6 +4,7 @@
 // spec/ and records exactly which upstream revision it was taken from.
 //
 //	go run scripts/specsync.go                 # follow api-spec main
+//	go run scripts/specsync.go -check          # report drift, write nothing
 //	go run scripts/specsync.go -ref <sha>      # pin to one api-spec commit
 //	go run scripts/specsync.go -spec-url <url> # any other source (debugging)
 //
@@ -20,6 +21,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -53,6 +55,7 @@ type versionFile struct {
 func main() {
 	ref := flag.String("ref", "main", "api-spec git ref (branch, tag or commit sha) to vendor the spec from")
 	specURL := flag.String("spec-url", "", "fetch the spec from this URL instead of api-spec (skips commit pinning)")
+	check := flag.Bool("check", false, "report whether the vendored spec is behind upstream and exit non-zero if it is; writes nothing")
 	flag.Parse()
 
 	before := readVersionFile()
@@ -90,6 +93,12 @@ func main() {
 	}
 
 	after := versionFile{NpmVersion: npmVersion, InfoVersion: infoVersion, APISpecCommit: commit}
+
+	if *check {
+		reportCheck(before, after, spec)
+		return
+	}
+
 	if err := writeFiles(spec, after); err != nil {
 		fatal(err)
 	}
@@ -99,6 +108,28 @@ func main() {
 	fmt.Printf("info_version: %s\n", change(before.InfoVersion, after.InfoVersion))
 	fmt.Printf("commit:       %s\n", change(before.APISpecCommit, after.APISpecCommit))
 	fmt.Printf("wrote %s (%d bytes) and %s\n", outSpec, len(spec), outVersion)
+}
+
+// reportCheck compares the vendored spec with what upstream publishes and exits
+// non-zero when they differ, so it can gate a scheduled job. It writes nothing,
+// so it is safe to run against a dirty working tree.
+func reportCheck(before, after versionFile, spec []byte) {
+	current, err := os.ReadFile(outSpec)
+	if err != nil {
+		fatal(fmt.Errorf("read %s: %w (run `make spec-sync` first)", outSpec, err))
+	}
+
+	if bytes.Equal(current, spec) && before.InfoVersion == after.InfoVersion {
+		fmt.Printf("up to date with api-spec: npm %s, spec %s\n", before.NpmVersion, before.InfoVersion)
+		return
+	}
+
+	fmt.Printf("api-spec has moved on:\n")
+	fmt.Printf("  npm_version:  %s\n", change(before.NpmVersion, after.NpmVersion))
+	fmt.Printf("  info_version: %s\n", change(before.InfoVersion, after.InfoVersion))
+	fmt.Printf("  commit:       %s\n", change(before.APISpecCommit, after.APISpecCommit))
+	fmt.Printf("\nRun `make spec-sync` to vendor it, then `make spec-check` for what needs code.\n")
+	os.Exit(1)
 }
 
 // resolveCommit turns a branch, tag or sha into a full commit sha, so the

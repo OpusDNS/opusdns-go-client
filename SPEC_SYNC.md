@@ -21,11 +21,17 @@ build of the site and lags behind by days.
 ## Commands
 
 ```bash
-make spec-sync                  # refresh spec/ from api-spec main
-make spec-sync SPEC_REF=<sha>   # ... or from one api-spec commit
-make spec-check                 # verify the client against the vendored spec
+make spec-outdated              # has api-spec moved on? changes nothing
+make spec-update                # refresh spec/, then report what needs code
+make spec-check                 # check the client against the vendored spec
 make spec-stubs                 # print coverage.yaml entries for untriaged operations
+make spec-sync SPEC_REF=<sha>   # vendor one specific api-spec commit
 ```
+
+Everything here runs locally and needs no credentials. `make spec-outdated` only
+reads, so it is safe on a dirty tree; it exits non-zero when upstream is ahead.
+`make spec-update` is the usual entry point: it vendors the new spec and then
+tells you what that costs in code.
 
 `make spec-sync` is idempotent: run it twice against an unchanged upstream and
 the working tree stays clean. The version stamp deliberately records no
@@ -75,24 +81,35 @@ in the test file: Go cannot look a type up by name at run time.
 Not checked: query parameters, headers, request bodies, enum values and status
 codes. Read the OpenAPI changes report on the sync PR for those.
 
-## How a change reaches this repo
+## Two things can drift, and they are caught differently
 
-```
-opusdns-api (push to main)
-  └─ repository_dispatch → api-spec: regenerate types, bump npm version
-       └─ repository_dispatch → this repo: .github/workflows/sync-openapi-spec.yaml
-            └─ bot PR on branch bot/openapi-spec-sync
-```
+**The client against the vendored spec.** `TestSpecCoverage` and
+`TestSpecModels` run in the ordinary test suite, so every pull request and every
+push to `main` already catches this. Nothing extra is needed.
 
-A weekly cron runs the same workflow, so a lost dispatch self-heals within seven
-days. `workflow_dispatch` takes a `spec_ref` input for a manual run.
+**The vendored spec against what is published.** No local test can see this: the
+vendored copy is a snapshot, and it only moves when somebody runs
+`make spec-sync`. `.github/workflows/check-openapi-spec.yaml` is what notices,
+weekly. It fetches the published spec, re-runs both checks against it, writes
+the whole report into the run summary, and fails.
 
-## Triaging a sync PR
+That workflow is deliberately read-only. It uses no token beyond the built-in
+one, opens no pull request and pushes nothing, so there is no secret to set up
+or rotate. A failed scheduled run is the notification: it shows in the Actions
+tab, and GitHub emails whoever last edited the cron in that file. Run it on
+demand from the Actions tab with a `spec_ref` input, or reproduce it exactly
+with `make spec-update`.
 
-The PR body carries the OpenAPI changes report, the coverage report, and
-ready-to-paste manifest stubs. **CI on that PR is expected to be red** while new
-operations are untriaged; that failure is the to-do list, and it is what stops an
-unnoticed endpoint from sitting unimplemented for months.
+It also listens for a `repository_dispatch` of type `openapi_spec_update`, which
+does nothing until somebody gives `api-spec` a token scoped to this repository.
+Adding that would turn the weekly notice into a same-day one; the mechanism does
+not depend on it.
+
+## Acting on a drift report
+
+The run summary carries the OpenAPI changes report, the coverage report and
+ready-to-paste manifest stubs. Locally, `make spec-update` produces the same
+thing.
 
 1. Read the OpenAPI changes report first, for the changes that add no operation:
    new required fields, changed types, new enum values, new status codes.
@@ -105,6 +122,8 @@ unnoticed endpoint from sitting unimplemented for months.
    the client is calling something the API does not serve, or reading a field it
    no longer sends.
 4. `make spec-check` until green, then `go test ./...`.
+5. Commit `spec/` together with the code it needed. They belong in one change:
+   the vendored spec is the evidence for what the code was written against.
 
 Operations that are always `excluded`, so they need no fresh argument each time:
 
@@ -118,7 +137,7 @@ Promoting a `deferred` entry later is just changing the status and adding
 
 ## Release checklist
 
-- [ ] The sync PR is merged and `go test ./...` is green on `main`.
+- [ ] `make spec-outdated` is quiet and `go test ./...` is green on `main`.
 - [ ] The release notes name the spec the release was built against, from
       `spec/version.yaml` (npm version and `info.version`).
 - [ ] Removed struct fields or renamed methods are called out as breaking.

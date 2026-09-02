@@ -627,6 +627,10 @@ func TestSpecCoverage(t *testing.T) {
 
 // writeStubs prints ready-to-paste manifest entries, pre-filled with the method
 // that already implements the operation where one exists.
+//
+// It writes to stdout rather than through t.Log on purpose: the test log
+// indents every line, which would corrupt the YAML for whoever pastes it. The
+// markers let `make spec-stubs` cut the block out verbatim.
 func writeStubs(t *testing.T, unmapped []string, specOps map[string]specOperation, byRoute map[string][]clientRoute) {
 	t.Helper()
 
@@ -643,7 +647,7 @@ func writeStubs(t *testing.T, unmapped []string, specOps map[string]specOperatio
 		fmt.Fprintf(&b, "    reason: TODO  # %s\n", strings.Join(specOps[key].Tags, ","))
 	}
 	b.WriteString("--- END STUBS\n")
-	t.Log(b.String())
+	fmt.Print(b.String())
 }
 
 func assertServiceMethod(ref string) error {

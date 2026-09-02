@@ -12,8 +12,9 @@ golangci-lint run                               # lint (config in .golangci.yml)
 go mod tidy && git diff --exit-code go.mod go.sum  # CI fails if go.mod is not tidy
 govulncheck ./...                               # security scan (CI also runs this)
 
-make spec-sync                                  # refresh the vendored OpenAPI spec from api-spec
-make spec-check                                 # verify the client against the vendored spec
+make spec-outdated                              # has api-spec moved on? changes nothing
+make spec-update                                # vendor the new spec, then report what needs code
+make spec-check                                 # check the client against the vendored spec
 make spec-stubs                                 # coverage.yaml entries for untriaged operations
 ```
 
@@ -34,7 +35,8 @@ whether the client implements it, has deferred it, or excludes it on purpose.
 `TestSpecCoverage` and `TestSpecModels` (in `opusdns/spec_coverage_test.go`) run
 with the normal test suite and fail when the client and the spec disagree — an
 untriaged new endpoint, a route the API no longer serves, or a struct field it no
-longer sends. A bot PR refreshes `spec/` whenever the published spec changes.
+longer sends. A weekly read-only workflow reports when the vendored spec itself
+falls behind what is published; `make spec-update` does the same locally.
 
 Read **SPEC_SYNC.md** before touching `spec/`, adding a service method, or
 triaging a sync PR. When you add a method, add its `spec/coverage.yaml` entry in

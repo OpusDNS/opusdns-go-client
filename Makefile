@@ -8,7 +8,7 @@ SPEC_URL ?=
 
 SPEC_TESTS := 'TestSpecCoverage|TestSpecModels'
 
-.PHONY: help build test lint tidy vuln spec-sync spec-check spec-stubs
+.PHONY: help build test lint tidy vuln spec-outdated spec-sync spec-check spec-stubs spec-update
 
 help: ## Show this help
 	@grep -hE '^[a-z-]+:.*?## ' $(MAKEFILE_LIST) | sort | \
@@ -29,6 +29,9 @@ tidy: ## Tidy go.mod/go.sum
 vuln: ## Run the vulnerability scanner
 	govulncheck ./...
 
+spec-outdated: ## Report whether api-spec has moved on; changes nothing
+	@go run scripts/specsync.go -check -ref "$(SPEC_REF)" $(if $(SPEC_URL),-spec-url "$(SPEC_URL)")
+
 spec-sync: ## Refresh the vendored OpenAPI spec from api-spec
 	go run scripts/specsync.go -ref "$(SPEC_REF)" $(if $(SPEC_URL),-spec-url "$(SPEC_URL)")
 
@@ -36,5 +39,7 @@ spec-check: ## Verify the client against the vendored spec (coverage + model dri
 	go test ./opusdns -run $(SPEC_TESTS) -v
 
 spec-stubs: ## Print coverage.yaml stubs for operations that are not yet triaged
-	@go test ./opusdns -run TestSpecCoverage -v 2>&1 | \
+	@go test ./opusdns -run TestSpecCoverage 2>&1 | \
 		sed -n '/^--- STUBS/,/^--- END STUBS/p'
+
+spec-update: spec-sync spec-check ## Refresh the vendored spec, then report what needs code
