@@ -284,3 +284,240 @@ func (s *DomainForwardsService) GetMetrics(ctx context.Context, opts *models.Dom
 
 	return &result, nil
 }
+
+// metricsQuery turns the shared metrics filters into query parameters.
+func metricsQuery(opts *models.DomainForwardMetricsOptions) url.Values {
+	query := url.Values{}
+	if opts == nil {
+		return query
+	}
+	if opts.Hostname != "" {
+		query.Set("hostname", opts.Hostname)
+	}
+	if opts.Domain != "" {
+		query.Set("domain", opts.Domain)
+	}
+	if opts.Protocol != "" {
+		query.Set("protocol", string(opts.Protocol))
+	}
+	if opts.TimeRange != "" {
+		query.Set("time_range", string(opts.TimeRange))
+	}
+	if opts.ExcludeBots != nil {
+		query.Set("exclude_bots", strconv.FormatBool(*opts.ExcludeBots))
+	}
+	return query
+}
+
+// GetTimeSeries retrieves visits over time for the matching domain forwards.
+func (s *DomainForwardsService) GetTimeSeries(ctx context.Context, opts *models.DomainForwardMetricsOptions) (*models.DomainForwardTimeSeriesResponse, error) {
+	path := s.client.http.BuildPath("domain-forwards", "metrics", "time-series")
+
+	resp, err := s.client.http.Get(ctx, path, metricsQuery(opts))
+	if err != nil {
+		return nil, err
+	}
+
+	var result models.DomainForwardTimeSeriesResponse
+	if err := s.client.http.DecodeResponse(resp, &result); err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
+// GetGeoStats retrieves visits by country for the matching domain forwards.
+func (s *DomainForwardsService) GetGeoStats(ctx context.Context, opts *models.DomainForwardMetricsOptions) (*models.DomainForwardGeoStatsResponse, error) {
+	path := s.client.http.BuildPath("domain-forwards", "metrics", "geo")
+
+	resp, err := s.client.http.Get(ctx, path, metricsQuery(opts))
+	if err != nil {
+		return nil, err
+	}
+
+	var result models.DomainForwardGeoStatsResponse
+	if err := s.client.http.DecodeResponse(resp, &result); err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
+// GetBrowserStats retrieves visits by browser for the matching domain forwards.
+func (s *DomainForwardsService) GetBrowserStats(ctx context.Context, opts *models.DomainForwardMetricsOptions) (*models.DomainForwardBrowserStatsResponse, error) {
+	path := s.client.http.BuildPath("domain-forwards", "metrics", "browser")
+
+	resp, err := s.client.http.Get(ctx, path, metricsQuery(opts))
+	if err != nil {
+		return nil, err
+	}
+
+	var result models.DomainForwardBrowserStatsResponse
+	if err := s.client.http.DecodeResponse(resp, &result); err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
+// GetPlatformStats retrieves visits by platform for the matching domain forwards.
+func (s *DomainForwardsService) GetPlatformStats(ctx context.Context, opts *models.DomainForwardMetricsOptions) (*models.DomainForwardPlatformStatsResponse, error) {
+	path := s.client.http.BuildPath("domain-forwards", "metrics", "platform")
+
+	resp, err := s.client.http.Get(ctx, path, metricsQuery(opts))
+	if err != nil {
+		return nil, err
+	}
+
+	var result models.DomainForwardPlatformStatsResponse
+	if err := s.client.http.DecodeResponse(resp, &result); err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
+// GetReferrerStats retrieves visits by referrer for the matching domain forwards.
+func (s *DomainForwardsService) GetReferrerStats(ctx context.Context, opts *models.DomainForwardMetricsOptions) (*models.DomainForwardReferrerStatsResponse, error) {
+	path := s.client.http.BuildPath("domain-forwards", "metrics", "referrer")
+
+	resp, err := s.client.http.Get(ctx, path, metricsQuery(opts))
+	if err != nil {
+		return nil, err
+	}
+
+	var result models.DomainForwardReferrerStatsResponse
+	if err := s.client.http.DecodeResponse(resp, &result); err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
+// GetStatusCodeStats retrieves visits by HTTP status code for the matching domain forwards.
+func (s *DomainForwardsService) GetStatusCodeStats(ctx context.Context, opts *models.DomainForwardMetricsOptions) (*models.DomainForwardStatusCodeStatsResponse, error) {
+	path := s.client.http.BuildPath("domain-forwards", "metrics", "status-code")
+
+	resp, err := s.client.http.Get(ctx, path, metricsQuery(opts))
+	if err != nil {
+		return nil, err
+	}
+
+	var result models.DomainForwardStatusCodeStatsResponse
+	if err := s.client.http.DecodeResponse(resp, &result); err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
+// GetUserAgentStats retrieves visits by user agent for the matching domain forwards.
+func (s *DomainForwardsService) GetUserAgentStats(ctx context.Context, opts *models.DomainForwardMetricsOptions) (*models.DomainForwardUserAgentStatsResponse, error) {
+	path := s.client.http.BuildPath("domain-forwards", "metrics", "user-agent")
+
+	resp, err := s.client.http.Get(ctx, path, metricsQuery(opts))
+	if err != nil {
+		return nil, err
+	}
+
+	var result models.DomainForwardUserAgentStatsResponse
+	if err := s.client.http.DecodeResponse(resp, &result); err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
+// GetVisitsByKey retrieves visit counts grouped by the requested key.
+func (s *DomainForwardsService) GetVisitsByKey(ctx context.Context, opts *models.DomainForwardVisitsByKeyOptions) (*models.DomainForwardVisitsByKeyResponse, error) {
+	path := s.client.http.BuildPath("domain-forwards", "metrics", "visits-by-key")
+
+	var query url.Values
+	if opts != nil {
+		query = metricsQuery(&opts.DomainForwardMetricsOptions)
+		if opts.Grouping != "" {
+			query.Set("grouping", opts.Grouping)
+		}
+	} else {
+		query = metricsQuery(nil)
+	}
+
+	resp, err := s.client.http.Get(ctx, path, query)
+	if err != nil {
+		return nil, err
+	}
+
+	var result models.DomainForwardVisitsByKeyResponse
+	if err := s.client.http.DecodeResponse(resp, &result); err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
+// ListZonesPage retrieves one page of zones that have domain forwards.
+func (s *DomainForwardsService) ListZonesPage(ctx context.Context, opts *models.ListDomainForwardZonesOptions) (*models.DomainForwardZoneListResponse, error) {
+	path := s.client.http.BuildPath("dns", "domain-forwards")
+
+	query := url.Values{}
+	if opts != nil {
+		if opts.Page > 0 {
+			query.Set("page", strconv.Itoa(opts.Page))
+		}
+		if opts.PageSize > 0 {
+			query.Set("page_size", strconv.Itoa(opts.PageSize))
+		}
+		if opts.SortBy != "" {
+			query.Set("sort_by", string(opts.SortBy))
+		}
+		if opts.SortOrder != "" {
+			query.Set("sort_order", string(opts.SortOrder))
+		}
+		if opts.Search != "" {
+			query.Set("search", opts.Search)
+		}
+	}
+
+	resp, err := s.client.http.Get(ctx, path, query)
+	if err != nil {
+		return nil, err
+	}
+
+	var result models.DomainForwardZoneListResponse
+	if err := s.client.http.DecodeResponse(resp, &result); err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
+// ListZones retrieves every zone that has domain forwards, following pagination.
+func (s *DomainForwardsService) ListZones(ctx context.Context, opts *models.ListDomainForwardZonesOptions) ([]models.DomainForwardZone, error) {
+	var all []models.DomainForwardZone
+	page := 1
+
+	for {
+		pageOpts := models.ListDomainForwardZonesOptions{}
+		if opts != nil {
+			pageOpts = *opts
+		}
+		pageOpts.Page = page
+		if pageOpts.PageSize == 0 {
+			pageOpts.PageSize = DefaultPageSize
+		}
+
+		resp, err := s.ListZonesPage(ctx, &pageOpts)
+		if err != nil {
+			return nil, err
+		}
+
+		all = append(all, resp.Results...)
+
+		if !resp.Pagination.HasNextPage {
+			break
+		}
+		page++
+	}
+
+	return all, nil
+}

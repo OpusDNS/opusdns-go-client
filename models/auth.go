@@ -51,3 +51,36 @@ type OrganizationCredential struct {
 	// LastUsedOn is when the API key was last used.
 	LastUsedOn *time.Time `json:"last_used_on,omitempty"`
 }
+
+// GrantTypeClientCredentials is the only grant type the token endpoint accepts.
+const GrantTypeClientCredentials = "client_credentials"
+
+// TokenRequest exchanges organization client credentials for an access token.
+type TokenRequest struct {
+	// GrantType is always GrantTypeClientCredentials.
+	GrantType string `json:"grant_type"`
+
+	// ClientID is the organization ID the credentials belong to.
+	ClientID OrganizationID `json:"client_id"`
+
+	// ClientSecret is the client secret.
+	ClientSecret string `json:"client_secret"`
+}
+
+// TokenResponse is a freshly issued access token.
+type TokenResponse struct {
+	// AccessToken is the bearer token to authenticate with.
+	AccessToken string `json:"access_token"`
+
+	// TokenType is the token type, normally "Bearer".
+	TokenType string `json:"token_type,omitempty"`
+
+	// ExpiresIn is the access token lifetime in seconds.
+	ExpiresIn int `json:"expires_in"`
+
+	// RefreshToken renews the access token.
+	RefreshToken string `json:"refresh_token"`
+
+	// RefreshExpiresIn is the refresh token lifetime in seconds.
+	RefreshExpiresIn int `json:"refresh_expires_in"`
+}

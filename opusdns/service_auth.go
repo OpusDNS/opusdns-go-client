@@ -28,3 +28,26 @@ func (s *AuthService) IntrospectAPIKey(ctx context.Context) (*models.Organizatio
 
 	return &credential, nil
 }
+
+// IssueToken exchanges organization client credentials for an access token.
+// This is an alternative to the X-Api-Key header for callers that need short
+// lived bearer tokens; it does not use the client's configured API key.
+func (s *AuthService) IssueToken(ctx context.Context, clientID models.OrganizationID, clientSecret string) (*models.TokenResponse, error) {
+	path := s.client.http.BuildPath("auth", "token")
+
+	resp, err := s.client.http.Post(ctx, path, &models.TokenRequest{
+		GrantType:    models.GrantTypeClientCredentials,
+		ClientID:     clientID,
+		ClientSecret: clientSecret,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var result models.TokenResponse
+	if err := s.client.http.DecodeResponse(resp, &result); err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}

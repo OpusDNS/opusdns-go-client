@@ -214,3 +214,46 @@ func TestVanityNameserversService_ListZonesReferencingSet(t *testing.T) {
 	require.Len(t, result.Results, 1)
 	assert.Equal(t, "example.com", result.Results[0].Name)
 }
+
+func TestVanityNameserversService_SetRenewalMode(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "PATCH", r.Method)
+		assert.Equal(t, "/v1/vanity-nameserver-sets/vns_123", r.URL.Path)
+
+		var body models.SetRenewalModeRequest
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		assert.Equal(t, models.RenewalModeExpire, body.RenewalMode)
+
+		_ = json.NewEncoder(w).Encode(models.VanityNameserverSet{
+			SetID:       "vns_123",
+			RenewalMode: models.RenewalModePtr(models.RenewalModeExpire),
+		})
+	}))
+	defer server.Close()
+
+	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+	require.NoError(t, err)
+
+	set, err := client.VanityNameservers.SetRenewalMode(context.Background(), "vns_123", models.RenewalModeExpire)
+	require.NoError(t, err)
+	require.NotNil(t, set.RenewalMode)
+	assert.Equal(t, models.RenewalModeExpire, *set.RenewalMode)
+}
+
+func TestVanityNameserversService_RetrySet(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "POST", r.Method)
+		assert.Equal(t, "/v1/vanity-nameserver-sets/vns_123/retry", r.URL.Path)
+
+		w.WriteHeader(http.StatusAccepted)
+		_ = json.NewEncoder(w).Encode(models.VanityNameserverSet{SetID: "vns_123"})
+	}))
+	defer server.Close()
+
+	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+	require.NoError(t, err)
+
+	set, err := client.VanityNameservers.RetrySet(context.Background(), "vns_123")
+	require.NoError(t, err)
+	assert.Equal(t, models.VanityNameserverSetID("vns_123"), set.SetID)
+}

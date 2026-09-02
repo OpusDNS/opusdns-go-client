@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/opusdns/opusdns-go-client/models"
 	"github.com/stretchr/testify/assert"
@@ -621,4 +622,106 @@ func TestOrganizationsService_ListOrganizationsPage(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, resp.Results, 1)
 	assert.Equal(t, "Example", resp.Results[0].Name)
+}
+
+func TestOrganizationsService_ListReceipts(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "GET", r.Method)
+		assert.Equal(t, "/v1/organizations/organization_123/billing/receipts", r.URL.Path)
+
+		_ = json.NewEncoder(w).Encode(models.InvoiceListResponse{
+			Results: []models.Invoice{{
+				ExternalID:   "inv_1",
+				Number:       "R-2026-001",
+				DocumentType: models.InvoiceDocumentTypeReceipt,
+			}},
+			Pagination: models.Pagination{HasNextPage: false},
+		})
+	}))
+	defer server.Close()
+
+	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+	require.NoError(t, err)
+
+	receipts, err := client.Organizations.ListReceipts(context.Background(), "organization_123")
+	require.NoError(t, err)
+	require.Len(t, receipts.Results, 1)
+	assert.Equal(t, models.InvoiceDocumentTypeReceipt, receipts.Results[0].DocumentType)
+}
+
+func TestOrganizationsService_GetUsageSeries(t *testing.T) {
+	start := time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC)
+	end := time.Date(2026, 8, 31, 0, 0, 0, 0, time.UTC)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "GET", r.Method)
+		assert.Equal(t, "/v1/organizations/organization_123/usage/ai_inference", r.URL.Path)
+
+		query := r.URL.Query()
+		assert.Equal(t, "2026-08-01", query.Get("start_date"))
+		assert.Equal(t, "2026-08-31", query.Get("end_date"))
+		assert.Equal(t, "day", query.Get("granularity"))
+
+		_ = json.NewEncoder(w).Encode(models.AIInferenceUsageSeries{
+			Product:     models.UsageProductAIInference,
+			Granularity: models.UsageGranularityDay,
+			StartDate:   "2026-08-01",
+			EndDate:     "2026-08-31",
+			Buckets: []models.AIInferenceUsageBucket{{
+				PeriodStart: "2026-08-01",
+				Groups: []models.AIInferenceUsageGroup{{
+					Model: "claude", InputTokens: 10, OutputTokens: 5, RequestCount: 2,
+				}},
+			}},
+		})
+	}))
+	defer server.Close()
+
+	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+	require.NoError(t, err)
+
+	series, err := client.Organizations.GetUsageSeries(context.Background(), "organization_123",
+		models.UsageProductAIInference, &models.UsageOptions{
+			StartDate:   &start,
+			EndDate:     &end,
+			Granularity: models.UsageGranularityDay,
+		})
+	require.NoError(t, err)
+	require.Len(t, series.Buckets, 1)
+	assert.Equal(t, int64(10), series.Buckets[0].Groups[0].InputTokens)
+}
+
+func TestOrganizationsService_GetUsageSummary(t *testing.T) {
+	start := time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/v1/organizations/organization_123/usage/ai_inference/summary", r.URL.Path)
+
+		query := r.URL.Query()
+		assert.Equal(t, "2026-08-01", query.Get("start_date"))
+		// The summary endpoint does not take a granularity.
+		assert.Empty(t, query.Get("granularity"))
+
+		_ = json.NewEncoder(w).Encode(models.AIInferenceUsageSummary{
+			Product:   models.UsageProductAIInference,
+			StartDate: "2026-08-01",
+			EndDate:   "2026-08-31",
+			Groups: []models.AIInferenceUsageGroup{{
+				Model: "claude", InputTokens: 100, RequestCount: 4,
+			}},
+		})
+	}))
+	defer server.Close()
+
+	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+	require.NoError(t, err)
+
+	summary, err := client.Organizations.GetUsageSummary(context.Background(), "organization_123",
+		models.UsageProductAIInference, &models.UsageOptions{
+			StartDate:   &start,
+			Granularity: models.UsageGranularityDay,
+		})
+	require.NoError(t, err)
+	require.Len(t, summary.Groups, 1)
+	assert.Equal(t, int64(100), summary.Groups[0].InputTokens)
 }

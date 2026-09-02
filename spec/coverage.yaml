@@ -85,8 +85,8 @@ operations:
     status: excluded
     reason: "unauthenticated account signup; an API client already needs an account"
   "POST /v1/auth/token":
-    status: deferred
-    reason: "backlog: not implemented yet"
+    status: implemented
+    method: Auth.IssueToken
 
   # --- availability (3) ---
   "GET /v1/availability":
@@ -166,11 +166,11 @@ operations:
     status: implemented
     method: DNS.ListZonesPage
   "GET /v1/dns/domain-forwards":
-    status: deferred
-    reason: "backlog: not implemented yet"
+    status: implemented
+    method: DomainForwards.ListZonesPage
   "GET /v1/dns/email-forwards":
-    status: deferred
-    reason: "backlog: not implemented yet"
+    status: implemented
+    method: EmailForwards.ListZonesPage
   "GET /v1/dns/summary":
     status: implemented
     method: DNS.GetSummary
@@ -237,8 +237,8 @@ operations:
     status: implemented
     method: Domains.CreateDomain
   "POST /v1/domains/claims-notices":
-    status: deferred
-    reason: "backlog: not implemented yet"
+    status: implemented
+    method: Domains.GetClaimsNotices
   "POST /v1/domains/transfer":
     status: implemented
     method: Domains.TransferDomain
@@ -255,8 +255,8 @@ operations:
     status: implemented
     method: Domains.RestoreDomain
   "POST /v1/domains/{domain_reference}/transfer/outbound":
-    status: deferred
-    reason: "backlog: not implemented yet"
+    status: implemented
+    method: Domains.ResolveOutboundTransfer
   "PUT /v1/domains/{domain_reference}/dnssec":
     status: implemented
     method: Domains.PutDNSSEC
@@ -266,44 +266,44 @@ operations:
     status: excluded
     reason: "unauthenticated token flow completed in a browser, not by an API client"
   "POST /v1/domains/tld-specific/at/{domain_reference}/withdraw":
-    status: deferred
-    reason: "backlog: not implemented yet"
+    status: implemented
+    method: Domains.WithdrawATDomain
   "POST /v1/domains/tld-specific/be/{domain_reference}/auth_code/request":
-    status: deferred
-    reason: "backlog: not implemented yet"
+    status: implemented
+    method: Domains.RequestAuthCode
   "POST /v1/domains/tld-specific/cymru/{domain_reference}/auth_code/request":
-    status: deferred
-    reason: "backlog: not implemented yet"
+    status: implemented
+    method: Domains.RequestAuthCode
   "POST /v1/domains/tld-specific/cz/{domain_reference}/auth_code/request":
-    status: deferred
-    reason: "backlog: not implemented yet"
+    status: implemented
+    method: Domains.RequestAuthCode
   "POST /v1/domains/tld-specific/de/{domain_reference}/transit":
-    status: deferred
-    reason: "backlog: not implemented yet"
+    status: implemented
+    method: Domains.TransitDEDomain
   "POST /v1/domains/tld-specific/dk/{domain_reference}/auth_code/request":
-    status: deferred
-    reason: "backlog: not implemented yet"
+    status: implemented
+    method: Domains.RequestAuthCode
   "POST /v1/domains/tld-specific/eu/{domain_reference}/auth_code/request":
-    status: deferred
-    reason: "backlog: not implemented yet"
+    status: implemented
+    method: Domains.RequestAuthCode
   "POST /v1/domains/tld-specific/lt/{domain_reference}/auth_code/request":
-    status: deferred
-    reason: "backlog: not implemented yet"
+    status: implemented
+    method: Domains.RequestAuthCode
   "POST /v1/domains/tld-specific/no/{domain_reference}/applicant-declaration":
-    status: deferred
-    reason: "backlog: not implemented yet"
+    status: implemented
+    method: Domains.SubmitNorIDDeclaration
   "POST /v1/domains/tld-specific/no/{domain_reference}/resend-declaration-email":
-    status: deferred
-    reason: "backlog: not implemented yet"
+    status: implemented
+    method: Domains.ResendNorIDDeclarationEmail
   "POST /v1/domains/tld-specific/nu/{domain_reference}/auth_code/request":
-    status: deferred
-    reason: "backlog: not implemented yet"
+    status: implemented
+    method: Domains.RequestAuthCode
   "POST /v1/domains/tld-specific/se/{domain_reference}/auth_code/request":
-    status: deferred
-    reason: "backlog: not implemented yet"
+    status: implemented
+    method: Domains.RequestAuthCode
   "POST /v1/domains/tld-specific/wales/{domain_reference}/auth_code/request":
-    status: deferred
-    reason: "backlog: not implemented yet"
+    status: implemented
+    method: Domains.RequestAuthCode
   "PUT /v1/domains/tld-specific/no/applicant-declaration":
     status: excluded
     reason: "unauthenticated token flow completed in a browser, not by an API client"
@@ -322,29 +322,29 @@ operations:
     status: implemented
     method: DomainForwards.GetMetrics
   "GET /v1/domain-forwards/metrics/browser":
-    status: deferred
-    reason: "backlog: not implemented yet"
+    status: implemented
+    method: DomainForwards.GetBrowserStats
   "GET /v1/domain-forwards/metrics/geo":
-    status: deferred
-    reason: "backlog: not implemented yet"
+    status: implemented
+    method: DomainForwards.GetGeoStats
   "GET /v1/domain-forwards/metrics/platform":
-    status: deferred
-    reason: "backlog: not implemented yet"
+    status: implemented
+    method: DomainForwards.GetPlatformStats
   "GET /v1/domain-forwards/metrics/referrer":
-    status: deferred
-    reason: "backlog: not implemented yet"
+    status: implemented
+    method: DomainForwards.GetReferrerStats
   "GET /v1/domain-forwards/metrics/status-code":
-    status: deferred
-    reason: "backlog: not implemented yet"
+    status: implemented
+    method: DomainForwards.GetStatusCodeStats
   "GET /v1/domain-forwards/metrics/time-series":
-    status: deferred
-    reason: "backlog: not implemented yet"
+    status: implemented
+    method: DomainForwards.GetTimeSeries
   "GET /v1/domain-forwards/metrics/user-agent":
-    status: deferred
-    reason: "backlog: not implemented yet"
+    status: implemented
+    method: DomainForwards.GetUserAgentStats
   "GET /v1/domain-forwards/metrics/visits-by-key":
-    status: deferred
-    reason: "backlog: not implemented yet"
+    status: implemented
+    method: DomainForwards.GetVisitsByKey
   "GET /v1/domain-forwards/{hostname}":
     status: implemented
     method: DomainForwards.GetDomainForward
@@ -490,8 +490,8 @@ operations:
     status: implemented
     method: VanityNameservers.ListZonesReferencingSet
   "PATCH /v1/vanity-nameserver-sets/{set_id}":
-    status: deferred
-    reason: "backlog: not implemented yet"
+    status: implemented
+    method: VanityNameservers.SetRenewalMode
   "PATCH /v1/vanity-nameserver-sets/{set_id}/default":
     status: implemented
     method: VanityNameservers.SetDefault
@@ -505,8 +505,8 @@ operations:
     status: implemented
     method: VanityNameservers.RestoreSet
   "POST /v1/vanity-nameserver-sets/{set_id}/retry":
-    status: deferred
-    reason: "backlog: not implemented yet"
+    status: implemented
+    method: VanityNameservers.RetrySet
 
   # --- organization (26) ---
   "DELETE /v1/organizations/ip-restrictions/{ip_restriction_id}":
@@ -552,8 +552,8 @@ operations:
     status: implemented
     method: Organizations.ListInvoices
   "GET /v1/organizations/{organization_id}/billing/receipts":
-    status: deferred
-    reason: "backlog: not implemented yet"
+    status: implemented
+    method: Organizations.ListReceipts
   "GET /v1/organizations/{organization_id}/pricing/product-type/{product_type}":
     status: implemented
     method: Organizations.GetPricing
@@ -590,11 +590,11 @@ operations:
 
   # --- organization,usage (2) ---
   "GET /v1/organizations/{organization_id}/usage/{product}":
-    status: deferred
-    reason: "backlog: not implemented yet"
+    status: implemented
+    method: Organizations.GetUsageSeries
   "GET /v1/organizations/{organization_id}/usage/{product}/summary":
-    status: deferred
-    reason: "backlog: not implemented yet"
+    status: implemented
+    method: Organizations.GetUsageSummary
 
   # --- parking (5) ---
   "GET /v1/parking":

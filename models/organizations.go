@@ -623,3 +623,99 @@ type InvoiceListResponse struct {
 	// Pagination contains the pagination metadata.
 	Pagination Pagination `json:"pagination"`
 }
+
+// UsageProduct is a metered product with a usage series.
+type UsageProduct string
+
+// UsageProductAIInference meters AI inference tokens and requests.
+const UsageProductAIInference UsageProduct = "ai_inference"
+
+// UsageGranularity is the bucket size of a usage series.
+type UsageGranularity string
+
+const (
+	// UsageGranularityDay buckets usage per day.
+	UsageGranularityDay UsageGranularity = "day"
+
+	// UsageGranularityWeek buckets usage per week.
+	UsageGranularityWeek UsageGranularity = "week"
+
+	// UsageGranularityMonth buckets usage per month.
+	UsageGranularityMonth UsageGranularity = "month"
+)
+
+// UsageOptions narrows a usage query to a date range. Dates are sent as
+// YYYY-MM-DD. Granularity applies to the series only, not to the summary.
+type UsageOptions struct {
+	// StartDate is the first day to report on.
+	StartDate *time.Time
+
+	// EndDate is the last day to report on.
+	EndDate *time.Time
+
+	// Granularity is the bucket size of the series.
+	Granularity UsageGranularity
+}
+
+// AIInferenceUsageSeries is AI inference usage bucketed over time.
+type AIInferenceUsageSeries struct {
+	// Product is the metered product.
+	Product UsageProduct `json:"product"`
+
+	// Granularity is the bucket size.
+	Granularity UsageGranularity `json:"granularity"`
+
+	// StartDate is the first day covered, as YYYY-MM-DD.
+	StartDate string `json:"start_date"`
+
+	// EndDate is the last day covered, as YYYY-MM-DD.
+	EndDate string `json:"end_date"`
+
+	// Buckets are the per-period usage buckets.
+	Buckets []AIInferenceUsageBucket `json:"buckets"`
+}
+
+// AIInferenceUsageSummary is AI inference usage totalled over a date range.
+type AIInferenceUsageSummary struct {
+	// Product is the metered product.
+	Product UsageProduct `json:"product"`
+
+	// StartDate is the first day covered, as YYYY-MM-DD.
+	StartDate string `json:"start_date"`
+
+	// EndDate is the last day covered, as YYYY-MM-DD.
+	EndDate string `json:"end_date"`
+
+	// Groups are the per-model totals.
+	Groups []AIInferenceUsageGroup `json:"groups"`
+}
+
+// AIInferenceUsageBucket is the usage of one period.
+type AIInferenceUsageBucket struct {
+	// PeriodStart is the first day of the bucket, as YYYY-MM-DD.
+	PeriodStart string `json:"period_start"`
+
+	// Groups are the per-model totals within the bucket.
+	Groups []AIInferenceUsageGroup `json:"groups"`
+}
+
+// AIInferenceUsageGroup is the usage of one model.
+type AIInferenceUsageGroup struct {
+	// Model is the model the usage is attributed to.
+	Model string `json:"model"`
+
+	// InputTokens is the number of input tokens.
+	InputTokens int64 `json:"input_tokens"`
+
+	// OutputTokens is the number of output tokens.
+	OutputTokens int64 `json:"output_tokens"`
+
+	// CacheReadTokens is the number of tokens read from the prompt cache.
+	CacheReadTokens int64 `json:"cache_read_tokens"`
+
+	// CacheWriteTokens is the number of tokens written to the prompt cache.
+	CacheWriteTokens int64 `json:"cache_write_tokens"`
+
+	// RequestCount is the number of requests.
+	RequestCount int64 `json:"request_count"`
+}

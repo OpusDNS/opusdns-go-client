@@ -33,3 +33,33 @@ func TestAuthService_IntrospectAPIKey(t *testing.T) {
 	assert.Equal(t, "admin", *cred.Role)
 	assert.Equal(t, models.OrganizationCredentialStatusActive, cred.Status)
 }
+
+func TestAuthService_IssueToken(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "POST", r.Method)
+		assert.Equal(t, "/v1/auth/token", r.URL.Path)
+
+		var body models.TokenRequest
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		assert.Equal(t, models.GrantTypeClientCredentials, body.GrantType)
+		assert.Equal(t, models.OrganizationID("organization_123"), body.ClientID)
+		assert.Equal(t, "secret", body.ClientSecret)
+
+		_ = json.NewEncoder(w).Encode(models.TokenResponse{
+			AccessToken:      "access",
+			TokenType:        "Bearer",
+			ExpiresIn:        3600,
+			RefreshToken:     "refresh",
+			RefreshExpiresIn: 86400,
+		})
+	}))
+	defer server.Close()
+
+	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+	require.NoError(t, err)
+
+	token, err := client.Auth.IssueToken(context.Background(), "organization_123", "secret")
+	require.NoError(t, err)
+	assert.Equal(t, "access", token.AccessToken)
+	assert.Equal(t, 3600, token.ExpiresIn)
+}

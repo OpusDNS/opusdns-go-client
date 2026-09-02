@@ -405,3 +405,41 @@ func (s *DomainsService) CheckDomains(ctx context.Context, domains []string) (*m
 
 	return &result, nil
 }
+
+// ResolveOutboundTransfer approves or rejects a pending outbound transfer, that
+// is a transfer of one of your domains away to another registrar. The domain is
+// referenced by either its ID or its name.
+func (s *DomainsService) ResolveOutboundTransfer(ctx context.Context, domainRef string, req *models.OutboundTransferRequest) (*models.OutboundTransferResponse, error) {
+	path := s.client.http.BuildPath("domains", url.PathEscape(domainRef), "transfer", "outbound")
+
+	resp, err := s.client.http.Post(ctx, path, req)
+	if err != nil {
+		return nil, err
+	}
+
+	var result models.OutboundTransferResponse
+	if err := s.client.http.DecodeResponse(resp, &result); err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
+// GetClaimsNotices retrieves the trademark claims notices for claims keys
+// returned by an availability check. A notice must be shown to the registrant,
+// who acknowledges it by passing its acceptance hash when registering.
+func (s *DomainsService) GetClaimsNotices(ctx context.Context, claimsKeys []string) ([]models.ClaimsNotice, error) {
+	path := s.client.http.BuildPath("domains", "claims-notices")
+
+	resp, err := s.client.http.Post(ctx, path, &models.ClaimsNoticesRequest{ClaimsKeys: claimsKeys})
+	if err != nil {
+		return nil, err
+	}
+
+	var result models.ClaimsNoticesResponse
+	if err := s.client.http.DecodeResponse(resp, &result); err != nil {
+		return nil, err
+	}
+
+	return result.ClaimsNotices, nil
+}

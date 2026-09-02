@@ -124,7 +124,7 @@ The client provides access to the following services:
 | `client.Availability` | Domain availability checking |
 | `client.Organizations` | Organization, billing, and role (RBAC) management |
 | `client.Users` | User management and role assignment |
-| `client.Auth` | Authentication (API key introspection) |
+| `client.Auth` | Authentication (API key introspection, access tokens) |
 | `client.VanityNameservers` | Vanity nameserver set management |
 | `client.Hosts` | Host object management |
 | `client.Events` | Event and audit log access |
@@ -324,6 +324,34 @@ domain, err := client.Domains.TransferDomain(ctx, &models.DomainTransferRequest{
 
 // Abort a transfer while it is still pending
 err = client.Domains.CancelTransfer(ctx, "example.com")
+
+// Approve or reject a transfer of one of your domains away to another registrar
+result, err := client.Domains.ResolveOutboundTransfer(ctx, "example.com",
+    &models.OutboundTransferRequest{Action: models.OutboundTransferApprove})
+```
+
+Some registries issue the transfer auth code on request and deliver it out of
+band rather than returning it over the API:
+
+```go
+result, err := client.Domains.RequestAuthCode(ctx, models.AuthCodeTLDSE, "example.se")
+```
+
+Other TLD-specific operations follow the same shape: `WithdrawATDomain`,
+`TransitDEDomain`, `SubmitNorIDDeclaration` and `ResendNorIDDeclarationEmail`.
+
+### Trademark Claims Notices
+
+A domain in a trademark claims period returns a `claims_key` from the
+availability check. Retrieve the notice, show it to the registrant, and pass the
+acceptance hash when registering:
+
+```go
+notices, err := client.Domains.GetClaimsNotices(ctx, []string{claimsKey})
+for _, notice := range notices {
+    fmt.Println(notice.RenderedHTML)
+    fmt.Println("acceptance hash:", notice.ClaimsNoticeAcceptanceHash)
+}
 ```
 
 ### Renew a Domain
@@ -435,7 +463,16 @@ forward, err := client.DomainForwards.CreateDomainForward(ctx, &models.DomainFor
         },
     },
 })
+
+// Traffic metrics, overall and broken down
+metrics, err := client.DomainForwards.GetMetrics(ctx, opts)
+geo, err := client.DomainForwards.GetGeoStats(ctx, opts)
+series, err := client.DomainForwards.GetTimeSeries(ctx, opts)
 ```
+
+`GetBrowserStats`, `GetPlatformStats`, `GetReferrerStats`, `GetStatusCodeStats`,
+`GetUserAgentStats` and `GetVisitsByKey` complete the set. `ListZones` lists the
+zones that have forwards, on both `DomainForwards` and `EmailForwards`.
 
 ## Jobs (Async Batch Operations)
 

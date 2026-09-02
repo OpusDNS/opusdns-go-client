@@ -349,3 +349,24 @@ func TestEmailForwardsService_GetMetrics(t *testing.T) {
 	assert.Equal(t, 42, metrics.TotalLogs)
 	assert.Equal(t, 40, metrics.ByStatus[models.EmailForwardLogStatusDelivered])
 }
+
+func TestEmailForwardsService_ListZones(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "GET", r.Method)
+		assert.Equal(t, "/v1/dns/email-forwards", r.URL.Path)
+
+		_ = json.NewEncoder(w).Encode(models.EmailForwardZoneListResponse{
+			Results:    []models.EmailForwardZone{{ZoneName: "example.com"}},
+			Pagination: models.Pagination{HasNextPage: false},
+		})
+	}))
+	defer server.Close()
+
+	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+	require.NoError(t, err)
+
+	zones, err := client.EmailForwards.ListZones(context.Background(), nil)
+	require.NoError(t, err)
+	require.Len(t, zones, 1)
+	assert.Equal(t, "example.com", zones[0].ZoneName)
+}

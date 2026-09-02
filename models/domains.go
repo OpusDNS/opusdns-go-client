@@ -574,3 +574,32 @@ type GetDomainOptions struct {
 	// Include requests additional response data.
 	Include []DomainIncludeField
 }
+
+// OutboundTransferAction resolves a pending outbound transfer.
+type OutboundTransferAction string
+
+const (
+	// OutboundTransferApprove releases the domain to the gaining registrar.
+	OutboundTransferApprove OutboundTransferAction = "approve"
+
+	// OutboundTransferReject keeps the domain and rejects the transfer.
+	OutboundTransferReject OutboundTransferAction = "reject"
+)
+
+// OutboundTransferRequest resolves a pending outbound transfer.
+type OutboundTransferRequest struct {
+	// Action says whether to approve or reject the transfer.
+	Action OutboundTransferAction `json:"action"`
+}
+
+// OutboundTransferResponse reports how an outbound transfer was resolved.
+type OutboundTransferResponse struct {
+	// DomainID is the domain whose transfer was resolved.
+	DomainID DomainID `json:"domain_id"`
+
+	// DomainName is the name of that domain.
+	DomainName string `json:"domain_name"`
+
+	// Action is the action that was applied.
+	Action OutboundTransferAction `json:"action"`
+}

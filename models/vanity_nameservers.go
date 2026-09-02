@@ -239,3 +239,11 @@ type ListVanityNameserverSetsOptions struct {
 	// PageSize is the number of items per page.
 	PageSize int
 }
+
+// SetRenewalModeRequest changes whether a vanity nameserver set renews at the
+// end of its current period. Setting RenewalModeExpire cancels at period end
+// and serves out the term; RenewalModeRenew un-cancels.
+type SetRenewalModeRequest struct {
+	// RenewalMode is the renewal mode to set.
+	RenewalMode RenewalMode `json:"renewal_mode"`
+}

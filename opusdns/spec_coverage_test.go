@@ -41,8 +41,10 @@ const (
 	statusExcluded    = "excluded"
 
 	// ignoreDirective opts a service method out of the route check, for the
-	// rare method whose path cannot be read off a single BuildPath call.
-	ignoreDirective = "speccheck:ignore"
+	// rare method whose path cannot be read off a single BuildPath call. Write
+	// it as a Go directive, on its own line with no space after the slashes, so
+	// it stays out of the rendered documentation.
+	ignoreDirective = "//speccheck:ignore"
 )
 
 // modelRegistry names the response structs TestSpecModels can check. Go cannot
@@ -299,7 +301,7 @@ var httpMethodConsts = map[string]string{
 // derives the route it calls, from its single BuildPath call and its single
 // request call. Methods that build no path (pagination wrappers, helpers) are
 // skipped.
-func extractClientRoutes(t *testing.T) map[string]clientRoute {
+func extractClientRoutes(t *testing.T) (map[string]clientRoute, map[string]bool) {
 	t.Helper()
 
 	fset := token.NewFileSet()
@@ -311,6 +313,7 @@ func extractClientRoutes(t *testing.T) map[string]clientRoute {
 	}
 
 	routes := make(map[string]clientRoute)
+	ignored := make(map[string]bool)
 	for _, pkg := range pkgs {
 		for _, file := range pkg.Files {
 			for _, decl := range file.Decls {
@@ -319,7 +322,11 @@ func extractClientRoutes(t *testing.T) map[string]clientRoute {
 					continue
 				}
 				service, recvVar, ok := serviceReceiver(fn)
-				if !ok || !fn.Name.IsExported() || hasIgnoreDirective(fn.Doc) {
+				if !ok || !fn.Name.IsExported() {
+					continue
+				}
+				if hasIgnoreDirective(fn.Doc) {
+					ignored[service+"."+fn.Name.Name] = true
 					continue
 				}
 
@@ -340,7 +347,7 @@ func extractClientRoutes(t *testing.T) map[string]clientRoute {
 	if len(routes) == 0 {
 		t.Fatalf("no client routes found; the BuildPath convention may have changed")
 	}
-	return routes
+	return routes, ignored
 }
 
 // serviceReceiver reports the service name and receiver variable of a method
@@ -403,13 +410,13 @@ func routeOf(fn *ast.FuncDecl, recvVar string) (string, error) {
 	case buildPaths == 0 && verbCalls == 0:
 		return "", nil
 	case buildPaths > 1:
-		return "", fmt.Errorf("calls BuildPath %d times; split the method or add a `// %s` comment", buildPaths, ignoreDirective)
+		return "", fmt.Errorf("calls BuildPath %d times; split the method or add a `%s` directive", buildPaths, ignoreDirective)
 	case verbCalls > 1:
-		return "", fmt.Errorf("issues %d requests; split the method or add a `// %s` comment", verbCalls, ignoreDirective)
+		return "", fmt.Errorf("issues %d requests; split the method or add a `%s` directive", verbCalls, ignoreDirective)
 	case buildPaths == 0:
-		return "", fmt.Errorf("issues a request without calling BuildPath; add a `// %s` comment if that is intended", ignoreDirective)
+		return "", fmt.Errorf("issues a request without calling BuildPath; add a `%s` directive if that is intended", ignoreDirective)
 	case verbCalls == 0:
-		return "", fmt.Errorf("builds a path but issues no request; add a `// %s` comment if that is intended", ignoreDirective)
+		return "", fmt.Errorf("builds a path but issues no request; add a `%s` directive if that is intended", ignoreDirective)
 	}
 
 	return verb + " /" + DefaultAPIVersion + "/" + strings.Join(segments, "/"), nil
@@ -473,7 +480,13 @@ func hasIgnoreDirective(doc *ast.CommentGroup) bool {
 	if doc == nil {
 		return false
 	}
-	return strings.Contains(doc.Text(), ignoreDirective)
+	// Not doc.Text(): that strips directives, which is exactly what this is.
+	for _, comment := range doc.List {
+		if strings.HasPrefix(comment.Text, ignoreDirective) {
+			return true
+		}
+	}
+	return false
 }
 
 func shortPos(fset *token.FileSet, pos token.Pos) string {
@@ -495,7 +508,7 @@ func TestSpecCoverage(t *testing.T) {
 	spec := loadSpec(t)
 	stamp := loadVersionStamp(t)
 	coverage := loadCoverage(t)
-	routes := extractClientRoutes(t)
+	routes, ignoredRoutes := extractClientRoutes(t)
 
 	if stamp.InfoVersion != spec.Info.Version {
 		t.Errorf("%s records info_version %q but %s says %q; re-run `make spec-sync`",
@@ -560,6 +573,11 @@ func TestSpecCoverage(t *testing.T) {
 
 		owner := entry.Method[0]
 		claimed[owner] = key
+		if ignoredRoutes[owner] {
+			// The method opted out of the route check, typically because it
+			// serves several spec paths that differ only in a path segment.
+			continue
+		}
 		route, ok := routes[owner]
 		if !ok {
 			// A wrapper may legitimately own no BuildPath, but then some

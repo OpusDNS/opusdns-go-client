@@ -321,3 +321,31 @@ type EmailForwardMetricsFilters struct {
 	// IncludeAliases indicates whether an alias breakdown is included.
 	IncludeAliases *bool `json:"include_aliases,omitempty"`
 }
+
+// EmailForwardZoneListResponse is a paginated list of zones with their email
+// forwards.
+type EmailForwardZoneListResponse struct {
+	// Results contains the zones for the current page.
+	Results []EmailForwardZone `json:"results"`
+
+	// Pagination contains the pagination metadata.
+	Pagination Pagination `json:"pagination"`
+}
+
+// ListEmailForwardZonesOptions filters a list of zones with email forwards.
+type ListEmailForwardZonesOptions struct {
+	// Page is the page number to retrieve (1-indexed).
+	Page int
+
+	// PageSize is the number of zones per page.
+	PageSize int
+
+	// SortBy is the field to sort by.
+	SortBy EmailForwardZoneSortField
+
+	// SortOrder is the sort direction.
+	SortOrder SortOrder
+
+	// Search is an optional search query to filter zones.
+	Search string
+}

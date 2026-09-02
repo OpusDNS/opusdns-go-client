@@ -503,3 +503,77 @@ func TestDomainsService_EnableDNSSEC(t *testing.T) {
 	require.Len(t, data, 1)
 	assert.Equal(t, models.DNSSECRecordTypeDSData, data[0].RecordType)
 }
+
+func TestDomainsService_ResolveOutboundTransfer(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "POST", r.Method)
+		assert.Equal(t, "/v1/domains/example.com/transfer/outbound", r.URL.Path)
+
+		var body models.OutboundTransferRequest
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		assert.Equal(t, models.OutboundTransferApprove, body.Action)
+
+		_ = json.NewEncoder(w).Encode(models.OutboundTransferResponse{
+			DomainID:   "domain_123",
+			DomainName: "example.com",
+			Action:     models.OutboundTransferApprove,
+		})
+	}))
+	defer server.Close()
+
+	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+	require.NoError(t, err)
+
+	result, err := client.Domains.ResolveOutboundTransfer(context.Background(), "example.com",
+		&models.OutboundTransferRequest{Action: models.OutboundTransferApprove})
+	require.NoError(t, err)
+	assert.Equal(t, "example.com", result.DomainName)
+	assert.Equal(t, models.OutboundTransferApprove, result.Action)
+}
+
+func TestDomainsService_GetClaimsNotices(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "POST", r.Method)
+		assert.Equal(t, "/v1/domains/claims-notices", r.URL.Path)
+
+		var body models.ClaimsNoticesRequest
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		assert.Equal(t, []string{"claims-key-1"}, body.ClaimsKeys)
+
+		_ = json.NewEncoder(w).Encode(models.ClaimsNoticesResponse{
+			ClaimsNotices: []models.ClaimsNotice{{
+				ClaimsKey:                  "claims-key-1",
+				Label:                      "example",
+				ClaimsNoticeAcceptanceHash: "hash-1",
+				Claims: []models.TmClaim{{
+					MarkName: "EXAMPLE",
+					Holders: []models.TmHolder{{
+						Entitlement: models.HolderEntitlementOwner,
+						Addr: models.TmAddr{
+							Street: []string{"Musterstrasse 1"},
+							City:   "Berlin",
+							CC:     "DE",
+						},
+					}},
+					JurDesc: &models.TmJurDesc{JurCC: "DE", Description: "Germany"},
+					ClassDescs: []models.TmClassDesc{
+						{ClassNum: 9, Description: "Computer software"},
+					},
+				}},
+			}},
+		})
+	}))
+	defer server.Close()
+
+	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+	require.NoError(t, err)
+
+	notices, err := client.Domains.GetClaimsNotices(context.Background(), []string{"claims-key-1"})
+	require.NoError(t, err)
+	require.Len(t, notices, 1)
+	assert.Equal(t, "hash-1", notices[0].ClaimsNoticeAcceptanceHash)
+	require.Len(t, notices[0].Claims, 1)
+	assert.Equal(t, "EXAMPLE", notices[0].Claims[0].MarkName)
+	assert.Equal(t, models.HolderEntitlementOwner, notices[0].Claims[0].Holders[0].Entitlement)
+	assert.Equal(t, "DE", notices[0].Claims[0].Holders[0].Addr.CC)
+}

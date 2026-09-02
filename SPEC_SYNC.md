@@ -51,6 +51,13 @@ calls `BuildPath` once and issues one request, which is enough to reconstruct
 | `UNCLAIMED` | The client implements a route no manifest entry points at. |
 | `MISSING` | A manifest entry names a method that builds no route. |
 
+A method whose path cannot be read off a single `BuildPath` call opts out with a
+`//speccheck:ignore` directive in its doc comment, written with no space after
+the slashes so it stays out of the rendered documentation. It still has to
+appear in the manifest, and the reflect check still applies; only the route
+comparison is skipped. `Domains.RequestAuthCode` is the current example: the TLD
+is a path segment there, so one method serves nine spec paths.
+
 **`TestSpecModels`** compares the `json` tags of the hand-written response
 structs with the properties of the schemas they mirror, for the mappings listed
 under `models:` in the manifest. It is deliberately asymmetric:

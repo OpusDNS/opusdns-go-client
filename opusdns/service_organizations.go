@@ -491,3 +491,76 @@ func (s *OrganizationsService) GetPricing(ctx context.Context, orgID models.Orga
 
 	return &pricing, nil
 }
+
+// ListReceipts retrieves the payment receipts of an organization. Receipts and
+// invoices share a shape and are told apart by their document type.
+func (s *OrganizationsService) ListReceipts(ctx context.Context, orgID models.OrganizationID) (*models.InvoiceListResponse, error) {
+	path := s.client.http.BuildPath("organizations", string(orgID), "billing", "receipts")
+
+	resp, err := s.client.http.Get(ctx, path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var result models.InvoiceListResponse
+	if err := s.client.http.DecodeResponse(resp, &result); err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
+// usageQuery turns usage filters into query parameters. Dates are sent as
+// YYYY-MM-DD, which is what the endpoint expects.
+func usageQuery(opts *models.UsageOptions, withGranularity bool) url.Values {
+	query := url.Values{}
+	if opts == nil {
+		return query
+	}
+	if opts.StartDate != nil {
+		query.Set("start_date", opts.StartDate.Format("2006-01-02"))
+	}
+	if opts.EndDate != nil {
+		query.Set("end_date", opts.EndDate.Format("2006-01-02"))
+	}
+	if withGranularity && opts.Granularity != "" {
+		query.Set("granularity", string(opts.Granularity))
+	}
+	return query
+}
+
+// GetUsageSeries retrieves usage of a metered product over time, bucketed by
+// the requested granularity.
+func (s *OrganizationsService) GetUsageSeries(ctx context.Context, orgID models.OrganizationID, product models.UsageProduct, opts *models.UsageOptions) (*models.AIInferenceUsageSeries, error) {
+	path := s.client.http.BuildPath("organizations", string(orgID), "usage", url.PathEscape(string(product)))
+
+	resp, err := s.client.http.Get(ctx, path, usageQuery(opts, true))
+	if err != nil {
+		return nil, err
+	}
+
+	var result models.AIInferenceUsageSeries
+	if err := s.client.http.DecodeResponse(resp, &result); err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
+// GetUsageSummary retrieves usage of a metered product totalled over a date
+// range.
+func (s *OrganizationsService) GetUsageSummary(ctx context.Context, orgID models.OrganizationID, product models.UsageProduct, opts *models.UsageOptions) (*models.AIInferenceUsageSummary, error) {
+	path := s.client.http.BuildPath("organizations", string(orgID), "usage", url.PathEscape(string(product)), "summary")
+
+	resp, err := s.client.http.Get(ctx, path, usageQuery(opts, false))
+	if err != nil {
+		return nil, err
+	}
+
+	var result models.AIInferenceUsageSummary
+	if err := s.client.http.DecodeResponse(resp, &result); err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
