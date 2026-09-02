@@ -87,29 +87,40 @@ codes. Read the OpenAPI changes report on the sync PR for those.
 `TestSpecModels` run in the ordinary test suite, so every pull request and every
 push to `main` already catches this. Nothing extra is needed.
 
-**The vendored spec against what is published.** No local test can see this: the
-vendored copy is a snapshot, and it only moves when somebody runs
-`make spec-sync`. `.github/workflows/check-openapi-spec.yaml` is what notices,
-weekly. It fetches the published spec, re-runs both checks against it, writes
-the whole report into the run summary, and fails.
+**The vendored spec against what is published.** Nothing catches this on its
+own. The vendored copy is a snapshot: it only moves when somebody runs
+`make spec-sync`, and until then CI is happily checking the client against a
+specification that may be months old. This is the one part of the loop that is
+deliberately manual: it needs the network, so it does not belong in the test
+suite, and it was judged not worth a scheduled job of its own.
 
-That workflow is deliberately read-only. It uses no token beyond the built-in
-one, opens no pull request and pushes nothing, so there is no secret to set up
-or rotate. A failed scheduled run is the notification: it shows in the Actions
-tab, and GitHub emails whoever last edited the cron in that file. Run it on
-demand from the Actions tab with a `spec_ref` input, or reproduce it exactly
-with `make spec-update`.
+So make it a habit rather than a memory. Run it:
 
-It also listens for a `repository_dispatch` of type `openapi_spec_update`, which
-does nothing until somebody gives `api-spec` a token scoped to this repository.
-Adding that would turn the weekly notice into a same-day one; the mechanism does
-not depend on it.
+- before cutting a release, which the checklist below repeats;
+- when you are about to add or change a service method, so you write against
+  what the API serves today;
+- when a changelog entry or a colleague mentions a new endpoint.
+
+```bash
+make spec-outdated
+```
+
+It reads only and exits non-zero when upstream is ahead, so it is also safe to
+put behind a shell alias or a local git hook if you would rather not think about
+it.
+
+If remembering ever becomes the weak link, a scheduled GitHub Actions job that
+runs `make spec-update` and fails would cover it, read-only and with no
+credentials beyond the built-in token. Its absence is a choice, not an
+oversight.
 
 ## Acting on a drift report
 
-The run summary carries the OpenAPI changes report, the coverage report and
-ready-to-paste manifest stubs. Locally, `make spec-update` produces the same
-thing.
+`make spec-update` vendors the new specification and then prints the coverage
+report and ready-to-paste manifest stubs. For the changes that add no operation,
+diff the specification itself: `git diff spec/openapi.yaml`, or run
+[`openapi-changes`](https://pb33f.io/openapi-changes/) over the old and new
+copies for a readable summary.
 
 1. Read the OpenAPI changes report first, for the changes that add no operation:
    new required fields, changed types, new enum values, new status codes.

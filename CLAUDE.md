@@ -35,8 +35,9 @@ whether the client implements it, has deferred it, or excludes it on purpose.
 `TestSpecCoverage` and `TestSpecModels` (in `opusdns/spec_coverage_test.go`) run
 with the normal test suite and fail when the client and the spec disagree — an
 untriaged new endpoint, a route the API no longer serves, or a struct field it no
-longer sends. A weekly read-only workflow reports when the vendored spec itself
-falls behind what is published; `make spec-update` does the same locally.
+longer sends. Noticing that the vendored spec is itself behind what `api-spec`
+publishes is manual and needs the network: run `make spec-outdated` before a
+release or before adding a service method.
 
 Read **SPEC_SYNC.md** before touching `spec/`, adding a service method, or
 triaging a sync PR. When you add a method, add its `spec/coverage.yaml` entry in
