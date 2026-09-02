@@ -75,6 +75,17 @@ jobs:
       - name: Build
         run: go build -v ./...
 
+      # examples/basic and examples/domains are their own modules, replaced onto
+      # the working tree, so `go build ./...` above does not reach them. Without
+      # this they break silently whenever a model changes.
+      - name: Build nested example modules
+        run: |
+          for mod in $(find examples -name go.mod -mindepth 2 -maxdepth 2); do
+            echo "::group::$(dirname "$mod")"
+            (cd "$(dirname "$mod")" && go build ./...)
+            echo "::endgroup::"
+          done
+
       - name: Verify go.mod is tidy
         run: |
           go mod tidy
