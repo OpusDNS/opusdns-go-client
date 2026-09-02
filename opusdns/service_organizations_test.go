@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
 	"time"
 
@@ -557,6 +558,8 @@ func TestOrganizationsService_ListInvoices(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "GET", r.Method)
 		assert.Equal(t, "/v1/organizations/organization_123/billing/invoices", r.URL.Path)
+		assert.Equal(t, "1", r.URL.Query().Get("page"))
+		assert.Equal(t, strconv.Itoa(DefaultPageSize), r.URL.Query().Get("page_size"))
 		_ = json.NewEncoder(w).Encode(models.InvoiceListResponse{
 			Results: []models.Invoice{
 				{Number: "INV-001", Status: models.InvoiceStatusFinalized, Amount: "10.00", Currency: models.CurrencyUSD},
@@ -569,10 +572,10 @@ func TestOrganizationsService_ListInvoices(t *testing.T) {
 	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
 	require.NoError(t, err)
 
-	resp, err := client.Organizations.ListInvoices(context.Background(), models.OrganizationID("organization_123"))
+	invoices, err := client.Organizations.ListInvoices(context.Background(), models.OrganizationID("organization_123"), nil)
 	require.NoError(t, err)
-	require.Len(t, resp.Results, 1)
-	assert.Equal(t, "INV-001", resp.Results[0].Number)
+	require.Len(t, invoices, 1)
+	assert.Equal(t, "INV-001", invoices[0].Number)
 }
 
 func TestOrganizationsService_GetPricing(t *testing.T) {
@@ -625,16 +628,44 @@ func TestOrganizationsService_ListOrganizationsPage(t *testing.T) {
 }
 
 func TestOrganizationsService_ListReceipts(t *testing.T) {
+	// The endpoint defaults to ten receipts per page, so the wrapper has to
+	// ask for a page size and keep following pages.
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "GET", r.Method)
 		assert.Equal(t, "/v1/organizations/organization_123/billing/receipts", r.URL.Path)
+		assert.Equal(t, strconv.Itoa(DefaultPageSize), r.URL.Query().Get("page_size"))
 
+		page := r.URL.Query().Get("page")
 		_ = json.NewEncoder(w).Encode(models.InvoiceListResponse{
 			Results: []models.Invoice{{
-				ExternalID:   "inv_1",
-				Number:       "R-2026-001",
+				ExternalID:   "inv_" + page,
+				Number:       "R-2026-00" + page,
 				DocumentType: models.InvoiceDocumentTypeReceipt,
 			}},
+			Pagination: models.Pagination{HasNextPage: page == "1"},
+		})
+	}))
+	defer server.Close()
+
+	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+	require.NoError(t, err)
+
+	receipts, err := client.Organizations.ListReceipts(context.Background(), "organization_123", nil)
+	require.NoError(t, err)
+	require.Len(t, receipts, 2)
+	assert.Equal(t, models.InvoiceDocumentTypeReceipt, receipts[0].DocumentType)
+	assert.Equal(t, "R-2026-001", receipts[0].Number)
+	assert.Equal(t, "R-2026-002", receipts[1].Number)
+}
+
+func TestOrganizationsService_ListReceiptsPage(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/v1/organizations/organization_123/billing/receipts", r.URL.Path)
+		assert.Equal(t, "3", r.URL.Query().Get("page"))
+		assert.Equal(t, "100", r.URL.Query().Get("page_size"))
+
+		_ = json.NewEncoder(w).Encode(models.InvoiceListResponse{
+			Results:    []models.Invoice{{Number: "R-2026-021"}},
 			Pagination: models.Pagination{HasNextPage: false},
 		})
 	}))
@@ -643,10 +674,13 @@ func TestOrganizationsService_ListReceipts(t *testing.T) {
 	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
 	require.NoError(t, err)
 
-	receipts, err := client.Organizations.ListReceipts(context.Background(), "organization_123")
+	resp, err := client.Organizations.ListReceiptsPage(context.Background(), "organization_123", &models.ListInvoicesOptions{
+		Page:     3,
+		PageSize: 100,
+	})
 	require.NoError(t, err)
-	require.Len(t, receipts.Results, 1)
-	assert.Equal(t, models.InvoiceDocumentTypeReceipt, receipts.Results[0].DocumentType)
+	require.Len(t, resp.Results, 1)
+	assert.Equal(t, "R-2026-021", resp.Results[0].Number)
 }
 
 func TestOrganizationsService_GetUsageSeries(t *testing.T) {

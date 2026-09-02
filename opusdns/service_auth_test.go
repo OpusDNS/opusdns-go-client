@@ -46,11 +46,9 @@ func TestAuthService_IssueToken(t *testing.T) {
 		assert.Equal(t, "secret", body.ClientSecret)
 
 		_ = json.NewEncoder(w).Encode(models.TokenResponse{
-			AccessToken:      "access",
-			TokenType:        "Bearer",
-			ExpiresIn:        3600,
-			RefreshToken:     "refresh",
-			RefreshExpiresIn: 86400,
+			AccessToken: "access",
+			TokenType:   "Bearer",
+			ExpiresIn:   3600,
 		})
 	}))
 	defer server.Close()

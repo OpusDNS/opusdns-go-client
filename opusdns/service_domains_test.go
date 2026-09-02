@@ -568,7 +568,7 @@ func TestDomainsService_GetClaimsNotices(t *testing.T) {
 	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
 	require.NoError(t, err)
 
-	notices, err := client.Domains.GetClaimsNotices(context.Background(), []string{"claims-key-1"})
+	notices, err := client.Domains.GetClaimsNotices(context.Background(), "claims-key-1")
 	require.NoError(t, err)
 	require.Len(t, notices, 1)
 	assert.Equal(t, "hash-1", notices[0].ClaimsNoticeAcceptanceHash)

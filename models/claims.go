@@ -5,10 +5,12 @@ package models
 // Notice Information Specification); field names mirror the API, which in turn
 // mirrors the RFC's element names.
 
-// ClaimsNoticesRequest asks for the claims notices behind one or more claims
-// keys.
+// ClaimsNoticesRequest asks for the claims notices behind a claims key. The
+// field is a list because the API models it as one, but the API accepts
+// exactly one key per request.
 type ClaimsNoticesRequest struct {
 	// ClaimsKeys are the claims keys returned by an availability check.
+	// Exactly one key is allowed.
 	ClaimsKeys []string `json:"claims_keys"`
 }
 

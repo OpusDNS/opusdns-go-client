@@ -436,7 +436,7 @@ func (s *DomainForwardsService) GetVisitsByKey(ctx context.Context, opts *models
 	if opts != nil {
 		query = metricsQuery(&opts.DomainForwardMetricsOptions)
 		if opts.Grouping != "" {
-			query.Set("grouping", opts.Grouping)
+			query.Set("grouping", string(opts.Grouping))
 		}
 	} else {
 		query = metricsQuery(nil)

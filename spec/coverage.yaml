@@ -550,10 +550,10 @@ operations:
     method: Organizations.GetAttributes
   "GET /v1/organizations/{organization_id}/billing/invoices":
     status: implemented
-    method: Organizations.ListInvoices
+    method: Organizations.ListInvoicesPage
   "GET /v1/organizations/{organization_id}/billing/receipts":
     status: implemented
-    method: Organizations.ListReceipts
+    method: Organizations.ListReceiptsPage
   "GET /v1/organizations/{organization_id}/pricing/product-type/{product_type}":
     status: implemented
     method: Organizations.GetPricing
@@ -734,6 +734,7 @@ models:
     Organization: OrganizationWithBillingData
     Report: PublicReportRes
     Tag: TagResponse
+    TokenResponse: OrganizationTokenResponse
     User: UserPublicWithAttributes
     VanityNameserverSet: VanityNameserverSetSummaryDTO
     Whitelabel: WhitelabelBrandingResponse
@@ -758,6 +759,7 @@ models:
     - Organization
     - Report
     - Tag
+    - TokenResponse
     - User
     - VanityNameserverSet
     - Whitelabel

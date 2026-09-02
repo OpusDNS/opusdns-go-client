@@ -477,7 +477,7 @@ func TestDomainForwardsService_MetricsBreakdowns(t *testing.T) {
 func TestDomainForwardsService_GetVisitsByKey(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/v1/domain-forwards/metrics/visits-by-key", r.URL.Path)
-		assert.Equal(t, "hostname", r.URL.Query().Get("grouping"))
+		assert.Equal(t, "fqdn", r.URL.Query().Get("grouping"))
 		assert.Equal(t, "example.com", r.URL.Query().Get("domain"))
 
 		_, _ = w.Write([]byte(`{"results":[{"key":"www.example.com","total":3}]}`))
@@ -489,7 +489,7 @@ func TestDomainForwardsService_GetVisitsByKey(t *testing.T) {
 
 	_, err = client.DomainForwards.GetVisitsByKey(context.Background(), &models.DomainForwardVisitsByKeyOptions{
 		DomainForwardMetricsOptions: models.DomainForwardMetricsOptions{Domain: "example.com"},
-		Grouping:                    "hostname",
+		Grouping:                    models.MetricsGroupingFQDN,
 	})
 	require.NoError(t, err)
 }

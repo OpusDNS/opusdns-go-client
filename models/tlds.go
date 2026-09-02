@@ -199,7 +199,6 @@ type TLDPortfolio struct {
 	UpdatedOn *time.Time `json:"updated_on,omitempty"`
 }
 
-// ListTLDsOptions contains options for listing TLDs.
 // GetTLDOptions overrides which TLD specification variant the API resolves.
 // All fields are optional; the API falls back to the organization's pinned
 // specification.
@@ -214,6 +213,7 @@ type GetTLDOptions struct {
 	Version string
 }
 
+// ListTLDsOptions contains options for listing TLDs.
 type ListTLDsOptions struct {
 	// Page is the page number to retrieve (1-indexed).
 	Page int

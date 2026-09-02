@@ -615,6 +615,16 @@ type Invoice struct {
 	FileURL *string `json:"file_url,omitempty"`
 }
 
+// ListInvoicesOptions paginates a list of billing documents. Receipts share
+// the invoice shape and are listed with the same options.
+type ListInvoicesOptions struct {
+	// Page is the page number to retrieve (1-indexed).
+	Page int
+
+	// PageSize is the number of documents per page.
+	PageSize int
+}
+
 // InvoiceListResponse represents the paginated response when listing invoices.
 type InvoiceListResponse struct {
 	// Results contains the list of invoices for the current page.

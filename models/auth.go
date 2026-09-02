@@ -67,7 +67,9 @@ type TokenRequest struct {
 	ClientSecret string `json:"client_secret"`
 }
 
-// TokenResponse is a freshly issued access token.
+// TokenResponse is a freshly issued organization access token, as returned by
+// the client-credentials grant. The user-credentials grant, which is the only
+// one that also returns a refresh token, is not part of this client.
 type TokenResponse struct {
 	// AccessToken is the bearer token to authenticate with.
 	AccessToken string `json:"access_token"`
@@ -77,10 +79,4 @@ type TokenResponse struct {
 
 	// ExpiresIn is the access token lifetime in seconds.
 	ExpiresIn int `json:"expires_in"`
-
-	// RefreshToken renews the access token.
-	RefreshToken string `json:"refresh_token"`
-
-	// RefreshExpiresIn is the refresh token lifetime in seconds.
-	RefreshExpiresIn int `json:"refresh_expires_in"`
 }

@@ -458,11 +458,28 @@ func (s *OrganizationsService) GetTransaction(ctx context.Context, orgID models.
 	return &transaction, nil
 }
 
-// ListInvoices retrieves invoices for an organization.
-func (s *OrganizationsService) ListInvoices(ctx context.Context, orgID models.OrganizationID) (*models.InvoiceListResponse, error) {
+// invoiceQuery turns billing-document pagination options into query
+// parameters. The endpoints default to ten documents per page, so a caller
+// that wants more has to ask.
+func invoiceQuery(opts *models.ListInvoicesOptions) url.Values {
+	query := url.Values{}
+	if opts == nil {
+		return query
+	}
+	if opts.Page > 0 {
+		query.Set("page", strconv.Itoa(opts.Page))
+	}
+	if opts.PageSize > 0 {
+		query.Set("page_size", strconv.Itoa(opts.PageSize))
+	}
+	return query
+}
+
+// ListInvoicesPage retrieves one page of invoices for an organization.
+func (s *OrganizationsService) ListInvoicesPage(ctx context.Context, orgID models.OrganizationID, opts *models.ListInvoicesOptions) (*models.InvoiceListResponse, error) {
 	path := s.client.http.BuildPath("organizations", string(orgID), "billing", "invoices")
 
-	resp, err := s.client.http.Get(ctx, path, nil)
+	resp, err := s.client.http.Get(ctx, path, invoiceQuery(opts))
 	if err != nil {
 		return nil, err
 	}
@@ -473,6 +490,13 @@ func (s *OrganizationsService) ListInvoices(ctx context.Context, orgID models.Or
 	}
 
 	return &result, nil
+}
+
+// ListInvoices retrieves every invoice of an organization, following pagination.
+func (s *OrganizationsService) ListInvoices(ctx context.Context, orgID models.OrganizationID, opts *models.ListInvoicesOptions) ([]models.Invoice, error) {
+	return s.listBillingDocuments(ctx, opts, func(ctx context.Context, pageOpts *models.ListInvoicesOptions) (*models.InvoiceListResponse, error) {
+		return s.ListInvoicesPage(ctx, orgID, pageOpts)
+	})
 }
 
 // GetPricing retrieves pricing for a specific product type.
@@ -492,12 +516,13 @@ func (s *OrganizationsService) GetPricing(ctx context.Context, orgID models.Orga
 	return &pricing, nil
 }
 
-// ListReceipts retrieves the payment receipts of an organization. Receipts and
-// invoices share a shape and are told apart by their document type.
-func (s *OrganizationsService) ListReceipts(ctx context.Context, orgID models.OrganizationID) (*models.InvoiceListResponse, error) {
+// ListReceiptsPage retrieves one page of the payment receipts of an
+// organization. Receipts and invoices share a shape and are told apart by
+// their document type.
+func (s *OrganizationsService) ListReceiptsPage(ctx context.Context, orgID models.OrganizationID, opts *models.ListInvoicesOptions) (*models.InvoiceListResponse, error) {
 	path := s.client.http.BuildPath("organizations", string(orgID), "billing", "receipts")
 
-	resp, err := s.client.http.Get(ctx, path, nil)
+	resp, err := s.client.http.Get(ctx, path, invoiceQuery(opts))
 	if err != nil {
 		return nil, err
 	}
@@ -508,6 +533,49 @@ func (s *OrganizationsService) ListReceipts(ctx context.Context, orgID models.Or
 	}
 
 	return &result, nil
+}
+
+// ListReceipts retrieves every payment receipt of an organization, following
+// pagination.
+func (s *OrganizationsService) ListReceipts(ctx context.Context, orgID models.OrganizationID, opts *models.ListInvoicesOptions) ([]models.Invoice, error) {
+	return s.listBillingDocuments(ctx, opts, func(ctx context.Context, pageOpts *models.ListInvoicesOptions) (*models.InvoiceListResponse, error) {
+		return s.ListReceiptsPage(ctx, orgID, pageOpts)
+	})
+}
+
+// listBillingDocuments walks the pages of an invoice-shaped listing.
+func (s *OrganizationsService) listBillingDocuments(
+	ctx context.Context,
+	opts *models.ListInvoicesOptions,
+	fetch func(context.Context, *models.ListInvoicesOptions) (*models.InvoiceListResponse, error),
+) ([]models.Invoice, error) {
+	var all []models.Invoice
+	page := 1
+
+	for {
+		pageOpts := models.ListInvoicesOptions{}
+		if opts != nil {
+			pageOpts = *opts
+		}
+		pageOpts.Page = page
+		if pageOpts.PageSize == 0 {
+			pageOpts.PageSize = DefaultPageSize
+		}
+
+		resp, err := fetch(ctx, &pageOpts)
+		if err != nil {
+			return nil, err
+		}
+
+		all = append(all, resp.Results...)
+
+		if !resp.Pagination.HasNextPage {
+			break
+		}
+		page++
+	}
+
+	return all, nil
 }
 
 // usageQuery turns usage filters into query parameters. Dates are sent as

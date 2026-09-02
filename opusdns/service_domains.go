@@ -425,13 +425,14 @@ func (s *DomainsService) ResolveOutboundTransfer(ctx context.Context, domainRef 
 	return &result, nil
 }
 
-// GetClaimsNotices retrieves the trademark claims notices for claims keys
+// GetClaimsNotices retrieves the trademark claims notices for a claims key
 // returned by an availability check. A notice must be shown to the registrant,
-// who acknowledges it by passing its acceptance hash when registering.
-func (s *DomainsService) GetClaimsNotices(ctx context.Context, claimsKeys []string) ([]models.ClaimsNotice, error) {
+// who acknowledges it by passing its acceptance hash when registering. The
+// API takes one key per request, so the result holds at most one notice.
+func (s *DomainsService) GetClaimsNotices(ctx context.Context, claimsKey string) ([]models.ClaimsNotice, error) {
 	path := s.client.http.BuildPath("domains", "claims-notices")
 
-	resp, err := s.client.http.Post(ctx, path, &models.ClaimsNoticesRequest{ClaimsKeys: claimsKeys})
+	resp, err := s.client.http.Post(ctx, path, &models.ClaimsNoticesRequest{ClaimsKeys: []string{claimsKey}})
 	if err != nil {
 		return nil, err
 	}

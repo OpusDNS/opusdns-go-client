@@ -348,7 +348,7 @@ availability check. Retrieve the notice, show it to the registrant, and pass the
 acceptance hash when registering:
 
 ```go
-notices, err := client.Domains.GetClaimsNotices(ctx, []string{claimsKey})
+notices, err := client.Domains.GetClaimsNotices(ctx, claimsKey)
 for _, notice := range notices {
     fmt.Println(notice.RenderedHTML)
     fmt.Println("acceptance hash:", notice.ClaimsNoticeAcceptanceHash)

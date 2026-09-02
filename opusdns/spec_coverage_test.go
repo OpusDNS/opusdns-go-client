@@ -67,6 +67,7 @@ var modelRegistry = map[string]interface{}{
 	"Organization":           models.Organization{},
 	"Report":                 models.Report{},
 	"Tag":                    models.Tag{},
+	"TokenResponse":          models.TokenResponse{},
 	"User":                   models.User{},
 	"VanityNameserverSet":    models.VanityNameserverSet{},
 	"Whitelabel":             models.Whitelabel{},
@@ -562,6 +563,12 @@ func TestSpecCoverage(t *testing.T) {
 			continue
 		}
 		implemented++
+
+		if len(entry.Method) == 0 {
+			// loadCoverage already reported the missing `method:`; the checks
+			// below all need an owning method, so skip rather than panic.
+			continue
+		}
 
 		if op, ok := specOps[key]; ok && op.Deprecated {
 			t.Logf("NOTE      %s is deprecated upstream but still implemented (%s)", key, entry.Method[0])
