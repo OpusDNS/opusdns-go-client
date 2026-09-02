@@ -181,6 +181,10 @@ func (c *HTTPClient) doRequest(ctx context.Context, req *Request) (*Response, er
 	httpReq.Header.Set("X-Api-Key", c.config.APIKey)
 	httpReq.Header.Set("User-Agent", c.config.UserAgent)
 	httpReq.Header.Set("Accept", "application/json")
+	// Ask for RFC 3339 datetimes. The API made this the default on 2026-09-01
+	// and now treats the header as a no-op, but sending it keeps responses
+	// unambiguous on any environment still on the old serialization.
+	httpReq.Header.Set(datetimeFormatHeader, datetimeFormatRFC3339)
 
 	if req.Body != nil {
 		contentType := req.ContentType
@@ -265,10 +269,19 @@ func (c *HTTPClient) Delete(ctx context.Context, path string) (*Response, error)
 	})
 }
 
+const (
+	// datetimeFormatHeader opts in to RFC 3339 datetime serialization.
+	datetimeFormatHeader = "X-Datetime-Format"
+	// datetimeFormatRFC3339 is the only value the API defines for that header.
+	datetimeFormatRFC3339 = "rfc3339"
+)
+
 // timestampRegex matches ISO 8601 timestamps without timezone info (e.g., "2026-01-23T08:26:55")
 var timestampRegex = regexp.MustCompile(`"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})"`)
 
-// fixTimestamps adds UTC timezone suffix to timestamps that lack timezone information.
+// fixTimestamps adds UTC timezone suffix to timestamps that lack timezone
+// information. Responses have been RFC 3339 since the 2026-09-01 cutover, so
+// this is a fallback for older environments and cached payloads.
 func fixTimestamps(data []byte) []byte {
 	return timestampRegex.ReplaceAll(data, []byte(`"${1}Z"`))
 }

@@ -18,6 +18,17 @@ create-contact
 update-contact
 delete-contact
 
+# Compiled example binaries (`go build` inside examples/<name> writes ./<name>)
+examples/basic/basic
+examples/create-zone/create-zone
+examples/delete-domain/delete-domain
+examples/domains/domains
+examples/list-domains/list-domains
+examples/register-domain/register-domain
+examples/renew-domain/renew-domain
+examples/restore-domain/restore-domain
+examples/transfer-domain/transfer-domain
+
 # Test binary, built with `go test -c`
 *.test
 

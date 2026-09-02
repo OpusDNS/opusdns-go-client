@@ -52,10 +52,7 @@ func TestUsersService_ListUsersOmitsUnsupportedFilters(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = client.Users.ListUsers(context.Background(), &models.ListUsersOptions{
-		Search:   "sam",
-		Email:    "sam@example.com",
-		Username: "sam",
-		Status:   models.UserStatusActive,
+		Search: "sam",
 	})
 
 	require.NoError(t, err)

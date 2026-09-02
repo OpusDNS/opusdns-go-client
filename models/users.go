@@ -6,17 +6,6 @@ import "time"
 // UserID is a TypeID for users.
 type UserID = TypeID
 
-// UserStatus represents the status of a user.
-type UserStatus string
-
-const (
-	// UserStatusActive indicates the user is active.
-	UserStatusActive UserStatus = "active"
-
-	// UserStatusInactive indicates the user is inactive.
-	UserStatusInactive UserStatus = "inactive"
-)
-
 // UserAttributeBase represents a single user attribute key/value pair.
 type UserAttributeBase struct {
 	// Key is the attribute key.
@@ -58,23 +47,14 @@ type User struct {
 	// Locale is the user's locale.
 	Locale string `json:"locale"`
 
-	// Status is the user's status.
-	Status UserStatus `json:"status"`
-
 	// OrganizationID is the ID of the user's organization.
 	OrganizationID OrganizationID `json:"organization_id,omitempty"`
-
-	// KeycloakUserID is the Keycloak user id.
-	KeycloakUserID *string `json:"keycloak_user_id,omitempty"`
 
 	// CreatedOn is when the user was created.
 	CreatedOn *time.Time `json:"created_on,omitempty"`
 
 	// UpdatedOn is when the user was last updated.
 	UpdatedOn *time.Time `json:"updated_on,omitempty"`
-
-	// DeletedOn is when the user was deleted.
-	DeletedOn *time.Time `json:"deleted_on,omitempty"`
 
 	// UserAttributes contains requested user attributes.
 	UserAttributes map[string]interface{} `json:"user_attributes,omitempty"`
@@ -180,19 +160,4 @@ type ListUsersOptions struct {
 
 	// Search is an optional search query to filter users.
 	Search string
-
-	// Email filters by email address.
-	//
-	// Deprecated: the current API only supports Search for organization user lists.
-	Email string
-
-	// Username filters by username.
-	//
-	// Deprecated: the current API only supports Search for organization user lists.
-	Username string
-
-	// Status filters by user status.
-	//
-	// Deprecated: the current API only supports Search for organization user lists.
-	Status UserStatus
 }

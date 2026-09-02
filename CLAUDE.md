@@ -11,6 +11,10 @@ go build ./...
 golangci-lint run                               # lint (config in .golangci.yml)
 go mod tidy && git diff --exit-code go.mod go.sum  # CI fails if go.mod is not tidy
 govulncheck ./...                               # security scan (CI also runs this)
+
+make spec-sync                                  # refresh the vendored OpenAPI spec from api-spec
+make spec-check                                 # verify the client against the vendored spec
+make spec-stubs                                 # coverage.yaml entries for untriaged operations
 ```
 
 Integration tests hit the real API and are behind the `integration` build tag, so `go test ./...` skips them. Run via:
@@ -21,6 +25,20 @@ OPUSDNS_API_KEY="opk_..." ./scripts/integration-test.sh
 ```
 
 The module targets **Go 1.21+**. CI runs the test and build matrices on Go 1.21, 1.23, and 1.26; lint and security jobs use `stable`. Keep changes compatible with 1.21 (no newer-stdlib-only APIs).
+
+## Spec sync
+
+The API contract is vendored under `spec/`: the published OpenAPI document, the
+revision it came from, and `spec/coverage.yaml`, which records for every operation
+whether the client implements it, has deferred it, or excludes it on purpose.
+`TestSpecCoverage` and `TestSpecModels` (in `opusdns/spec_coverage_test.go`) run
+with the normal test suite and fail when the client and the spec disagree — an
+untriaged new endpoint, a route the API no longer serves, or a struct field it no
+longer sends. A bot PR refreshes `spec/` whenever the published spec changes.
+
+Read **SPEC_SYNC.md** before touching `spec/`, adding a service method, or
+triaging a sync PR. When you add a method, add its `spec/coverage.yaml` entry in
+the same change.
 
 ## Architecture
 

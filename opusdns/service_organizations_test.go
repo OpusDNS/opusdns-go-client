@@ -445,7 +445,7 @@ func TestOrganizationsService_DeleteIPRestriction(t *testing.T) {
 func TestOrganizationsService_GetAttributes(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "GET", r.Method)
-		assert.Equal(t, "/v1/organizations/attributes/organization_123", r.URL.Path)
+		assert.Equal(t, "/v1/organizations/organization_123/attributes", r.URL.Path)
 		_ = json.NewEncoder(w).Encode(models.OrganizationAttributesResponse{
 			Attributes: []models.OrganizationAttribute{
 				{OrganizationAttributeID: 1, Key: "plan", Value: "reseller"},
@@ -466,7 +466,7 @@ func TestOrganizationsService_GetAttributes(t *testing.T) {
 func TestOrganizationsService_UpdateAttributes(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "PATCH", r.Method)
-		assert.Equal(t, "/v1/organizations/attributes/organization_123", r.URL.Path)
+		assert.Equal(t, "/v1/organizations/organization_123/attributes", r.URL.Path)
 
 		var req models.OrganizationAttributeUpdateRequest
 		err := json.NewDecoder(r.Body).Decode(&req)

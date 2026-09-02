@@ -361,7 +361,7 @@ func (s *OrganizationsService) UpdateCurrentAttributes(ctx context.Context, req 
 
 // GetAttributes retrieves organization attributes.
 func (s *OrganizationsService) GetAttributes(ctx context.Context, orgID models.OrganizationID) (*models.OrganizationAttributesResponse, error) {
-	path := s.client.http.BuildPath("organizations", "attributes", string(orgID))
+	path := s.client.http.BuildPath("organizations", string(orgID), "attributes")
 
 	resp, err := s.client.http.Get(ctx, path, nil)
 	if err != nil {
@@ -378,7 +378,7 @@ func (s *OrganizationsService) GetAttributes(ctx context.Context, orgID models.O
 
 // UpdateAttributes updates organization attributes.
 func (s *OrganizationsService) UpdateAttributes(ctx context.Context, orgID models.OrganizationID, req *models.OrganizationAttributeUpdateRequest) (*models.OrganizationAttributesResponse, error) {
-	path := s.client.http.BuildPath("organizations", "attributes", string(orgID))
+	path := s.client.http.BuildPath("organizations", string(orgID), "attributes")
 
 	resp, err := s.client.http.Patch(ctx, path, req)
 	if err != nil {

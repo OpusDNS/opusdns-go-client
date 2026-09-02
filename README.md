@@ -8,7 +8,7 @@ The official Go client library for the [OpusDNS](https://opusdns.com) API - a co
 
 ## Features
 
-- **Complete API Coverage**: Full support for DNS zones, domains, contacts, email forwarding, domain forwarding, and more
+- **Broad API Coverage**: DNS zones, domains, contacts, email forwarding, domain forwarding, jobs, reports, tags and more ([what is and is not covered](spec/coverage.yaml))
 - **Type-Safe**: Strongly typed models with Go idioms
 - **Automatic Pagination**: Easily iterate through all resources
 - **Retry Logic**: Built-in exponential backoff for transient failures
@@ -775,6 +775,16 @@ go run main.go
 
 For complete API documentation, visit [developers.opusdns.com](https://developers.opusdns.com).
 
+## API Specification
+
+The OpenAPI specification this release was built against is vendored under
+[`spec/`](spec/). `spec/version.yaml` records exactly which published revision
+that is, and `spec/coverage.yaml` lists every API operation together with the Go
+method that implements it, or the reason it is deferred or out of scope.
+
+Those files are checked by the test suite, so they cannot drift from the code.
+See [SPEC_SYNC.md](SPEC_SYNC.md) for how the client is kept in step with the API.
+
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
@@ -784,6 +794,10 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 3. Commit your changes (`git commit -m 'Add some amazing feature'`)
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
+
+When you add or change a service method, update its entry in
+[`spec/coverage.yaml`](spec/coverage.yaml) in the same change and run
+`make spec-check`. See [SPEC_SYNC.md](SPEC_SYNC.md).
 
 ## License
 

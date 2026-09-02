@@ -14,6 +14,14 @@ go mod tidy && git diff --exit-code go.mod go.sum
 
 CI, the README, and the module toolchain are standardized on **Go 1.21+** (`.github/workflows/ci.yml`, `README.md`, `go.mod`). Prefer matching CI when validating changes.
 
+## Spec sync
+
+The OpenAPI contract is vendored in `spec/`, and `spec/coverage.yaml` records the
+status of every API operation (implemented, deferred or excluded). The spec tests
+in `opusdns/spec_coverage_test.go` fail when the client and the spec disagree. Add
+a `spec/coverage.yaml` entry in the same change as a new service method, and run
+`make spec-check`. See SPEC_SYNC.md.
+
 ## High-level architecture
 
 This repository has three main layers:

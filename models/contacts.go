@@ -115,12 +115,6 @@ type Contact struct {
 
 	// CreatedOn is when the contact was created.
 	CreatedOn *time.Time `json:"created_on,omitempty"`
-
-	// UpdatedOn is when the contact was last updated.
-	UpdatedOn *time.Time `json:"updated_on,omitempty"`
-
-	// DeletedOn is when the contact was deleted.
-	DeletedOn *time.Time `json:"deleted_on,omitempty"`
 }
 
 // FullName returns the contact's full name.
