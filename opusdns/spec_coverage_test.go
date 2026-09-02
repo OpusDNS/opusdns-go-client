@@ -69,6 +69,7 @@ var modelRegistry = map[string]interface{}{
 	"Tag":                    models.Tag{},
 	"User":                   models.User{},
 	"VanityNameserverSet":    models.VanityNameserverSet{},
+	"Whitelabel":             models.Whitelabel{},
 	"Zone":                   models.Zone{},
 	"ZoneSummary":            models.ZoneSummary{},
 }

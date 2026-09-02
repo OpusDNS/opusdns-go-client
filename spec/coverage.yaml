@@ -689,29 +689,29 @@ operations:
 
   # --- whitelabel (8) ---
   "GET /v1/whitelabel-branding":
-    status: deferred
-    reason: "backlog: whitelabel service"
+    status: implemented
+    method: Whitelabel.Get
   "GET /v1/whitelabel-branding/email/templates":
-    status: deferred
-    reason: "backlog: whitelabel service"
+    status: implemented
+    method: Whitelabel.ListEmailTemplates
   "PATCH /v1/whitelabel-branding":
-    status: deferred
-    reason: "backlog: whitelabel service"
+    status: implemented
+    method: Whitelabel.Update
   "POST /v1/whitelabel-branding":
-    status: deferred
-    reason: "backlog: whitelabel service"
+    status: implemented
+    method: Whitelabel.Create
   "POST /v1/whitelabel-branding/email/preview":
-    status: deferred
-    reason: "backlog: whitelabel service"
+    status: implemented
+    method: Whitelabel.PreviewEmail
   "POST /v1/whitelabel-branding/recheck":
-    status: deferred
-    reason: "backlog: whitelabel service"
+    status: implemented
+    method: Whitelabel.Recheck
   "POST /v1/whitelabel-branding/restore":
-    status: deferred
-    reason: "backlog: whitelabel service"
+    status: implemented
+    method: Whitelabel.Restore
   "POST /v1/whitelabel-branding/tier":
-    status: deferred
-    reason: "backlog: whitelabel service"
+    status: implemented
+    method: Whitelabel.UpgradeToPlus
 
 # Hand-written response structs checked against the schemas they mirror.
 # Every Go type here must also be listed in modelRegistry in
@@ -736,6 +736,7 @@ models:
     Tag: TagResponse
     User: UserPublicWithAttributes
     VanityNameserverSet: VanityNameserverSetSummaryDTO
+    Whitelabel: WhitelabelBrandingResponse
     Zone: DnsZoneResponse
     ZoneSummary: DnsZoneSummary
   # Types where a property the spec declares but the struct lacks is an error,
@@ -759,5 +760,6 @@ models:
     - Tag
     - User
     - VanityNameserverSet
+    - Whitelabel
     - Zone
     - ZoneSummary

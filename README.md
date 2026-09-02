@@ -131,6 +131,7 @@ The client provides access to the following services:
 | `client.Jobs` | Async job batch management |
 | `client.Reports` | Report generation and download |
 | `client.Tags` | Tag management and bulk tag assignment |
+| `client.Whitelabel` | Whitelabel branding configuration |
 
 ## DNS Management
 
@@ -705,6 +706,52 @@ host, err = client.Hosts.UpdateHost(ctx, host.HostID.String(), &models.HostUpdat
 // Delete (only possible when the host is not in use).
 err = client.Hosts.DeleteHost(ctx, host.HostID.String())
 ```
+
+## Whitelabel Branding
+
+Serve the dashboard and its transactional email under your own brand. An
+organization has one configuration, on the base tier (a subdomain of an
+OpusDNS-owned zone) or the plus tier (your own domain).
+
+```go
+result, err := client.Whitelabel.Create(ctx, &models.WhitelabelPlusCreateRequest{
+    Tier:          models.WhitelabelTierPlus,
+    Label:         "reseller",
+    Period:        models.DomainPeriod{Value: 1, Unit: models.PeriodUnitYear},
+    Hostname:      "reseller.com",
+    AuthSubdomain: "auth",
+    CreateZone:    models.BoolPtr(true),
+})
+
+// Onboarding continues in the background
+config, err := client.Whitelabel.Get(ctx)
+fmt.Println(config.OnboardingStatus)
+
+// After a failure, correct the hostname and try again
+config, err = client.Whitelabel.Recheck(ctx, &models.WhitelabelRecheckRequest{
+    Hostname: models.StringPtr("reseller.com"),
+})
+```
+
+Preview a mail template against a branding document before saving it:
+
+```go
+templates, err := client.Whitelabel.ListEmailTemplates(ctx)
+
+preview, err := client.Whitelabel.PreviewEmail(ctx, &models.PreviewMailRequest{
+    TemplateName: "domain_expiring",
+    LanguageCode: "en",
+    BrandingDocument: &models.BrandingDocument{
+        Theme: &models.Theme{
+            Light: &models.Palette{Primary: models.StringPtr("#0a7cff")},
+        },
+    },
+})
+```
+
+`UpgradeToPlus` moves a base configuration onto your own domain, `Update`
+changes the label, the enabled flag or the renewal intent, and `Restore` brings
+back a configuration that was force-disabled.
 
 ## Error Handling
 

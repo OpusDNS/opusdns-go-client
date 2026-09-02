@@ -57,6 +57,9 @@ type Client struct {
 
 	// Tags provides access to tag management.
 	Tags *TagsService
+
+	// Whitelabel provides access to whitelabel branding configuration.
+	Whitelabel *WhitelabelService
 }
 
 // NewClient creates a new OpusDNS client with the given options.
@@ -101,6 +104,7 @@ func NewClient(opts ...Option) (*Client, error) {
 	client.Jobs = &JobsService{client: client}
 	client.Reports = &ReportsService{client: client}
 	client.Tags = &TagsService{client: client}
+	client.Whitelabel = &WhitelabelService{client: client}
 
 	return client, nil
 }
@@ -138,6 +142,7 @@ func NewClientWithConfig(config *Config) (*Client, error) {
 	client.Jobs = &JobsService{client: client}
 	client.Reports = &ReportsService{client: client}
 	client.Tags = &TagsService{client: client}
+	client.Whitelabel = &WhitelabelService{client: client}
 
 	return client, nil
 }
