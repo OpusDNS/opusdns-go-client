@@ -579,24 +579,37 @@ func TestSpecCoverage(t *testing.T) {
 			}
 		}
 
+		// Every method on the entry is claimed by it. An operation is served
+		// by more than one method when its request body is discriminated and
+		// the client splits it into one method per variant.
 		owner := entry.Method[0]
-		claimed[owner] = key
+		for _, ref := range entry.Method {
+			claimed[ref] = key
+		}
 		if ignoredRoutes[owner] {
 			// The method opted out of the route check, typically because it
 			// serves several spec paths that differ only in a path segment.
 			continue
 		}
-		route, ok := routes[owner]
-		if !ok {
+		if _, ok := routes[owner]; !ok {
 			// A wrapper may legitimately own no BuildPath, but then some
 			// method must; point at the mismatch rather than guessing.
 			t.Errorf("MISSING   %s is mapped to %s, which builds no route of its own; "+
 				"name the method that calls BuildPath first", key, owner)
 			continue
 		}
-		if got, want := normalizeRoute(route.route), normalizeRoute(key); got != want {
-			t.Errorf("MISMATCH  %s builds %q but coverage.yaml maps it to %q (%s)",
-				owner, got, want, route.pos)
+		for _, ref := range entry.Method {
+			if ignoredRoutes[ref] {
+				continue
+			}
+			route, ok := routes[ref]
+			if !ok {
+				continue // a wrapper that delegates to another method
+			}
+			if got, want := normalizeRoute(route.route), normalizeRoute(key); got != want {
+				t.Errorf("MISMATCH  %s builds %q but coverage.yaml maps it to %q (%s)",
+					ref, got, want, route.pos)
+			}
 		}
 	}
 

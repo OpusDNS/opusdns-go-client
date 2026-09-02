@@ -713,9 +713,11 @@ Serve the dashboard and its transactional email under your own brand. An
 organization has one configuration, on the base tier (a subdomain of an
 OpusDNS-owned zone) or the plus tier (your own domain).
 
+The tier is the method you call, not a field you set: `CreateBase` provisions
+the base tier, `CreatePlus` the plus tier.
+
 ```go
-result, err := client.Whitelabel.Create(ctx, &models.WhitelabelPlusCreateRequest{
-    Tier:          models.WhitelabelTierPlus,
+result, err := client.Whitelabel.CreatePlus(ctx, &models.WhitelabelPlusCreateRequest{
     Label:         "reseller",
     Period:        models.DomainPeriod{Value: 1, Unit: models.PeriodUnitYear},
     Hostname:      "reseller.com",

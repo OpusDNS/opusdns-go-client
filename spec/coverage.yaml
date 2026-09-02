@@ -699,7 +699,10 @@ operations:
     method: Whitelabel.Update
   "POST /v1/whitelabel-branding":
     status: implemented
-    method: Whitelabel.Create
+    # The body is discriminated by `tier`, one method per variant.
+    method:
+      - Whitelabel.CreateBase
+      - Whitelabel.CreatePlus
   "POST /v1/whitelabel-branding/email/preview":
     status: implemented
     method: Whitelabel.PreviewEmail

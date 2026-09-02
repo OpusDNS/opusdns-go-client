@@ -157,11 +157,9 @@ type WhitelabelSubscription struct {
 }
 
 // WhitelabelBaseCreateRequest provisions a base-tier whitelabel, served on a
-// subdomain of an OpusDNS-owned zone.
+// subdomain of an OpusDNS-owned zone. The tier discriminator is not a field:
+// it follows from calling WhitelabelService.CreateBase.
 type WhitelabelBaseCreateRequest struct {
-	// Tier must be WhitelabelTierBase.
-	Tier WhitelabelTier `json:"tier"`
-
 	// Label is the label to serve under.
 	Label string `json:"label"`
 
@@ -170,11 +168,9 @@ type WhitelabelBaseCreateRequest struct {
 }
 
 // WhitelabelPlusCreateRequest provisions a plus-tier whitelabel, served on the
-// customer's own domain.
+// customer's own domain. The tier discriminator is not a field: it follows from
+// calling WhitelabelService.CreatePlus.
 type WhitelabelPlusCreateRequest struct {
-	// Tier must be WhitelabelTierPlus.
-	Tier WhitelabelTier `json:"tier"`
-
 	// Label is the label to serve under.
 	Label string `json:"label"`
 

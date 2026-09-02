@@ -64,13 +64,23 @@ func TestWhitelabelService_CreateBase(t *testing.T) {
 	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
 	require.NoError(t, err)
 
-	result, err := client.Whitelabel.Create(context.Background(), &models.WhitelabelBaseCreateRequest{
-		Tier:   models.WhitelabelTierBase,
+	result, err := client.Whitelabel.CreateBase(context.Background(), &models.WhitelabelBaseCreateRequest{
 		Label:  "reseller",
 		Period: models.DomainPeriod{Value: 1, Unit: models.PeriodUnitMonth},
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "sub_1", result.SubscriptionID)
+}
+
+func TestWhitelabelService_CreateRequiresRequest(t *testing.T) {
+	client, err := NewClient(WithAPIKey("opk_test"))
+	require.NoError(t, err)
+
+	_, err = client.Whitelabel.CreateBase(context.Background(), nil)
+	require.ErrorIs(t, err, ErrInvalidInput)
+
+	_, err = client.Whitelabel.CreatePlus(context.Background(), nil)
+	require.ErrorIs(t, err, ErrInvalidInput)
 }
 
 func TestWhitelabelService_CreatePlus(t *testing.T) {
@@ -90,8 +100,7 @@ func TestWhitelabelService_CreatePlus(t *testing.T) {
 	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
 	require.NoError(t, err)
 
-	_, err = client.Whitelabel.Create(context.Background(), &models.WhitelabelPlusCreateRequest{
-		Tier:          models.WhitelabelTierPlus,
+	_, err = client.Whitelabel.CreatePlus(context.Background(), &models.WhitelabelPlusCreateRequest{
 		Label:         "reseller",
 		Period:        models.DomainPeriod{Value: 1, Unit: models.PeriodUnitYear},
 		Hostname:      "reseller.com",

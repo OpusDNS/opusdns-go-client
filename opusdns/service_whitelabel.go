@@ -32,14 +32,66 @@ func (s *WhitelabelService) Get(ctx context.Context) (*models.Whitelabel, error)
 	return &result, nil
 }
 
-// Create provisions a whitelabel configuration. Pass a
-// models.WhitelabelBaseCreateRequest to be served on a subdomain of an
-// OpusDNS-owned zone, or a models.WhitelabelPlusCreateRequest to be served on
-// your own domain. Onboarding continues asynchronously; poll Get to follow it.
-func (s *WhitelabelService) Create(ctx context.Context, req interface{}) (*models.ProductCreateResponse, error) {
+// The create endpoint takes a body discriminated by `tier`, with a different
+// shape per tier. These envelopes carry the discriminator so the calling
+// method sets it rather than the caller, which makes a request that names one
+// tier while carrying another tier's fields unrepresentable.
+type (
+	whitelabelBaseCreate struct {
+		Tier models.WhitelabelTier `json:"tier"`
+		models.WhitelabelBaseCreateRequest
+	}
+
+	whitelabelPlusCreate struct {
+		Tier models.WhitelabelTier `json:"tier"`
+		models.WhitelabelPlusCreateRequest
+	}
+)
+
+// CreateBase provisions a base-tier whitelabel configuration, served on a
+// subdomain of an OpusDNS-owned zone. Onboarding continues asynchronously;
+// poll Get to follow it.
+func (s *WhitelabelService) CreateBase(ctx context.Context, req *models.WhitelabelBaseCreateRequest) (*models.ProductCreateResponse, error) {
+	if req == nil {
+		return nil, &ValidationError{Field: "request", Message: "a base create request is required"}
+	}
+
 	path := s.client.http.BuildPath("whitelabel-branding")
 
-	resp, err := s.client.http.Post(ctx, path, req)
+	body := whitelabelBaseCreate{
+		Tier:                        models.WhitelabelTierBase,
+		WhitelabelBaseCreateRequest: *req,
+	}
+
+	resp, err := s.client.http.Post(ctx, path, &body)
+	if err != nil {
+		return nil, err
+	}
+
+	var result models.ProductCreateResponse
+	if err := s.client.http.DecodeResponse(resp, &result); err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
+// CreatePlus provisions a plus-tier whitelabel configuration, served on the
+// customer's own domain. Onboarding continues asynchronously; poll Get to
+// follow it.
+func (s *WhitelabelService) CreatePlus(ctx context.Context, req *models.WhitelabelPlusCreateRequest) (*models.ProductCreateResponse, error) {
+	if req == nil {
+		return nil, &ValidationError{Field: "request", Message: "a plus create request is required"}
+	}
+
+	path := s.client.http.BuildPath("whitelabel-branding")
+
+	body := whitelabelPlusCreate{
+		Tier:                        models.WhitelabelTierPlus,
+		WhitelabelPlusCreateRequest: *req,
+	}
+
+	resp, err := s.client.http.Post(ctx, path, &body)
 	if err != nil {
 		return nil, err
 	}
