@@ -12,6 +12,7 @@ build tells you what changed and what is still missing.
 | `spec/openapi.yaml` | The published public specification, byte-for-byte as `api-spec` serves it. |
 | `spec/version.yaml` | Which revision that is: npm version, the spec's own `info.version`, and the `api-spec` commit. |
 | `spec/coverage.yaml` | One entry per operation, saying whether the client implements it, has deferred it, or excludes it on purpose. |
+| `spec/go.mod` | Not a real module. Its presence keeps this directory out of the published module zip, so the specification is not downloaded by everyone who runs `go get`. Deleting it silently puts 130 KB back into every download. |
 
 The source of truth is
 `https://raw.githubusercontent.com/OpusDNS/api-spec/main/src/openapi.yaml`.
