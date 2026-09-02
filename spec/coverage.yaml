@@ -659,7 +659,7 @@ operations:
     method: TLDs.GetPortfolio
   "GET /v1/tlds/{tld}":
     status: implemented
-    method: TLDs.GetTLD
+    method: [TLDs.GetTLDWithOptions, TLDs.GetTLD]
 
   # --- user (8) ---
   "DELETE /v1/users/{user_id}":
@@ -719,13 +719,45 @@ operations:
 models:
   mappings:
     Contact: ContactResponse
+    ContactAttributeSet: ContactAttributeSetResponse
     Domain: DomainResponse
     DomainForward: DomainForward
+    DomainSummary: DomainSummaryResponse
     EmailForward: EmailForwardResponse
+    Event: EventResponse
+    Host: HostResponse
+    IPRestriction: IpRestrictionResponse
+    Invoice: InvoiceResponse
+    JobBatchRetryResponse: JobBatchRetryResponse
+    JobBatchStatusResponse: JobBatchStatusResponse
+    JobResponse: JobResponse
     Organization: OrganizationWithBillingData
+    Report: PublicReportRes
     Tag: TagResponse
     User: UserPublicWithAttributes
+    VanityNameserverSet: VanityNameserverSetSummaryDTO
     Zone: DnsZoneResponse
+    ZoneSummary: DnsZoneSummary
   # Types where a property the spec declares but the struct lacks is an error,
-  # not a warning. Add a type here once its fields are complete.
-  strict: []
+  # not a warning. A type belongs here once its fields are complete.
+  strict:
+    - Contact
+    - ContactAttributeSet
+    - Domain
+    - DomainForward
+    - DomainSummary
+    - EmailForward
+    - Event
+    - Host
+    - IPRestriction
+    - Invoice
+    - JobBatchRetryResponse
+    - JobBatchStatusResponse
+    - JobResponse
+    - Organization
+    - Report
+    - Tag
+    - User
+    - VanityNameserverSet
+    - Zone
+    - ZoneSummary

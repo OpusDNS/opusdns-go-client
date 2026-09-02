@@ -200,6 +200,20 @@ type TLDPortfolio struct {
 }
 
 // ListTLDsOptions contains options for listing TLDs.
+// GetTLDOptions overrides which TLD specification variant the API resolves.
+// All fields are optional; the API falls back to the organization's pinned
+// specification.
+type GetTLDOptions struct {
+	// Backend selects the registry backend variant of the specification.
+	Backend string
+
+	// CustomerSpecRef selects a customer-specific specification.
+	CustomerSpecRef string
+
+	// Version selects a specific specification version.
+	Version string
+}
+
 type ListTLDsOptions struct {
 	// Page is the page number to retrieve (1-indexed).
 	Page int

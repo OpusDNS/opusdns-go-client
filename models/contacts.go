@@ -115,6 +115,17 @@ type Contact struct {
 
 	// CreatedOn is when the contact was created.
 	CreatedOn *time.Time `json:"created_on,omitempty"`
+
+	// AttributeSets are the registry attribute sets linked to this contact.
+	AttributeSets []ContactAttributeLinkDetail `json:"attribute_sets,omitempty"`
+
+	// Tags are the tags assigned to this contact. Only present when tags are
+	// requested via Include.
+	Tags []TagEnriched `json:"tags,omitempty"`
+
+	// StatusTags are the status tags assigned to this contact. Only present
+	// when tags are requested via Include.
+	StatusTags []StatusTagResponse `json:"status_tags,omitempty"`
 }
 
 // FullName returns the contact's full name.
@@ -269,9 +280,6 @@ type ListContactsOptions struct {
 	// Country filters by country code.
 	Country string
 
-	// Verified filters by verification status.
-	Verified *bool
-
 	// CreatedAfter filters contacts created after this time.
 	CreatedAfter *time.Time
 
@@ -280,6 +288,17 @@ type ListContactsOptions struct {
 
 	// Include requests additional response data.
 	Include []ContactIncludeField
+
+	// InUse filters by whether the contact is referenced by a domain in any
+	// role (registrant, admin, tech or billing).
+	InUse *bool
+
+	// StatusTags filters by status tag. Multiple values are sent as repeated
+	// status_tags params.
+	StatusTags []StatusTagType
+
+	// StatusTagMode controls whether any, all or none of StatusTags must match.
+	StatusTagMode TagFilterMode
 }
 
 // ContactIncludeField represents optional contact response expansions.

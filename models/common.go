@@ -26,6 +26,9 @@ const (
 
 	// TagFilterModeMatchAll matches resources with all selected tags.
 	TagFilterModeMatchAll TagFilterMode = "match_all"
+
+	// TagFilterModeMatchNone matches resources with none of the selected tags.
+	TagFilterModeMatchNone TagFilterMode = "match_none"
 )
 
 // HTTPMethod represents an HTTP method in request-history filters.

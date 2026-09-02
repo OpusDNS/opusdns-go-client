@@ -49,14 +49,26 @@ const (
 // look up a type by name at run time, so every type referenced from the
 // `models.mappings` block of spec/coverage.yaml has to be listed here.
 var modelRegistry = map[string]interface{}{
-	"Contact":       models.Contact{},
-	"Domain":        models.Domain{},
-	"DomainForward": models.DomainForward{},
-	"EmailForward":  models.EmailForward{},
-	"Organization":  models.Organization{},
-	"Tag":           models.Tag{},
-	"User":          models.User{},
-	"Zone":          models.Zone{},
+	"Contact":                models.Contact{},
+	"ContactAttributeSet":    models.ContactAttributeSet{},
+	"Domain":                 models.Domain{},
+	"DomainForward":          models.DomainForward{},
+	"DomainSummary":          models.DomainSummary{},
+	"EmailForward":           models.EmailForward{},
+	"Event":                  models.Event{},
+	"Host":                   models.Host{},
+	"IPRestriction":          models.IPRestriction{},
+	"Invoice":                models.Invoice{},
+	"JobBatchRetryResponse":  models.JobBatchRetryResponse{},
+	"JobBatchStatusResponse": models.JobBatchStatusResponse{},
+	"JobResponse":            models.JobResponse{},
+	"Organization":           models.Organization{},
+	"Report":                 models.Report{},
+	"Tag":                    models.Tag{},
+	"User":                   models.User{},
+	"VanityNameserverSet":    models.VanityNameserverSet{},
+	"Zone":                   models.Zone{},
+	"ZoneSummary":            models.ZoneSummary{},
 }
 
 // ---------------------------------------------------------------------------

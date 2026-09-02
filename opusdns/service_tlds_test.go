@@ -185,3 +185,28 @@ func TestAvailabilityService_GetSuggestions(t *testing.T) {
 	assert.Equal(t, "example.com", result.Suggestions[0].Domain)
 	assert.True(t, result.Suggestions[0].Available)
 }
+
+func TestTLDsService_GetTLDWithOptions(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "GET", r.Method)
+		assert.Equal(t, "/v1/tlds/com", r.URL.Path)
+
+		query := r.URL.Query()
+		assert.Equal(t, "nominet_dragon", query.Get("backend"))
+		assert.Equal(t, "acme", query.Get("customer_spec_ref"))
+		assert.Equal(t, "3", query.Get("version"))
+
+		_ = json.NewEncoder(w).Encode(models.TLDDetails{})
+	}))
+	defer server.Close()
+
+	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+	require.NoError(t, err)
+
+	_, err = client.TLDs.GetTLDWithOptions(context.Background(), "com", &models.GetTLDOptions{
+		Backend:         "nominet_dragon",
+		CustomerSpecRef: "acme",
+		Version:         "3",
+	})
+	require.NoError(t, err)
+}

@@ -3,6 +3,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 
 	"github.com/opusdns/opusdns-go-client/models"
 	"github.com/spf13/cobra"
@@ -96,25 +97,21 @@ var domainsSummaryCmd = &cobra.Command{
 			return fmt.Errorf("failed to get domain summary: %w", err)
 		}
 
+		counts := summary.Domains
+
 		fmt.Println("Domain Summary")
 		fmt.Println("==============")
-		fmt.Printf("Total domains:           %d\n", summary.TotalDomains)
-		fmt.Printf("Expiring within 30 days: %d\n", summary.ExpiringWithin30Days)
-		fmt.Printf("Expiring within 90 days: %d\n", summary.ExpiringWithin90Days)
-
-		if len(summary.DomainsByTLD) > 0 {
-			fmt.Println("\nDomains by TLD:")
-			for tld, count := range summary.DomainsByTLD {
-				fmt.Printf("  .%s: %d\n", tld, count)
-			}
+		fmt.Printf("Total domains:           %d\n", counts.TotalCount)
+		if expiring := counts.ExpiringSoon; expiring != nil {
+			fmt.Printf("Expiring within 30 days: %d\n", expiring.Next30Days)
+			fmt.Printf("Expiring within 60 days: %d\n", expiring.Next60Days)
+			fmt.Printf("Expiring within 90 days: %d\n", expiring.Next90Days)
 		}
 
-		if len(summary.DomainsByStatus) > 0 {
-			fmt.Println("\nDomains by Status:")
-			for status, count := range summary.DomainsByStatus {
-				fmt.Printf("  %s: %d\n", status, count)
-			}
-		}
+		printCounts("Domains by TLD", counts.ByTLD, ".")
+		printCounts("Domains by Status", stringKeyed(counts.ByStatus), "")
+		printCounts("Domains by Status Tag", stringKeyed(counts.ByStatusTag), "")
+		printCounts("Domains by Organization", counts.ByOrganization, "")
 
 		return nil
 	},
@@ -298,4 +295,30 @@ func init() {
 	// Cancel transfer subcommand
 	domainsCmd.AddCommand(domainsCancelTransferCmd)
 	domainsCancelTransferCmd.Flags().BoolP("force", "f", false, "Skip confirmation prompt")
+}
+
+// stringKeyed re-keys a count map so it can be printed by printCounts.
+func stringKeyed[K ~string](counts map[K]int) map[string]int {
+	out := make(map[string]int, len(counts))
+	for key, count := range counts {
+		out[string(key)] = count
+	}
+	return out
+}
+
+// printCounts writes a sorted count breakdown, or nothing when it is empty.
+func printCounts(title string, counts map[string]int, prefix string) {
+	if len(counts) == 0 {
+		return
+	}
+	keys := make([]string, 0, len(counts))
+	for key := range counts {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	fmt.Printf("\n%s:\n", title)
+	for _, key := range keys {
+		fmt.Printf("  %s%s: %d\n", prefix, key, counts[key])
+	}
 }

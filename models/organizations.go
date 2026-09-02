@@ -6,6 +6,30 @@ import "time"
 // OrganizationID is a TypeID for organizations.
 type OrganizationID = TypeID
 
+// BillingMetadata carries an organization's payment terms.
+type BillingMetadata struct {
+	// BillingModel is the payment terms for the organization.
+	BillingModel *string `json:"billing_model,omitempty"`
+
+	// CreditLimit is the credit limit for the organization.
+	CreditLimit *int `json:"credit_limit,omitempty"`
+
+	// CustomerNumber is the customer account number for the organization.
+	CustomerNumber *int `json:"customer_number,omitempty"`
+}
+
+// BillingMode says whether an organization is billed through its parent or on
+// its own account.
+type BillingMode string
+
+const (
+	// BillingModeConsolidated bills the organization through its parent.
+	BillingModeConsolidated BillingMode = "consolidated"
+
+	// BillingModeIndependent bills the organization on its own account.
+	BillingModeIndependent BillingMode = "independent"
+)
+
 // OrganizationStatus represents the status of an organization.
 type OrganizationStatus string
 
@@ -78,6 +102,18 @@ type Organization struct {
 
 	// DefaultLocale is the default locale for the organization.
 	DefaultLocale *string `json:"default_locale,omitempty"`
+
+	// BillingMode says whether the organization is billed through its parent
+	// or on its own account. Only present on organization detail responses.
+	BillingMode *BillingMode `json:"billing_mode,omitempty"`
+
+	// AccountBalance is the organization's wallet balance. Only present on
+	// organization detail responses.
+	AccountBalance *string `json:"account_balance,omitempty"`
+
+	// BillingMetadata carries the organization's payment terms. Only present
+	// on organization detail responses.
+	BillingMetadata *BillingMetadata `json:"billing_metadata,omitempty"`
 
 	// Attributes contains organization attributes.
 	Attributes []OrganizationAttribute `json:"attributes,omitempty"`
@@ -179,6 +215,10 @@ type OrganizationCreateRequest struct {
 
 	// DefaultLocale is the default locale for the organization.
 	DefaultLocale *string `json:"default_locale,omitempty"`
+
+	// BillingMode selects consolidated or independent billing for the new
+	// sub-organization. Defaults to consolidated when omitted.
+	BillingMode *BillingMode `json:"billing_mode,omitempty"`
 
 	// Users contains optional initial users to create with the organization.
 	Users []UserCreateRequest `json:"users,omitempty"`
@@ -350,6 +390,9 @@ const (
 	BillingProductTypeDomainForward    BillingTransactionProductType = "domain_forward"
 	BillingProductTypeAccountWallet    BillingTransactionProductType = "account_wallet"
 	BillingProductTypeVanityNameserver BillingTransactionProductType = "vanity_nameserver"
+	BillingProductTypeWhitelabel       BillingTransactionProductType = "whitelabel_branding"
+	BillingProductTypeWhitelabelPlus   BillingTransactionProductType = "whitelabel_branding_plus"
+	BillingProductTypeRASDomain        BillingTransactionProductType = "ras_domain_lifecycle"
 )
 
 // BillingTransactionAction represents the action in a transaction.
@@ -363,6 +406,7 @@ const (
 	BillingActionTrade       BillingTransactionAction = "trade"
 	BillingActionApplication BillingTransactionAction = "application"
 	BillingActionServiceFee  BillingTransactionAction = "service_fee"
+	BillingActionUpgradeFee  BillingTransactionAction = "upgrade_fee"
 	BillingActionWalletTopUp BillingTransactionAction = "wallet_top_up"
 )
 
@@ -483,6 +527,17 @@ type ListTransactionsOptions struct {
 	CreatedBefore *time.Time
 }
 
+// InvoiceDocumentType distinguishes an invoice from a payment receipt.
+type InvoiceDocumentType string
+
+const (
+	// InvoiceDocumentTypeInvoice marks a billing invoice.
+	InvoiceDocumentTypeInvoice InvoiceDocumentType = "invoice"
+
+	// InvoiceDocumentTypeReceipt marks a payment receipt.
+	InvoiceDocumentTypeReceipt InvoiceDocumentType = "receipt"
+)
+
 // InvoiceResponseStatus represents the status of an invoice.
 type InvoiceResponseStatus string
 
@@ -519,6 +574,9 @@ const (
 type Invoice struct {
 	// ExternalID is the Lago (external) ID for this invoice.
 	ExternalID string `json:"external_id"`
+
+	// DocumentType says whether this is an invoice or a payment receipt.
+	DocumentType InvoiceDocumentType `json:"document_type"`
 
 	// Number is the human-readable invoice number.
 	Number string `json:"number"`

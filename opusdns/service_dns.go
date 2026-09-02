@@ -94,6 +94,9 @@ func (s *DNSService) ListZonesPage(ctx context.Context, opts *models.ListZonesOp
 		for _, include := range opts.Include {
 			query.Add("include", string(include))
 		}
+		if opts.VanityNameserverSetID != nil {
+			query.Set("vanity_nameserver_set_id", string(*opts.VanityNameserverSetID))
+		}
 	}
 
 	resp, err := s.client.http.Get(ctx, path, query)

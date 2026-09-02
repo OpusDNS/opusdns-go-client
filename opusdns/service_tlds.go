@@ -74,11 +74,31 @@ func (s *TLDsService) ListTLDs(ctx context.Context, opts *models.ListTLDsOptions
 	return tlds, nil
 }
 
-// GetTLD retrieves details for a specific TLD.
+// GetTLD retrieves details for a specific TLD, using the specification the
+// caller's organization is pinned to.
 func (s *TLDsService) GetTLD(ctx context.Context, tld string) (*models.TLDDetails, error) {
+	return s.GetTLDWithOptions(ctx, tld, nil)
+}
+
+// GetTLDWithOptions retrieves details for a specific TLD, optionally overriding
+// which specification variant is resolved.
+func (s *TLDsService) GetTLDWithOptions(ctx context.Context, tld string, opts *models.GetTLDOptions) (*models.TLDDetails, error) {
 	path := s.client.http.BuildPath("tlds", url.PathEscape(tld))
 
-	resp, err := s.client.http.Get(ctx, path, nil)
+	query := url.Values{}
+	if opts != nil {
+		if opts.Backend != "" {
+			query.Set("backend", opts.Backend)
+		}
+		if opts.CustomerSpecRef != "" {
+			query.Set("customer_spec_ref", opts.CustomerSpecRef)
+		}
+		if opts.Version != "" {
+			query.Set("version", opts.Version)
+		}
+	}
+
+	resp, err := s.client.http.Get(ctx, path, query)
 	if err != nil {
 		return nil, err
 	}

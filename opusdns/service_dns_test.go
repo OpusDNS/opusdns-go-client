@@ -504,3 +504,24 @@ func TestDNSService_ListZonesPage(t *testing.T) {
 	assert.True(t, resp.Pagination.HasNextPage)
 	assert.Equal(t, 2, resp.Pagination.CurrentPage)
 }
+
+func TestDNSService_ListZonesVanitySetFilter(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "vns_123", r.URL.Query().Get("vanity_nameserver_set_id"))
+
+		_ = json.NewEncoder(w).Encode(models.ZoneListResponse{
+			Results:    []models.Zone{},
+			Pagination: models.Pagination{HasNextPage: false},
+		})
+	}))
+	defer server.Close()
+
+	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+	require.NoError(t, err)
+
+	setID := models.VanityNameserverSetID("vns_123")
+	_, err = client.DNS.ListZones(context.Background(), &models.ListZonesOptions{
+		VanityNameserverSetID: &setID,
+	})
+	require.NoError(t, err)
+}

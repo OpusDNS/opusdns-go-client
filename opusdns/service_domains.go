@@ -84,9 +84,6 @@ func (s *DomainsService) ListDomainsPage(ctx context.Context, opts *models.ListD
 		if opts.IsPremium != nil {
 			query.Set("is_premium", strconv.FormatBool(*opts.IsPremium))
 		}
-		if opts.RenewalMode != nil {
-			query.Set("renewal_mode", string(*opts.RenewalMode))
-		}
 		if opts.CreatedAfter != nil {
 			query.Set("created_after", opts.CreatedAfter.Format(time.RFC3339))
 		}
@@ -126,8 +123,20 @@ func (s *DomainsService) ListDomainsPage(ctx context.Context, opts *models.ListD
 		for _, include := range opts.Include {
 			query.Add("include", string(include))
 		}
-		if opts.Status != "" {
-			query.Set("status", string(opts.Status))
+		for _, statusTag := range opts.StatusTags {
+			query.Add("status_tags", string(statusTag))
+		}
+		if opts.StatusTagMode != "" {
+			query.Set("status_tag_mode", string(opts.StatusTagMode))
+		}
+		if opts.ReadOnly != nil {
+			query.Set("read_only", strconv.FormatBool(*opts.ReadOnly))
+		}
+		if opts.TransferredAfter != nil {
+			query.Set("transferred_after", opts.TransferredAfter.Format(time.RFC3339))
+		}
+		if opts.TransferredBefore != nil {
+			query.Set("transferred_before", opts.TransferredBefore.Format(time.RFC3339))
 		}
 	}
 
