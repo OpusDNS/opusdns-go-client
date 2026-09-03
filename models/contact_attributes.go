@@ -72,6 +72,22 @@ type ListContactAttributeSetsOptions struct {
 	PageSize int
 }
 
+// ContactAttributeLinkDetail is an attribute set as it appears inline on a
+// contact, with the attributes it contributes already resolved.
+type ContactAttributeLinkDetail struct {
+	// ContactAttributeSetID is the attribute set linked to the contact.
+	ContactAttributeSetID ContactAttributeSetID `json:"contact_attribute_set_id"`
+
+	// Label is the label of the linked attribute set.
+	Label string `json:"label"`
+
+	// TLD is the TLD this link applies to.
+	TLD string `json:"tld"`
+
+	// Attributes are the attributes contributed by the linked set.
+	Attributes map[RegistryHandleAttributeType]string `json:"attributes"`
+}
+
 // ContactAttributeLink represents a link between a contact and an attribute set.
 type ContactAttributeLink struct {
 	// ContactAttributeLinkID is the unique identifier of the link.

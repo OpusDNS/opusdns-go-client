@@ -188,6 +188,54 @@ type Domain struct {
 
 	// UpdatedOn is when the domain record was last updated.
 	UpdatedOn *time.Time `json:"updated_on,omitempty"`
+
+	// TransferredOn is when the domain was last transferred to OpusDNS.
+	TransferredOn *time.Time `json:"transferred_on,omitempty"`
+
+	// ReadOnly indicates the domain is listed in the portfolio but cannot be
+	// managed, for example while it awaits a migration. Set only by OpusDNS.
+	ReadOnly bool `json:"read_only,omitempty"`
+
+	// RenewalPeriod is the renewal period as an ISO 8601 duration (e.g. "P1Y").
+	// Nil when the domain is not set to renew.
+	RenewalPeriod *string `json:"renewal_period,omitempty"`
+
+	// RenewalPrice is the price this organization pays to renew the domain.
+	// Only present when renewal_price is requested via Include.
+	RenewalPrice *DomainRenewalPrice `json:"renewal_price,omitempty"`
+
+	// StatusTags are the status tags assigned to this domain. Only present
+	// when tags are requested via Include.
+	StatusTags []StatusTagResponse `json:"status_tags,omitempty"`
+
+	// VerificationRequired carries pending verification claims and deadlines.
+	VerificationRequired *VerificationRequired `json:"verification_required,omitempty"`
+}
+
+// DomainRenewalPrice is the price to renew a domain for one period.
+type DomainRenewalPrice struct {
+	// Price is the renewal price for Period, taxes excluded, in the
+	// organization's billing currency.
+	Price string `json:"price"`
+
+	// Currency is the ISO 4217 currency code.
+	Currency string `json:"currency"`
+
+	// Period is the period the price covers.
+	Period DomainPeriod `json:"period"`
+
+	// IsPremium is true when the price came from the registry's premium
+	// classification rather than standard TLD pricing.
+	IsPremium bool `json:"is_premium"`
+}
+
+// VerificationRequired carries the verification a domain is waiting on.
+type VerificationRequired struct {
+	// Claims are the outstanding verification claims.
+	Claims []VerificationClaimType `json:"claims"`
+
+	// Deadlines are the deadlines attached to those claims.
+	Deadlines []VerificationDeadline `json:"deadlines,omitempty"`
 }
 
 // Nameserver represents a nameserver for a domain.
@@ -223,22 +271,47 @@ type DomainListResponse struct {
 	Pagination Pagination `json:"pagination"`
 }
 
-// DomainSummary represents a summary of domains.
+// DomainSummary is the domain summary of an organization.
 type DomainSummary struct {
-	// TotalDomains is the total number of domains.
-	TotalDomains int `json:"total_domains"`
+	// OrganizationID is the organization the summary covers.
+	OrganizationID OrganizationID `json:"organization_id"`
 
-	// DomainsByTLD is a count of domains grouped by TLD.
-	DomainsByTLD map[string]int `json:"domains_by_tld,omitempty"`
+	// Domains holds the counts.
+	Domains DomainSummaryData `json:"domains"`
+}
 
-	// DomainsByStatus is a count of domains grouped by status.
-	DomainsByStatus map[string]int `json:"domains_by_status,omitempty"`
+// DomainSummaryData holds the domain counts of a DomainSummary.
+type DomainSummaryData struct {
+	// TotalCount is the total number of domains, including sub-organizations.
+	TotalCount int `json:"total_count"`
 
-	// ExpiringWithin30Days is the count of domains expiring within 30 days.
-	ExpiringWithin30Days int `json:"expiring_within_30_days,omitempty"`
+	// ByStatus counts domains per status.
+	ByStatus map[DomainStatus]int `json:"by_status"`
 
-	// ExpiringWithin90Days is the count of domains expiring within 90 days.
-	ExpiringWithin90Days int `json:"expiring_within_90_days,omitempty"`
+	// ByStatusTag counts domains per status tag, listing only tags with at
+	// least one domain.
+	ByStatusTag map[StatusTagType]int `json:"by_status_tag"`
+
+	// ByTLD counts domains per TLD.
+	ByTLD map[string]int `json:"by_tld"`
+
+	// ByOrganization counts domains per organization name.
+	ByOrganization map[string]int `json:"by_organization,omitempty"`
+
+	// ExpiringSoon counts domains by how soon they expire.
+	ExpiringSoon *DomainsExpiringSoon `json:"expiring_soon,omitempty"`
+}
+
+// DomainsExpiringSoon counts domains expiring within the coming days.
+type DomainsExpiringSoon struct {
+	// Next30Days is the number of domains expiring in the next 30 days.
+	Next30Days int `json:"next_30_days"`
+
+	// Next60Days is the number of domains expiring in the next 60 days.
+	Next60Days int `json:"next_60_days"`
+
+	// Next90Days is the number of domains expiring in the next 90 days.
+	Next90Days int `json:"next_90_days"`
 }
 
 // DomainCreateRequest represents a request to register a new domain.
@@ -432,9 +505,6 @@ type ListDomainsOptions struct {
 	// IsPremium filters by premium status.
 	IsPremium *bool
 
-	// RenewalMode filters by renewal mode.
-	RenewalMode *RenewalMode
-
 	// CreatedAfter filters domains created after this date.
 	CreatedAfter *time.Time
 
@@ -474,8 +544,21 @@ type ListDomainsOptions struct {
 	// Include requests additional response data.
 	Include []DomainIncludeField
 
-	// Status filters by domain status.
-	Status DomainStatus
+	// StatusTags filters by status tag. Multiple values are sent as repeated
+	// status_tags params.
+	StatusTags []StatusTagType
+
+	// StatusTagMode controls whether any, all or none of StatusTags must match.
+	StatusTagMode TagFilterMode
+
+	// ReadOnly filters by whether the domain is read-only in OpusDNS.
+	ReadOnly *bool
+
+	// TransferredAfter filters domains transferred in after this date.
+	TransferredAfter *time.Time
+
+	// TransferredBefore filters domains transferred in before this date.
+	TransferredBefore *time.Time
 }
 
 // DomainIncludeField represents optional domain response expansions.
@@ -490,4 +573,33 @@ const (
 type GetDomainOptions struct {
 	// Include requests additional response data.
 	Include []DomainIncludeField
+}
+
+// OutboundTransferAction resolves a pending outbound transfer.
+type OutboundTransferAction string
+
+const (
+	// OutboundTransferApprove releases the domain to the gaining registrar.
+	OutboundTransferApprove OutboundTransferAction = "approve"
+
+	// OutboundTransferReject keeps the domain and rejects the transfer.
+	OutboundTransferReject OutboundTransferAction = "reject"
+)
+
+// OutboundTransferRequest resolves a pending outbound transfer.
+type OutboundTransferRequest struct {
+	// Action says whether to approve or reject the transfer.
+	Action OutboundTransferAction `json:"action"`
+}
+
+// OutboundTransferResponse reports how an outbound transfer was resolved.
+type OutboundTransferResponse struct {
+	// DomainID is the domain whose transfer was resolved.
+	DomainID DomainID `json:"domain_id"`
+
+	// DomainName is the name of that domain.
+	DomainName string `json:"domain_name"`
+
+	// Action is the action that was applied.
+	Action OutboundTransferAction `json:"action"`
 }

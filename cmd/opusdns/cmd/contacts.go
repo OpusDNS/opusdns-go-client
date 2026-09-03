@@ -24,8 +24,8 @@ var contactsListCmd = &cobra.Command{
 		search, _ := cmd.Flags().GetString("search")
 		email, _ := cmd.Flags().GetString("email")
 		country, _ := cmd.Flags().GetString("country")
-		verifiedFlag, _ := cmd.Flags().GetBool("verified")
-		verifiedChanged := cmd.Flags().Changed("verified")
+		inUseFlag, _ := cmd.Flags().GetBool("in-use")
+		inUseChanged := cmd.Flags().Changed("in-use")
 
 		opts := &models.ListContactsOptions{}
 		if search != "" {
@@ -37,8 +37,8 @@ var contactsListCmd = &cobra.Command{
 		if country != "" {
 			opts.Country = country
 		}
-		if verifiedChanged {
-			opts.Verified = &verifiedFlag
+		if inUseChanged {
+			opts.InUse = &inUseFlag
 		}
 
 		contacts, err := getClient().Contacts.ListContacts(ctx, opts)
@@ -281,7 +281,7 @@ func init() {
 	contactsListCmd.Flags().String("search", "", "Search contacts by name or email")
 	contactsListCmd.Flags().String("email", "", "Filter by email address")
 	contactsListCmd.Flags().String("country", "", "Filter by country code (e.g., US, DE)")
-	contactsListCmd.Flags().Bool("verified", false, "Filter by verification status")
+	contactsListCmd.Flags().Bool("in-use", false, "Filter by whether the contact is used by a domain")
 
 	// Get subcommand
 	contactsCmd.AddCommand(contactsGetCmd)

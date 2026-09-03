@@ -107,6 +107,9 @@ type JobBatchStatusResponse struct {
 	// BatchID is the unique identifier for the batch.
 	BatchID BatchID `json:"batch_id"`
 
+	// Label is a human-readable label for this batch.
+	Label *string `json:"label,omitempty"`
+
 	// Total is the total number of jobs in the batch.
 	Total int `json:"total"`
 
@@ -200,8 +203,22 @@ type JobResponse struct {
 	// Payload is the original request payload.
 	Payload interface{} `json:"payload,omitempty"`
 
+	// Result is the worker result of a finished job. Its shape depends on the
+	// command; decode it into the type matching Command when needed.
+	Result interface{} `json:"result,omitempty"`
+
+	// DomainName is the domain this job acts on, when it has one.
+	DomainName *string `json:"domain_name,omitempty"`
+
 	// ErrorClass is the error type if the job failed.
 	ErrorClass *string `json:"error_class,omitempty"`
+
+	// ErrorCode is a stable semantic error code propagated verbatim from the
+	// failing upstream service (e.g. ERROR_DOMAIN_TRANSFER_INVALID_AUTH_CODE).
+	ErrorCode *string `json:"error_code,omitempty"`
+
+	// ErrorDetails is the full upstream problem-details payload (RFC 9457).
+	ErrorDetails map[string]interface{} `json:"error_details,omitempty"`
 
 	// ErrorMessage is the detailed error message if the job failed.
 	ErrorMessage *string `json:"error_message,omitempty"`
@@ -247,6 +264,13 @@ type JobBatchRetryResponse struct {
 
 	// RetriedCount is the number of FAILED/DEAD_LETTER jobs reset to QUEUED for retry.
 	RetriedCount int `json:"retried_count"`
+
+	// QueuedCount is the number of retried jobs dispatched immediately.
+	QueuedCount int `json:"queued_count"`
+
+	// BlockedCount is the number of retried jobs held behind the topic rate
+	// limit or backlog.
+	BlockedCount int `json:"blocked_count"`
 }
 
 // ListBatchesOptions contains options for listing job batches.

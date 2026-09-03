@@ -81,14 +81,20 @@ func (s *ContactsService) ListContactsPage(ctx context.Context, opts *models.Lis
 		if opts.Country != "" {
 			query.Set("country", opts.Country)
 		}
-		if opts.Verified != nil {
-			query.Set("verified", strconv.FormatBool(*opts.Verified))
+		if opts.InUse != nil {
+			query.Set("in_use", strconv.FormatBool(*opts.InUse))
 		}
 		if opts.CreatedAfter != nil {
 			query.Set("created_after", opts.CreatedAfter.Format(time.RFC3339))
 		}
 		if opts.CreatedBefore != nil {
 			query.Set("created_before", opts.CreatedBefore.Format(time.RFC3339))
+		}
+		for _, statusTag := range opts.StatusTags {
+			query.Add("status_tags", string(statusTag))
+		}
+		if opts.StatusTagMode != "" {
+			query.Set("status_tag_mode", string(opts.StatusTagMode))
 		}
 		for _, include := range opts.Include {
 			query.Add("include", string(include))

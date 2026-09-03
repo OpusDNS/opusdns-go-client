@@ -84,13 +84,16 @@ func domainSummaryExample(ctx context.Context, client *opusdns.Client) {
 		return
 	}
 
-	fmt.Printf("Total domains: %d\n", summary.TotalDomains)
-	fmt.Printf("Expiring within 30 days: %d\n", summary.ExpiringWithin30Days)
-	fmt.Printf("Expiring within 90 days: %d\n", summary.ExpiringWithin90Days)
+	fmt.Printf("Total domains: %d\n", summary.Domains.TotalCount)
 
-	if len(summary.DomainsByTLD) > 0 {
+	if expiring := summary.Domains.ExpiringSoon; expiring != nil {
+		fmt.Printf("Expiring within 30 days: %d\n", expiring.Next30Days)
+		fmt.Printf("Expiring within 90 days: %d\n", expiring.Next90Days)
+	}
+
+	if len(summary.Domains.ByTLD) > 0 {
 		fmt.Println("Domains by TLD:")
-		for tld, count := range summary.DomainsByTLD {
+		for tld, count := range summary.Domains.ByTLD {
 			fmt.Printf("  .%s: %d\n", tld, count)
 		}
 	}

@@ -376,3 +376,29 @@ func TestContactsService_GetVerificationStatus(t *testing.T) {
 	assert.Equal(t, models.ContactID("contact_123"), verification.ContactID)
 	assert.Equal(t, models.EmailVerificationVerified, verification.Status)
 }
+
+func TestContactsService_ListContactsFilters(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		query := r.URL.Query()
+		assert.Equal(t, "true", query.Get("in_use"))
+		assert.Equal(t, []string{"VERIFICATION_REQUIRED"}, query["status_tags"])
+		assert.Equal(t, "match_any", query.Get("status_tag_mode"))
+
+		_ = json.NewEncoder(w).Encode(models.ContactListResponse{
+			Results:    []models.Contact{},
+			Pagination: models.Pagination{HasNextPage: false},
+		})
+	}))
+	defer server.Close()
+
+	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+	require.NoError(t, err)
+
+	inUse := true
+	_, err = client.Contacts.ListContacts(context.Background(), &models.ListContactsOptions{
+		InUse:         &inUse,
+		StatusTags:    []models.StatusTagType{models.StatusTagTypeVerificationRequired},
+		StatusTagMode: models.TagFilterModeMatchAny,
+	})
+	require.NoError(t, err)
+}

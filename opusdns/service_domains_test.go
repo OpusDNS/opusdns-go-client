@@ -107,6 +107,7 @@ func TestDomainsService_ListDomains(t *testing.T) {
 	t.Run("sends documented filters", func(t *testing.T) {
 		now := time.Date(2026, 5, 5, 8, 0, 0, 0, time.UTC)
 		trueValue := true
+		falseValue := false
 
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			query := r.URL.Query()
@@ -118,6 +119,11 @@ func TestDomainsService_ListDomains(t *testing.T) {
 			assert.Equal(t, now.Format(time.RFC3339), query.Get("registered_after"))
 			assert.Equal(t, []string{"ok", "clientTransferProhibited"}, query["registry_statuses"])
 			assert.Equal(t, []string{"tags"}, query["include"])
+			assert.Equal(t, []string{"EXTERNAL", "DNSSEC_PENDING"}, query["status_tags"])
+			assert.Equal(t, "match_none", query.Get("status_tag_mode"))
+			assert.Equal(t, "false", query.Get("read_only"))
+			assert.Equal(t, now.Format(time.RFC3339), query.Get("transferred_after"))
+			assert.Equal(t, now.Format(time.RFC3339), query.Get("transferred_before"))
 
 			_ = json.NewEncoder(w).Encode(models.DomainListResponse{
 				Results:    []models.Domain{},
@@ -141,6 +147,14 @@ func TestDomainsService_ListDomains(t *testing.T) {
 				"clientTransferProhibited",
 			},
 			Include: []models.DomainIncludeField{models.DomainIncludeTags},
+			StatusTags: []models.StatusTagType{
+				models.StatusTagTypeExternal,
+				models.StatusTagTypeDNSSECPending,
+			},
+			StatusTagMode:     models.TagFilterModeMatchNone,
+			ReadOnly:          &falseValue,
+			TransferredAfter:  &now,
+			TransferredBefore: &now,
 		})
 
 		require.NoError(t, err)
@@ -403,7 +417,14 @@ func TestDomainsService_GetSummary(t *testing.T) {
 		assert.Equal(t, "/v1/domains/summary", r.URL.Path)
 
 		_ = json.NewEncoder(w).Encode(models.DomainSummary{
-			TotalDomains: 42,
+			OrganizationID: "organization_123",
+			Domains: models.DomainSummaryData{
+				TotalCount:   42,
+				ByStatus:     map[models.DomainStatus]int{models.DomainStatusOK: 40},
+				ByStatusTag:  map[models.StatusTagType]int{models.StatusTagTypeDNSSECPending: 2},
+				ByTLD:        map[string]int{"com": 42},
+				ExpiringSoon: &models.DomainsExpiringSoon{Next30Days: 3, Next60Days: 5, Next90Days: 9},
+			},
 		})
 	}))
 	defer server.Close()
@@ -414,7 +435,12 @@ func TestDomainsService_GetSummary(t *testing.T) {
 	summary, err := client.Domains.GetSummary(context.Background())
 
 	require.NoError(t, err)
-	assert.Equal(t, 42, summary.TotalDomains)
+	assert.Equal(t, models.OrganizationID("organization_123"), summary.OrganizationID)
+	assert.Equal(t, 42, summary.Domains.TotalCount)
+	assert.Equal(t, 40, summary.Domains.ByStatus[models.DomainStatusOK])
+	assert.Equal(t, 2, summary.Domains.ByStatusTag[models.StatusTagTypeDNSSECPending])
+	require.NotNil(t, summary.Domains.ExpiringSoon)
+	assert.Equal(t, 3, summary.Domains.ExpiringSoon.Next30Days)
 }
 
 func TestDomainsService_CheckDomains(t *testing.T) {
@@ -476,4 +502,78 @@ func TestDomainsService_EnableDNSSEC(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, data, 1)
 	assert.Equal(t, models.DNSSECRecordTypeDSData, data[0].RecordType)
+}
+
+func TestDomainsService_ResolveOutboundTransfer(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "POST", r.Method)
+		assert.Equal(t, "/v1/domains/example.com/transfer/outbound", r.URL.Path)
+
+		var body models.OutboundTransferRequest
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		assert.Equal(t, models.OutboundTransferApprove, body.Action)
+
+		_ = json.NewEncoder(w).Encode(models.OutboundTransferResponse{
+			DomainID:   "domain_123",
+			DomainName: "example.com",
+			Action:     models.OutboundTransferApprove,
+		})
+	}))
+	defer server.Close()
+
+	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+	require.NoError(t, err)
+
+	result, err := client.Domains.ResolveOutboundTransfer(context.Background(), "example.com",
+		&models.OutboundTransferRequest{Action: models.OutboundTransferApprove})
+	require.NoError(t, err)
+	assert.Equal(t, "example.com", result.DomainName)
+	assert.Equal(t, models.OutboundTransferApprove, result.Action)
+}
+
+func TestDomainsService_GetClaimsNotices(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "POST", r.Method)
+		assert.Equal(t, "/v1/domains/claims-notices", r.URL.Path)
+
+		var body models.ClaimsNoticesRequest
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		assert.Equal(t, []string{"claims-key-1"}, body.ClaimsKeys)
+
+		_ = json.NewEncoder(w).Encode(models.ClaimsNoticesResponse{
+			ClaimsNotices: []models.ClaimsNotice{{
+				ClaimsKey:                  "claims-key-1",
+				Label:                      "example",
+				ClaimsNoticeAcceptanceHash: "hash-1",
+				Claims: []models.TmClaim{{
+					MarkName: "EXAMPLE",
+					Holders: []models.TmHolder{{
+						Entitlement: models.HolderEntitlementOwner,
+						Addr: models.TmAddr{
+							Street: []string{"Musterstrasse 1"},
+							City:   "Berlin",
+							CC:     "DE",
+						},
+					}},
+					JurDesc: &models.TmJurDesc{JurCC: "DE", Description: "Germany"},
+					ClassDescs: []models.TmClassDesc{
+						{ClassNum: 9, Description: "Computer software"},
+					},
+				}},
+			}},
+		})
+	}))
+	defer server.Close()
+
+	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+	require.NoError(t, err)
+
+	notices, err := client.Domains.GetClaimsNotices(context.Background(), "claims-key-1")
+	require.NoError(t, err)
+	require.Len(t, notices, 1)
+	assert.Equal(t, "hash-1", notices[0].ClaimsNoticeAcceptanceHash)
+	require.Len(t, notices[0].Claims, 1)
+	assert.Equal(t, "EXAMPLE", notices[0].Claims[0].MarkName)
+	assert.Equal(t, models.HolderEntitlementOwner, notices[0].Claims[0].Holders[0].Entitlement)
+	assert.Equal(t, "DE", notices[0].Claims[0].Holders[0].Addr.CC)
 }

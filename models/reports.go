@@ -19,6 +19,10 @@ const (
 	ReportTypeRegistrarPortfolioPDF      ReportType = "registrar_portfolio_pdf"
 	ReportTypeBillingTransactions        ReportType = "billing_transactions"
 	ReportTypeBillingTransactionsMonthly ReportType = "billing_transactions_monthly"
+
+	// ReportTypeSuborgBillingTransactionsMonthly reports monthly billing
+	// transactions for independently billed sub-organizations.
+	ReportTypeSuborgBillingTransactionsMonthly ReportType = "suborg_billing_transactions_monthly"
 )
 
 // ReportStatus represents the status of a report.

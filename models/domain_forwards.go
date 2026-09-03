@@ -479,3 +479,49 @@ type DomainForwardVisitsByKeyResponse struct {
 	// Results contains the visits by key data.
 	Results []VisitsByKeyBucket `json:"results"`
 }
+
+// ListDomainForwardZonesOptions filters a list of zones with domain forwards.
+type ListDomainForwardZonesOptions struct {
+	// Page is the page number to retrieve (1-indexed).
+	Page int
+
+	// PageSize is the number of zones per page.
+	PageSize int
+
+	// SortBy is the field to sort by.
+	SortBy DomainForwardZoneSortField
+
+	// SortOrder is the sort direction.
+	SortOrder SortOrder
+
+	// Search is an optional search query to filter zones.
+	Search string
+}
+
+// MetricsGrouping is the key a visits-by-key breakdown groups on.
+type MetricsGrouping string
+
+const (
+	// MetricsGroupingURL groups visits by requested URL.
+	MetricsGroupingURL MetricsGrouping = "url"
+
+	// MetricsGroupingFQDN groups visits by requested hostname.
+	MetricsGroupingFQDN MetricsGrouping = "fqdn"
+
+	// MetricsGroupingDomain groups visits by domain.
+	MetricsGroupingDomain MetricsGrouping = "domain"
+
+	// MetricsGroupingForward groups visits by domain forward.
+	MetricsGroupingForward MetricsGrouping = "forward"
+
+	// MetricsGroupingRule groups visits by forward rule.
+	MetricsGroupingRule MetricsGrouping = "rule"
+)
+
+// DomainForwardVisitsByKeyOptions adds the grouping key to a metrics query.
+type DomainForwardVisitsByKeyOptions struct {
+	DomainForwardMetricsOptions
+
+	// Grouping is the key to group visits by.
+	Grouping MetricsGrouping
+}

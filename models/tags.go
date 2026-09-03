@@ -32,7 +32,29 @@ const (
 type StatusTagType string
 
 const (
+	// StatusTagTypeVerificationRequired marks a resource awaiting contact verification.
 	StatusTagTypeVerificationRequired StatusTagType = "VERIFICATION_REQUIRED"
+
+	// StatusTagTypeCreateRequested marks a domain whose creation has been requested.
+	StatusTagTypeCreateRequested StatusTagType = "CREATE_REQUESTED"
+
+	// StatusTagTypeInboundTransferPending marks a domain transferring in.
+	StatusTagTypeInboundTransferPending StatusTagType = "INBOUND_TRANSFER_PENDING"
+
+	// StatusTagTypeOutboundTransferPending marks a domain transferring out.
+	StatusTagTypeOutboundTransferPending StatusTagType = "OUTBOUND_TRANSFER_PENDING"
+
+	// StatusTagTypeExternal marks a domain mirrored from a connected external registrar.
+	StatusTagTypeExternal StatusTagType = "EXTERNAL"
+
+	// StatusTagTypeImportRequested marks a domain whose import has been requested.
+	StatusTagTypeImportRequested StatusTagType = "IMPORT_REQUESTED"
+
+	// StatusTagTypeImportPending marks a domain whose import is in progress.
+	StatusTagTypeImportPending StatusTagType = "IMPORT_PENDING"
+
+	// StatusTagTypeDNSSECPending marks a domain whose DS submission is deferred and retrying.
+	StatusTagTypeDNSSECPending StatusTagType = "DNSSEC_PENDING"
 )
 
 // StatusTagResponse represents a system-managed status tag on a resource.

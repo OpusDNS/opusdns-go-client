@@ -1,6 +1,8 @@
 // Package models contains all the data types for the OpusDNS API.
 package models
 
+import "time"
+
 // VanityNameserverSetID is a TypeID for vanity nameserver sets (prefix "vns_").
 type VanityNameserverSetID = TypeID
 
@@ -49,6 +51,21 @@ type VanityNameserverSet struct {
 
 	// Nameservers are the nameservers in the set, ordered by position.
 	Nameservers []VanityNameserver `json:"nameservers,omitempty"`
+
+	// RenewalMode says whether the set renews or expires at the end of the
+	// current period. It uses the same values as a domain's renewal mode.
+	RenewalMode *RenewalMode `json:"renewal_mode,omitempty"`
+
+	// ExpiresOn is when the current service period ends.
+	ExpiresOn *time.Time `json:"expires_on,omitempty"`
+
+	// RenewScheduledAt is when the next automatic renewal is scheduled, or nil
+	// when the set will not renew.
+	RenewScheduledAt *time.Time `json:"renew_scheduled_at,omitempty"`
+
+	// GracePeriodEndsAt is when the grace period ends, or nil when the set is
+	// not in a grace period.
+	GracePeriodEndsAt *time.Time `json:"grace_period_ends_at,omitempty"`
 }
 
 // VanityNameserverSetCreateRequest is the request body for creating a vanity NS set.
@@ -221,4 +238,12 @@ type ListVanityNameserverSetsOptions struct {
 
 	// PageSize is the number of items per page.
 	PageSize int
+}
+
+// SetRenewalModeRequest changes whether a vanity nameserver set renews at the
+// end of its current period. Setting RenewalModeExpire cancels at period end
+// and serves out the term; RenewalModeRenew un-cancels.
+type SetRenewalModeRequest struct {
+	// RenewalMode is the renewal mode to set.
+	RenewalMode RenewalMode `json:"renewal_mode"`
 }

@@ -1,0 +1,770 @@
+# Which OpusDNS API operations this client binds.
+#
+# Every operation in spec/openapi.yaml must appear here exactly once, so a newly
+# published endpoint fails the build until somebody decides what to do with it.
+# Keys are "METHOD /path" copied verbatim from the spec.
+#
+#   implemented  bound by the library; `method` names the Go method that builds
+#                the path (further entries are wrappers over it)
+#   deferred     not bound yet, but in scope; `reason` says why it is waiting
+#   excluded     deliberately out of scope; `reason` says why
+#
+# See SPEC_SYNC.md. Regenerate stubs for new operations with `make spec-stubs`.
+version: 1
+
+operations:
+  # --- ai_concierge (15) ---
+  "DELETE /v1/ai-concierge/conversations/{conversation_id}":
+    status: excluded
+    reason: "ai-concierge is intentionally not part of the Go client"
+  "DELETE /v1/ai-concierge/memory/facts/{fact_id}":
+    status: excluded
+    reason: "ai-concierge is intentionally not part of the Go client"
+  "GET /v1/ai-concierge/contexts/{context_id}":
+    status: excluded
+    reason: "ai-concierge is intentionally not part of the Go client"
+  "GET /v1/ai-concierge/conversations":
+    status: excluded
+    reason: "ai-concierge is intentionally not part of the Go client"
+  "GET /v1/ai-concierge/conversations/{conversation_id}":
+    status: excluded
+    reason: "ai-concierge is intentionally not part of the Go client"
+  "GET /v1/ai-concierge/conversations/{conversation_id}/contexts":
+    status: excluded
+    reason: "ai-concierge is intentionally not part of the Go client"
+  "GET /v1/ai-concierge/conversations/{conversation_id}/messages":
+    status: excluded
+    reason: "ai-concierge is intentionally not part of the Go client"
+  "GET /v1/ai-concierge/conversations/{conversation_id}/messages/{message_id}":
+    status: excluded
+    reason: "ai-concierge is intentionally not part of the Go client"
+  "GET /v1/ai-concierge/memory/facts":
+    status: excluded
+    reason: "ai-concierge is intentionally not part of the Go client"
+  "PATCH /v1/ai-concierge/conversations/{conversation_id}":
+    status: excluded
+    reason: "ai-concierge is intentionally not part of the Go client"
+  "PATCH /v1/ai-concierge/memory/facts/{fact_id}":
+    status: excluded
+    reason: "ai-concierge is intentionally not part of the Go client"
+  "POST /v1/ai-concierge/conversations":
+    status: excluded
+    reason: "ai-concierge is intentionally not part of the Go client"
+  "POST /v1/ai-concierge/conversations/{conversation_id}/contexts":
+    status: excluded
+    reason: "ai-concierge is intentionally not part of the Go client"
+  "POST /v1/ai-concierge/conversations/{conversation_id}/messages":
+    status: excluded
+    reason: "ai-concierge is intentionally not part of the Go client"
+  "POST /v1/ai-concierge/memory/facts":
+    status: excluded
+    reason: "ai-concierge is intentionally not part of the Go client"
+
+  # --- archive (5) ---
+  "GET /v1/archive/email-forward-logs/aliases/{email_forward_alias_id}":
+    status: implemented
+    method: Events.ListEmailForwardLogsByAlias
+  "GET /v1/archive/email-forward-logs/{email_forward_id}":
+    status: implemented
+    method: Events.ListEmailForwardLogs
+  "GET /v1/archive/object-logs":
+    status: implemented
+    method: Events.ListObjectLogs
+  "GET /v1/archive/object-logs/{object_id}":
+    status: implemented
+    method: Events.GetObjectLog
+  "GET /v1/archive/request-history":
+    status: implemented
+    method: Events.ListRequestHistory
+
+  # --- authentication (3) ---
+  "GET /v1/auth/client_credentials/introspect":
+    status: implemented
+    method: Auth.IntrospectAPIKey
+  "POST /v1/auth/signup":
+    status: excluded
+    reason: "unauthenticated account signup; an API client already needs an account"
+  "POST /v1/auth/token":
+    status: implemented
+    method: Auth.IssueToken
+
+  # --- availability (3) ---
+  "GET /v1/availability":
+    status: implemented
+    method: Availability.CheckAvailability
+  "GET /v1/availability/stream":
+    status: excluded
+    reason: "server-sent event stream; not a request/response operation"
+  "POST /v1/availability/stream":
+    status: excluded
+    reason: "server-sent event stream; not a request/response operation"
+
+  # --- contact (19) ---
+  "DELETE /v1/contacts/attribute-sets/{contact_attribute_set_id}":
+    status: implemented
+    method: Contacts.DeleteContactAttributeSet
+  "DELETE /v1/contacts/{contact_id}":
+    status: implemented
+    method: Contacts.DeleteContact
+  "DELETE /v1/contacts/{contact_id}/verification":
+    status: implemented
+    method: Contacts.CancelContactVerification
+  "GET /v1/contacts":
+    status: implemented
+    method: Contacts.ListContactsPage
+  "GET /v1/contacts/attribute-sets":
+    status: implemented
+    method: Contacts.ListContactAttributeSetsPage
+  "GET /v1/contacts/attribute-sets/{contact_attribute_set_id}":
+    status: implemented
+    method: Contacts.GetContactAttributeSet
+  "GET /v1/contacts/verification":
+    status: excluded
+    reason: "unauthenticated token flow completed in a browser, not by an API client"
+  "GET /v1/contacts/verify":
+    status: implemented
+    method: Contacts.VerifyContact
+  "GET /v1/contacts/{contact_id}":
+    status: implemented
+    method: Contacts.GetContact
+  "GET /v1/contacts/{contact_id}/verification":
+    status: implemented
+    method: Contacts.GetVerificationStatus
+  "GET /v1/contacts/{contact_id}/verifications":
+    status: implemented
+    method: Contacts.GetContactVerifications
+  "PATCH /v1/contacts/attribute-sets/{contact_attribute_set_id}":
+    status: implemented
+    method: Contacts.UpdateContactAttributeSet
+  "PATCH /v1/contacts/{contact_id}/link/{contact_attribute_set_id}":
+    status: implemented
+    method: Contacts.LinkContactAttributeSet
+  "POST /v1/contacts":
+    status: implemented
+    method: Contacts.CreateContact
+  "POST /v1/contacts/attribute-sets":
+    status: implemented
+    method: Contacts.CreateContactAttributeSet
+  "POST /v1/contacts/{contact_id}/verification":
+    status: implemented
+    method: Contacts.RequestVerification
+  "POST /v1/contacts/{contact_id}/verifications/attest":
+    status: implemented
+    method: Contacts.AttestContactVerification
+  "PUT /v1/contacts/verification":
+    status: excluded
+    reason: "unauthenticated token flow completed in a browser, not by an API client"
+  "PUT /v1/contacts/{contact_id}/verification":
+    status: excluded
+    reason: "unauthenticated token flow completed in a browser, not by an API client"
+
+  # --- dns (15) ---
+  "DELETE /v1/dns/{zone_name}":
+    status: implemented
+    method: DNS.DeleteZone
+  "GET /v1/dns":
+    status: implemented
+    method: DNS.ListZonesPage
+  "GET /v1/dns/domain-forwards":
+    status: implemented
+    method: DomainForwards.ListZonesPage
+  "GET /v1/dns/email-forwards":
+    status: implemented
+    method: EmailForwards.ListZonesPage
+  "GET /v1/dns/summary":
+    status: implemented
+    method: DNS.GetSummary
+  "GET /v1/dns/{zone_name}":
+    status: implemented
+    method: DNS.GetZoneWithOptions
+  "GET /v1/dns/{zone_name}/domain-forwards":
+    status: implemented
+    method: DomainForwards.ListDomainForwardsByZone
+  "GET /v1/dns/{zone_name}/email-forwards":
+    status: implemented
+    method: EmailForwards.ListEmailForwardsByZone
+  "PATCH /v1/dns/{zone_name}/records":
+    status: implemented
+    method: DNS.PatchRecords
+  "PATCH /v1/dns/{zone_name}/rrsets":
+    status: implemented
+    method: DNS.PatchRRSets
+  "PATCH /v1/dns/{zone_name}/vanity-set":
+    status: implemented
+    method: DNS.SetZoneVanitySet
+  "POST /v1/dns":
+    status: implemented
+    method: DNS.CreateZone
+  "POST /v1/dns/{zone_name}/dnssec/disable":
+    status: implemented
+    method: DNS.DisableDNSSEC
+  "POST /v1/dns/{zone_name}/dnssec/enable":
+    status: implemented
+    method: DNS.EnableDNSSEC
+  "PUT /v1/dns/{zone_name}/rrsets":
+    status: implemented
+    method: DNS.PutRRSets
+
+  # --- domain (18) ---
+  "DELETE /v1/domains/{domain_reference}":
+    status: implemented
+    method: Domains.DeleteDomain
+  "DELETE /v1/domains/{domain_reference}/dnssec":
+    status: implemented
+    method: Domains.DeleteDNSSEC
+  "DELETE /v1/domains/{domain_reference}/transfer":
+    status: implemented
+    method: Domains.CancelTransfer
+  "GET /v1/domains":
+    status: implemented
+    method: Domains.ListDomainsPage
+  "GET /v1/domains/check":
+    status: implemented
+    method: Domains.CheckDomains
+  "GET /v1/domains/summary":
+    status: implemented
+    method: Domains.GetSummary
+  "GET /v1/domains/{domain_reference}":
+    status: implemented
+    method: Domains.GetDomainWithOptions
+  "GET /v1/domains/{domain_reference}/dnssec":
+    status: implemented
+    method: Domains.GetDNSSEC
+  "PATCH /v1/domains/{domain_reference}":
+    status: implemented
+    method: Domains.UpdateDomain
+  "POST /v1/domains":
+    status: implemented
+    method: Domains.CreateDomain
+  "POST /v1/domains/claims-notices":
+    status: implemented
+    method: Domains.GetClaimsNotices
+  "POST /v1/domains/transfer":
+    status: implemented
+    method: Domains.TransferDomain
+  "POST /v1/domains/{domain_reference}/dnssec/disable":
+    status: implemented
+    method: Domains.DisableDNSSEC
+  "POST /v1/domains/{domain_reference}/dnssec/enable":
+    status: implemented
+    method: Domains.EnableDNSSEC
+  "POST /v1/domains/{domain_reference}/renew":
+    status: implemented
+    method: Domains.RenewDomain
+  "POST /v1/domains/{domain_reference}/restore":
+    status: implemented
+    method: Domains.RestoreDomain
+  "POST /v1/domains/{domain_reference}/transfer/outbound":
+    status: implemented
+    method: Domains.ResolveOutboundTransfer
+  "PUT /v1/domains/{domain_reference}/dnssec":
+    status: implemented
+    method: Domains.PutDNSSEC
+
+  # --- domain,domain_tld_specific (15) ---
+  "GET /v1/domains/tld-specific/no/applicant-declaration":
+    status: excluded
+    reason: "unauthenticated token flow completed in a browser, not by an API client"
+  "POST /v1/domains/tld-specific/at/{domain_reference}/withdraw":
+    status: implemented
+    method: Domains.WithdrawATDomain
+  "POST /v1/domains/tld-specific/be/{domain_reference}/auth_code/request":
+    status: implemented
+    method: Domains.RequestAuthCode
+  "POST /v1/domains/tld-specific/cymru/{domain_reference}/auth_code/request":
+    status: implemented
+    method: Domains.RequestAuthCode
+  "POST /v1/domains/tld-specific/cz/{domain_reference}/auth_code/request":
+    status: implemented
+    method: Domains.RequestAuthCode
+  "POST /v1/domains/tld-specific/de/{domain_reference}/transit":
+    status: implemented
+    method: Domains.TransitDEDomain
+  "POST /v1/domains/tld-specific/dk/{domain_reference}/auth_code/request":
+    status: implemented
+    method: Domains.RequestAuthCode
+  "POST /v1/domains/tld-specific/eu/{domain_reference}/auth_code/request":
+    status: implemented
+    method: Domains.RequestAuthCode
+  "POST /v1/domains/tld-specific/lt/{domain_reference}/auth_code/request":
+    status: implemented
+    method: Domains.RequestAuthCode
+  "POST /v1/domains/tld-specific/no/{domain_reference}/applicant-declaration":
+    status: implemented
+    method: Domains.SubmitNorIDDeclaration
+  "POST /v1/domains/tld-specific/no/{domain_reference}/resend-declaration-email":
+    status: implemented
+    method: Domains.ResendNorIDDeclarationEmail
+  "POST /v1/domains/tld-specific/nu/{domain_reference}/auth_code/request":
+    status: implemented
+    method: Domains.RequestAuthCode
+  "POST /v1/domains/tld-specific/se/{domain_reference}/auth_code/request":
+    status: implemented
+    method: Domains.RequestAuthCode
+  "POST /v1/domains/tld-specific/wales/{domain_reference}/auth_code/request":
+    status: implemented
+    method: Domains.RequestAuthCode
+  "PUT /v1/domains/tld-specific/no/applicant-declaration":
+    status: excluded
+    reason: "unauthenticated token flow completed in a browser, not by an API client"
+
+  # --- domain_forward (20) ---
+  "DELETE /v1/domain-forwards/{hostname}":
+    status: implemented
+    method: DomainForwards.DeleteDomainForward
+  "DELETE /v1/domain-forwards/{hostname}/{protocol}":
+    status: implemented
+    method: DomainForwards.DeleteDomainForwardConfig
+  "GET /v1/domain-forwards":
+    status: implemented
+    method: DomainForwards.ListDomainForwardsPage
+  "GET /v1/domain-forwards/metrics":
+    status: implemented
+    method: DomainForwards.GetMetrics
+  "GET /v1/domain-forwards/metrics/browser":
+    status: implemented
+    method: DomainForwards.GetBrowserStats
+  "GET /v1/domain-forwards/metrics/geo":
+    status: implemented
+    method: DomainForwards.GetGeoStats
+  "GET /v1/domain-forwards/metrics/platform":
+    status: implemented
+    method: DomainForwards.GetPlatformStats
+  "GET /v1/domain-forwards/metrics/referrer":
+    status: implemented
+    method: DomainForwards.GetReferrerStats
+  "GET /v1/domain-forwards/metrics/status-code":
+    status: implemented
+    method: DomainForwards.GetStatusCodeStats
+  "GET /v1/domain-forwards/metrics/time-series":
+    status: implemented
+    method: DomainForwards.GetTimeSeries
+  "GET /v1/domain-forwards/metrics/user-agent":
+    status: implemented
+    method: DomainForwards.GetUserAgentStats
+  "GET /v1/domain-forwards/metrics/visits-by-key":
+    status: implemented
+    method: DomainForwards.GetVisitsByKey
+  "GET /v1/domain-forwards/{hostname}":
+    status: implemented
+    method: DomainForwards.GetDomainForward
+  "GET /v1/domain-forwards/{hostname}/{protocol}":
+    status: implemented
+    method: DomainForwards.GetDomainForwardSet
+  "PATCH /v1/domain-forwards":
+    status: implemented
+    method: DomainForwards.PatchRedirects
+  "PATCH /v1/domain-forwards/{hostname}/disable":
+    status: implemented
+    method: DomainForwards.DisableDomainForward
+  "PATCH /v1/domain-forwards/{hostname}/enable":
+    status: implemented
+    method: DomainForwards.EnableDomainForward
+  "POST /v1/domain-forwards":
+    status: implemented
+    method: DomainForwards.CreateDomainForward
+  "POST /v1/domain-forwards/{hostname}":
+    status: implemented
+    method: DomainForwards.CreateDomainForwardSet
+  "PUT /v1/domain-forwards/{hostname}/{protocol}":
+    status: implemented
+    method: DomainForwards.UpdateDomainForwardConfig
+
+  # --- domain_search (1) ---
+  "GET /v1/domain-search/suggest":
+    status: implemented
+    method: Availability.GetSuggestions
+
+  # --- email_forward (10) ---
+  "DELETE /v1/email-forwards/{email_forward_id}":
+    status: implemented
+    method: EmailForwards.DeleteEmailForward
+  "DELETE /v1/email-forwards/{email_forward_id}/aliases/{alias_id}":
+    status: implemented
+    method: EmailForwards.DeleteAlias
+  "GET /v1/email-forwards":
+    status: implemented
+    method: EmailForwards.ListEmailForwardsPage
+  "GET /v1/email-forwards/{email_forward_id}":
+    status: implemented
+    method: EmailForwards.GetEmailForward
+  "GET /v1/email-forwards/{email_forward_id}/metrics":
+    status: implemented
+    method: EmailForwards.GetMetrics
+  "PATCH /v1/email-forwards/{email_forward_id}/disable":
+    status: implemented
+    method: EmailForwards.DisableEmailForward
+  "PATCH /v1/email-forwards/{email_forward_id}/enable":
+    status: implemented
+    method: EmailForwards.EnableEmailForward
+  "POST /v1/email-forwards":
+    status: implemented
+    method: EmailForwards.CreateEmailForward
+  "POST /v1/email-forwards/{email_forward_id}/aliases":
+    status: implemented
+    method: EmailForwards.CreateAlias
+  "PUT /v1/email-forwards/{email_forward_id}/aliases/{alias_id}":
+    status: implemented
+    method: EmailForwards.UpdateAlias
+
+  # --- event (3) ---
+  "GET /v1/events":
+    status: implemented
+    method: Events.ListEventsPage
+  "GET /v1/events/{event_id}":
+    status: implemented
+    method: Events.GetEvent
+  "PATCH /v1/events/{event_id}":
+    status: implemented
+    method: Events.AcknowledgeEvent
+
+  # --- host (4) ---
+  "DELETE /v1/hosts/{host_reference}":
+    status: implemented
+    method: Hosts.DeleteHost
+  "GET /v1/hosts/{host_reference}":
+    status: implemented
+    method: Hosts.GetHost
+  "POST /v1/hosts":
+    status: implemented
+    method: Hosts.CreateHost
+  "PUT /v1/hosts/{host_reference}":
+    status: implemented
+    method: Hosts.UpdateHost
+
+  # --- jobs (13) ---
+  "DELETE /v1/job/{job_id}":
+    status: implemented
+    method: Jobs.DeleteJob
+  "DELETE /v1/jobs/{batch_id}":
+    status: implemented
+    method: Jobs.DeleteBatch
+  "GET /v1/job/{job_id}":
+    status: implemented
+    method: Jobs.GetJob
+  "GET /v1/jobs":
+    status: implemented
+    method: Jobs.ListBatchesPage
+  "GET /v1/jobs/{batch_id}":
+    status: implemented
+    method: Jobs.GetBatchStatus
+  "GET /v1/jobs/{batch_id}/jobs":
+    status: implemented
+    method: Jobs.ListBatchJobsPage
+  "POST /v1/job/{job_id}/pause":
+    status: implemented
+    method: Jobs.PauseJob
+  "POST /v1/job/{job_id}/resume":
+    status: implemented
+    method: Jobs.ResumeJob
+  "POST /v1/job/{job_id}/retry":
+    status: implemented
+    method: Jobs.RetryJob
+  "POST /v1/jobs":
+    status: implemented
+    method: Jobs.CreateBatch
+  "POST /v1/jobs/{batch_id}/pause":
+    status: implemented
+    method: Jobs.PauseBatch
+  "POST /v1/jobs/{batch_id}/resume":
+    status: implemented
+    method: Jobs.ResumeBatch
+  "POST /v1/jobs/{batch_id}/retry":
+    status: implemented
+    method: Jobs.RetryBatch
+
+  # --- nameserver (11) ---
+  "DELETE /v1/vanity-nameserver-sets/default":
+    status: implemented
+    method: VanityNameservers.ClearDefault
+  "DELETE /v1/vanity-nameserver-sets/{set_id}":
+    status: implemented
+    method: VanityNameservers.DeleteSet
+  "GET /v1/vanity-nameserver-sets":
+    status: implemented
+    method: VanityNameservers.ListSetsPage
+  "GET /v1/vanity-nameserver-sets/{set_id}":
+    status: implemented
+    method: VanityNameservers.GetSet
+  "GET /v1/vanity-nameserver-sets/{set_id}/zones":
+    status: implemented
+    method: VanityNameservers.ListZonesReferencingSet
+  "PATCH /v1/vanity-nameserver-sets/{set_id}":
+    status: implemented
+    method: VanityNameservers.SetRenewalMode
+  "PATCH /v1/vanity-nameserver-sets/{set_id}/default":
+    status: implemented
+    method: VanityNameservers.SetDefault
+  "POST /v1/vanity-nameserver-sets":
+    status: implemented
+    method: VanityNameservers.CreateSet
+  "POST /v1/vanity-nameserver-sets/check":
+    status: implemented
+    method: VanityNameservers.CheckSet
+  "POST /v1/vanity-nameserver-sets/{set_id}/restore":
+    status: implemented
+    method: VanityNameservers.RestoreSet
+  "POST /v1/vanity-nameserver-sets/{set_id}/retry":
+    status: implemented
+    method: VanityNameservers.RetrySet
+
+  # --- organization (26) ---
+  "DELETE /v1/organizations/ip-restrictions/{ip_restriction_id}":
+    status: implemented
+    method: Organizations.DeleteIPRestriction
+  "DELETE /v1/organizations/roles/{label}":
+    status: implemented
+    method: Organizations.DeleteRole
+  "DELETE /v1/organizations/{organization_id}":
+    status: implemented
+    method: Organizations.DeleteOrganization
+  "GET /v1/organizations":
+    status: implemented
+    method: Organizations.ListOrganizationsPage
+  "GET /v1/organizations/attributes":
+    status: implemented
+    method: Organizations.GetCurrentAttributes
+  "GET /v1/organizations/ip-restrictions":
+    status: implemented
+    method: Organizations.ListIPRestrictions
+  "GET /v1/organizations/ip-restrictions/{ip_restriction_id}":
+    status: implemented
+    method: Organizations.GetIPRestriction
+  "GET /v1/organizations/role-permissions":
+    status: implemented
+    method: Organizations.ListRolePermissions
+  "GET /v1/organizations/roles":
+    status: implemented
+    method: Organizations.ListRoles
+  "GET /v1/organizations/roles/{label}":
+    status: implemented
+    method: Organizations.GetRole
+  "GET /v1/organizations/users":
+    status: implemented
+    method: Users.ListUsersPage
+  "GET /v1/organizations/{organization_id}":
+    status: implemented
+    method: Organizations.GetOrganization
+  "GET /v1/organizations/{organization_id}/attributes":
+    status: implemented
+    method: Organizations.GetAttributes
+  "GET /v1/organizations/{organization_id}/billing/invoices":
+    status: implemented
+    method: Organizations.ListInvoicesPage
+  "GET /v1/organizations/{organization_id}/billing/receipts":
+    status: implemented
+    method: Organizations.ListReceiptsPage
+  "GET /v1/organizations/{organization_id}/pricing/product-type/{product_type}":
+    status: implemented
+    method: Organizations.GetPricing
+  "GET /v1/organizations/{organization_id}/transactions":
+    status: implemented
+    method: Organizations.ListTransactions
+  "GET /v1/organizations/{organization_id}/transactions/{transaction_id}":
+    status: implemented
+    method: Organizations.GetTransaction
+  "PATCH /v1/organizations/attributes":
+    status: implemented
+    method: Organizations.UpdateCurrentAttributes
+  "PATCH /v1/organizations/ip-restrictions/{ip_restriction_id}":
+    status: implemented
+    method: Organizations.UpdateIPRestriction
+  "PATCH /v1/organizations/roles/{label}":
+    status: implemented
+    method: Organizations.UpdateRole
+  "PATCH /v1/organizations/{organization_id}":
+    status: implemented
+    method: Organizations.UpdateOrganization
+  "PATCH /v1/organizations/{organization_id}/attributes":
+    status: implemented
+    method: Organizations.UpdateAttributes
+  "POST /v1/organizations":
+    status: implemented
+    method: Organizations.CreateOrganization
+  "POST /v1/organizations/ip-restrictions":
+    status: implemented
+    method: Organizations.CreateIPRestriction
+  "POST /v1/organizations/roles":
+    status: implemented
+    method: Organizations.CreateRole
+
+  # --- organization,usage (2) ---
+  "GET /v1/organizations/{organization_id}/usage/{product}":
+    status: implemented
+    method: Organizations.GetUsageSeries
+  "GET /v1/organizations/{organization_id}/usage/{product}/summary":
+    status: implemented
+    method: Organizations.GetUsageSummary
+
+  # --- parking (5) ---
+  "GET /v1/parking":
+    status: excluded
+    reason: "parking is intentionally not part of the Go client"
+  "GET /v1/parking/metrics":
+    status: excluded
+    reason: "parking is intentionally not part of the Go client"
+  "GET /v1/parking/signup/status":
+    status: excluded
+    reason: "parking is intentionally not part of the Go client"
+  "GET /v1/parking/{parking_reference}/metrics":
+    status: excluded
+    reason: "parking is intentionally not part of the Go client"
+  "POST /v1/parking/signup":
+    status: excluded
+    reason: "parking is intentionally not part of the Go client"
+
+  # --- report (4) ---
+  "GET /v1/reports":
+    status: implemented
+    method: Reports.ListReportsPage
+  "GET /v1/reports/{report_id}":
+    status: implemented
+    method: Reports.GetReport
+  "GET /v1/reports/{report_id}/download":
+    status: implemented
+    method: Reports.DownloadReport
+  "POST /v1/reports":
+    status: implemented
+    method: Reports.CreateReport
+
+  # --- tag (7) ---
+  "DELETE /v1/tags/{tag_id}":
+    status: implemented
+    method: Tags.DeleteTag
+  "GET /v1/tags":
+    status: implemented
+    method: Tags.ListTagsPage
+  "GET /v1/tags/{tag_id}":
+    status: implemented
+    method: Tags.GetTag
+  "PATCH /v1/tags/{tag_id}":
+    status: implemented
+    method: Tags.UpdateTag
+  "POST /v1/tags":
+    status: implemented
+    method: Tags.CreateTag
+  "POST /v1/tags/objects":
+    status: implemented
+    method: Tags.BulkUpdateObjects
+  "POST /v1/tags/{tag_id}/objects":
+    status: implemented
+    method: Tags.UpdateTagObjects
+
+  # --- tld (3) ---
+  "GET /v1/tlds/":
+    status: implemented
+    method: TLDs.ListTLDs
+  "GET /v1/tlds/portfolio":
+    status: implemented
+    method: TLDs.GetPortfolio
+  "GET /v1/tlds/{tld}":
+    status: implemented
+    method: [TLDs.GetTLDWithOptions, TLDs.GetTLD]
+
+  # --- user (8) ---
+  "DELETE /v1/users/{user_id}":
+    status: implemented
+    method: Users.DeleteUser
+  "GET /v1/users/me":
+    status: implemented
+    method: Users.GetCurrentUser
+  "GET /v1/users/{user_id}":
+    status: implemented
+    method: Users.GetUserWithAttributes
+  "GET /v1/users/{user_id}/permissions":
+    status: implemented
+    method: Users.GetUserPermissions
+  "GET /v1/users/{user_id}/role":
+    status: implemented
+    method: Users.GetUserRole
+  "PATCH /v1/users/{user_id}":
+    status: implemented
+    method: Users.UpdateUser
+  "POST /v1/users":
+    status: implemented
+    method: Users.CreateUser
+  "PUT /v1/users/{user_id}/role":
+    status: implemented
+    method: Users.SetUserRole
+
+  # --- whitelabel (8) ---
+  "GET /v1/whitelabel-branding":
+    status: implemented
+    method: Whitelabel.Get
+  "GET /v1/whitelabel-branding/email/templates":
+    status: implemented
+    method: Whitelabel.ListEmailTemplates
+  "PATCH /v1/whitelabel-branding":
+    status: implemented
+    method: Whitelabel.Update
+  "POST /v1/whitelabel-branding":
+    status: implemented
+    # The body is discriminated by `tier`, one method per variant.
+    method:
+      - Whitelabel.CreateBase
+      - Whitelabel.CreatePlus
+  "POST /v1/whitelabel-branding/email/preview":
+    status: implemented
+    method: Whitelabel.PreviewEmail
+  "POST /v1/whitelabel-branding/recheck":
+    status: implemented
+    method: Whitelabel.Recheck
+  "POST /v1/whitelabel-branding/restore":
+    status: implemented
+    method: Whitelabel.Restore
+  "POST /v1/whitelabel-branding/tier":
+    status: implemented
+    method: Whitelabel.UpgradeToPlus
+
+# Hand-written response structs checked against the schemas they mirror.
+# Every Go type here must also be listed in modelRegistry in
+# opusdns/spec_coverage_test.go.
+models:
+  mappings:
+    Contact: ContactResponse
+    ContactAttributeSet: ContactAttributeSetResponse
+    Domain: DomainResponse
+    DomainForward: DomainForward
+    DomainSummary: DomainSummaryResponse
+    EmailForward: EmailForwardResponse
+    Event: EventResponse
+    Host: HostResponse
+    IPRestriction: IpRestrictionResponse
+    Invoice: InvoiceResponse
+    JobBatchRetryResponse: JobBatchRetryResponse
+    JobBatchStatusResponse: JobBatchStatusResponse
+    JobResponse: JobResponse
+    Organization: OrganizationWithBillingData
+    Report: PublicReportRes
+    Tag: TagResponse
+    TokenResponse: OrganizationTokenResponse
+    User: UserPublicWithAttributes
+    VanityNameserverSet: VanityNameserverSetSummaryDTO
+    Whitelabel: WhitelabelBrandingResponse
+    Zone: DnsZoneResponse
+    ZoneSummary: DnsZoneSummary
+  # Types where a property the spec declares but the struct lacks is an error,
+  # not a warning. A type belongs here once its fields are complete.
+  strict:
+    - Contact
+    - ContactAttributeSet
+    - Domain
+    - DomainForward
+    - DomainSummary
+    - EmailForward
+    - Event
+    - Host
+    - IPRestriction
+    - Invoice
+    - JobBatchRetryResponse
+    - JobBatchStatusResponse
+    - JobResponse
+    - Organization
+    - Report
+    - Tag
+    - TokenResponse
+    - User
+    - VanityNameserverSet
+    - Whitelabel
+    - Zone
+    - ZoneSummary

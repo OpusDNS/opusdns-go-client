@@ -401,3 +401,117 @@ func TestDomainForwardsService_GetMetrics(t *testing.T) {
 	assert.Equal(t, 100, metrics.TotalVisits)
 	assert.Equal(t, 5, metrics.ConfiguredForwards)
 }
+
+func TestDomainForwardsService_MetricsBreakdowns(t *testing.T) {
+	excludeBots := true
+	opts := &models.DomainForwardMetricsOptions{
+		Hostname:    "www.example.com",
+		Domain:      "example.com",
+		Protocol:    models.HttpProtocolHTTPS,
+		TimeRange:   models.TimeRange7D,
+		ExcludeBots: &excludeBots,
+	}
+
+	assertQuery := func(t *testing.T, r *http.Request) {
+		t.Helper()
+		query := r.URL.Query()
+		assert.Equal(t, "GET", r.Method)
+		assert.Equal(t, "www.example.com", query.Get("hostname"))
+		assert.Equal(t, "example.com", query.Get("domain"))
+		assert.Equal(t, "https", query.Get("protocol"))
+		assert.Equal(t, "7d", query.Get("time_range"))
+		assert.Equal(t, "true", query.Get("exclude_bots"))
+	}
+
+	cases := []struct {
+		name string
+		path string
+		call func(*Client, context.Context) error
+	}{
+		{"time-series", "/v1/domain-forwards/metrics/time-series", func(c *Client, ctx context.Context) error {
+			_, err := c.DomainForwards.GetTimeSeries(ctx, opts)
+			return err
+		}},
+		{"geo", "/v1/domain-forwards/metrics/geo", func(c *Client, ctx context.Context) error {
+			_, err := c.DomainForwards.GetGeoStats(ctx, opts)
+			return err
+		}},
+		{"browser", "/v1/domain-forwards/metrics/browser", func(c *Client, ctx context.Context) error {
+			_, err := c.DomainForwards.GetBrowserStats(ctx, opts)
+			return err
+		}},
+		{"platform", "/v1/domain-forwards/metrics/platform", func(c *Client, ctx context.Context) error {
+			_, err := c.DomainForwards.GetPlatformStats(ctx, opts)
+			return err
+		}},
+		{"referrer", "/v1/domain-forwards/metrics/referrer", func(c *Client, ctx context.Context) error {
+			_, err := c.DomainForwards.GetReferrerStats(ctx, opts)
+			return err
+		}},
+		{"status-code", "/v1/domain-forwards/metrics/status-code", func(c *Client, ctx context.Context) error {
+			_, err := c.DomainForwards.GetStatusCodeStats(ctx, opts)
+			return err
+		}},
+		{"user-agent", "/v1/domain-forwards/metrics/user-agent", func(c *Client, ctx context.Context) error {
+			_, err := c.DomainForwards.GetUserAgentStats(ctx, opts)
+			return err
+		}},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				assertQuery(t, r)
+				assert.Equal(t, tc.path, r.URL.Path)
+				_, _ = w.Write([]byte(`{"results":[{"key":"DE","total":7}]}`))
+			}))
+			defer server.Close()
+
+			client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+			require.NoError(t, err)
+			require.NoError(t, tc.call(client, context.Background()))
+		})
+	}
+}
+
+func TestDomainForwardsService_GetVisitsByKey(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/v1/domain-forwards/metrics/visits-by-key", r.URL.Path)
+		assert.Equal(t, "fqdn", r.URL.Query().Get("grouping"))
+		assert.Equal(t, "example.com", r.URL.Query().Get("domain"))
+
+		_, _ = w.Write([]byte(`{"results":[{"key":"www.example.com","total":3}]}`))
+	}))
+	defer server.Close()
+
+	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+	require.NoError(t, err)
+
+	_, err = client.DomainForwards.GetVisitsByKey(context.Background(), &models.DomainForwardVisitsByKeyOptions{
+		DomainForwardMetricsOptions: models.DomainForwardMetricsOptions{Domain: "example.com"},
+		Grouping:                    models.MetricsGroupingFQDN,
+	})
+	require.NoError(t, err)
+}
+
+func TestDomainForwardsService_ListZones(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "GET", r.Method)
+		assert.Equal(t, "/v1/dns/domain-forwards", r.URL.Path)
+		assert.Equal(t, "1", r.URL.Query().Get("page"))
+
+		_ = json.NewEncoder(w).Encode(models.DomainForwardZoneListResponse{
+			Results:    []models.DomainForwardZone{{ZoneName: "example.com"}},
+			Pagination: models.Pagination{HasNextPage: false},
+		})
+	}))
+	defer server.Close()
+
+	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+	require.NoError(t, err)
+
+	zones, err := client.DomainForwards.ListZones(context.Background(), nil)
+	require.NoError(t, err)
+	require.Len(t, zones, 1)
+	assert.Equal(t, "example.com", zones[0].ZoneName)
+}

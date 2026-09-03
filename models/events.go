@@ -24,6 +24,7 @@ const (
 	EventTypeVanityNSSuspension  EventType = "VANITY_NS_SUSPENSION"
 	EventTypeVanityNSRestoration EventType = "VANITY_NS_RESTORATION"
 	EventTypeVanityNSTermination EventType = "VANITY_NS_TERMINATION"
+	EventTypeClone               EventType = "CLONE"
 )
 
 // EventSubtype represents a more specific event subtype.

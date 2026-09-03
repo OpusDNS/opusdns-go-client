@@ -245,3 +245,70 @@ func (s *EmailForwardsService) GetMetrics(ctx context.Context, emailForwardID mo
 
 	return &result, nil
 }
+
+// ListZonesPage retrieves one page of zones that have email forwards.
+func (s *EmailForwardsService) ListZonesPage(ctx context.Context, opts *models.ListEmailForwardZonesOptions) (*models.EmailForwardZoneListResponse, error) {
+	path := s.client.http.BuildPath("dns", "email-forwards")
+
+	query := url.Values{}
+	if opts != nil {
+		if opts.Page > 0 {
+			query.Set("page", strconv.Itoa(opts.Page))
+		}
+		if opts.PageSize > 0 {
+			query.Set("page_size", strconv.Itoa(opts.PageSize))
+		}
+		if opts.SortBy != "" {
+			query.Set("sort_by", string(opts.SortBy))
+		}
+		if opts.SortOrder != "" {
+			query.Set("sort_order", string(opts.SortOrder))
+		}
+		if opts.Search != "" {
+			query.Set("search", opts.Search)
+		}
+	}
+
+	resp, err := s.client.http.Get(ctx, path, query)
+	if err != nil {
+		return nil, err
+	}
+
+	var result models.EmailForwardZoneListResponse
+	if err := s.client.http.DecodeResponse(resp, &result); err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
+// ListZones retrieves every zone that has email forwards, following pagination.
+func (s *EmailForwardsService) ListZones(ctx context.Context, opts *models.ListEmailForwardZonesOptions) ([]models.EmailForwardZone, error) {
+	var all []models.EmailForwardZone
+	page := 1
+
+	for {
+		pageOpts := models.ListEmailForwardZonesOptions{}
+		if opts != nil {
+			pageOpts = *opts
+		}
+		pageOpts.Page = page
+		if pageOpts.PageSize == 0 {
+			pageOpts.PageSize = DefaultPageSize
+		}
+
+		resp, err := s.ListZonesPage(ctx, &pageOpts)
+		if err != nil {
+			return nil, err
+		}
+
+		all = append(all, resp.Results...)
+
+		if !resp.Pagination.HasNextPage {
+			break
+		}
+		page++
+	}
+
+	return all, nil
+}

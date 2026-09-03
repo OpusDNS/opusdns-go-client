@@ -8,7 +8,7 @@ The official Go client library for the [OpusDNS](https://opusdns.com) API - a co
 
 ## Features
 
-- **Complete API Coverage**: Full support for DNS zones, domains, contacts, email forwarding, domain forwarding, and more
+- **Broad API Coverage**: DNS zones, domains, contacts, email forwarding, domain forwarding, jobs, reports, tags and more ([what is and is not covered](spec/coverage.yaml))
 - **Type-Safe**: Strongly typed models with Go idioms
 - **Automatic Pagination**: Easily iterate through all resources
 - **Retry Logic**: Built-in exponential backoff for transient failures
@@ -124,13 +124,14 @@ The client provides access to the following services:
 | `client.Availability` | Domain availability checking |
 | `client.Organizations` | Organization, billing, and role (RBAC) management |
 | `client.Users` | User management and role assignment |
-| `client.Auth` | Authentication (API key introspection) |
+| `client.Auth` | Authentication (API key introspection, access tokens) |
 | `client.VanityNameservers` | Vanity nameserver set management |
 | `client.Hosts` | Host object management |
 | `client.Events` | Event and audit log access |
 | `client.Jobs` | Async job batch management |
 | `client.Reports` | Report generation and download |
 | `client.Tags` | Tag management and bulk tag assignment |
+| `client.Whitelabel` | Whitelabel branding configuration |
 
 ## DNS Management
 
@@ -324,6 +325,34 @@ domain, err := client.Domains.TransferDomain(ctx, &models.DomainTransferRequest{
 
 // Abort a transfer while it is still pending
 err = client.Domains.CancelTransfer(ctx, "example.com")
+
+// Approve or reject a transfer of one of your domains away to another registrar
+result, err := client.Domains.ResolveOutboundTransfer(ctx, "example.com",
+    &models.OutboundTransferRequest{Action: models.OutboundTransferApprove})
+```
+
+Some registries issue the transfer auth code on request and deliver it out of
+band rather than returning it over the API:
+
+```go
+result, err := client.Domains.RequestAuthCode(ctx, models.AuthCodeTLDSE, "example.se")
+```
+
+Other TLD-specific operations follow the same shape: `WithdrawATDomain`,
+`TransitDEDomain`, `SubmitNorIDDeclaration` and `ResendNorIDDeclarationEmail`.
+
+### Trademark Claims Notices
+
+A domain in a trademark claims period returns a `claims_key` from the
+availability check. Retrieve the notice, show it to the registrant, and pass the
+acceptance hash when registering:
+
+```go
+notices, err := client.Domains.GetClaimsNotices(ctx, claimsKey)
+for _, notice := range notices {
+    fmt.Println(notice.RenderedHTML)
+    fmt.Println("acceptance hash:", notice.ClaimsNoticeAcceptanceHash)
+}
 ```
 
 ### Renew a Domain
@@ -435,7 +464,16 @@ forward, err := client.DomainForwards.CreateDomainForward(ctx, &models.DomainFor
         },
     },
 })
+
+// Traffic metrics, overall and broken down
+metrics, err := client.DomainForwards.GetMetrics(ctx, opts)
+geo, err := client.DomainForwards.GetGeoStats(ctx, opts)
+series, err := client.DomainForwards.GetTimeSeries(ctx, opts)
 ```
+
+`GetBrowserStats`, `GetPlatformStats`, `GetReferrerStats`, `GetStatusCodeStats`,
+`GetUserAgentStats` and `GetVisitsByKey` complete the set. `ListZones` lists the
+zones that have forwards, on both `DomainForwards` and `EmailForwards`.
 
 ## Jobs (Async Batch Operations)
 
@@ -669,6 +707,54 @@ host, err = client.Hosts.UpdateHost(ctx, host.HostID.String(), &models.HostUpdat
 err = client.Hosts.DeleteHost(ctx, host.HostID.String())
 ```
 
+## Whitelabel Branding
+
+Serve the dashboard and its transactional email under your own brand. An
+organization has one configuration, on the base tier (a subdomain of an
+OpusDNS-owned zone) or the plus tier (your own domain).
+
+The tier is the method you call, not a field you set: `CreateBase` provisions
+the base tier, `CreatePlus` the plus tier.
+
+```go
+result, err := client.Whitelabel.CreatePlus(ctx, &models.WhitelabelPlusCreateRequest{
+    Label:         "reseller",
+    Period:        models.DomainPeriod{Value: 1, Unit: models.PeriodUnitYear},
+    Hostname:      "reseller.com",
+    AuthSubdomain: "auth",
+    CreateZone:    models.BoolPtr(true),
+})
+
+// Onboarding continues in the background
+config, err := client.Whitelabel.Get(ctx)
+fmt.Println(config.OnboardingStatus)
+
+// After a failure, correct the hostname and try again
+config, err = client.Whitelabel.Recheck(ctx, &models.WhitelabelRecheckRequest{
+    Hostname: models.StringPtr("reseller.com"),
+})
+```
+
+Preview a mail template against a branding document before saving it:
+
+```go
+templates, err := client.Whitelabel.ListEmailTemplates(ctx)
+
+preview, err := client.Whitelabel.PreviewEmail(ctx, &models.PreviewMailRequest{
+    TemplateName: "domain_expiring",
+    LanguageCode: "en",
+    BrandingDocument: &models.BrandingDocument{
+        Theme: &models.Theme{
+            Light: &models.Palette{Primary: models.StringPtr("#0a7cff")},
+        },
+    },
+})
+```
+
+`UpgradeToPlus` moves a base configuration onto your own domain, `Update`
+changes the label, the enabled flag or the renewal intent, and `Restore` brings
+back a configuration that was force-disabled.
+
 ## Error Handling
 
 The client provides detailed error types for different failure scenarios:
@@ -775,6 +861,16 @@ go run main.go
 
 For complete API documentation, visit [developers.opusdns.com](https://developers.opusdns.com).
 
+## API Specification
+
+The OpenAPI specification this release was built against is vendored under
+[`spec/`](spec/). `spec/version.yaml` records exactly which published revision
+that is, and `spec/coverage.yaml` lists every API operation together with the Go
+method that implements it, or the reason it is deferred or out of scope.
+
+Those files are checked by the test suite, so they cannot drift from the code.
+See [SPEC_SYNC.md](SPEC_SYNC.md) for how the client is kept in step with the API.
+
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
@@ -784,6 +880,10 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 3. Commit your changes (`git commit -m 'Add some amazing feature'`)
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
+
+When you add or change a service method, update its entry in
+[`spec/coverage.yaml`](spec/coverage.yaml) in the same change and run
+`make spec-check`. See [SPEC_SYNC.md](SPEC_SYNC.md).
 
 ## License
 

@@ -54,6 +54,9 @@ const (
 	// DnsProtectedReasonEmailForward indicates the record is managed by email forwarding.
 	DnsProtectedReasonEmailForward DnsProtectedReason = "EMAIL_FORWARD"
 
+	// DnsProtectedReasonWhitelabel indicates the record is managed by whitelabel branding.
+	DnsProtectedReasonWhitelabel DnsProtectedReason = "WHITELABEL"
+
 	// DnsProtectedReasonDomainForward indicates the record is managed by domain forwarding.
 	DnsProtectedReasonDomainForward DnsProtectedReason = "DOMAIN_FORWARD"
 
@@ -416,6 +419,9 @@ type ListZonesOptions struct {
 
 	// Include requests additional response data.
 	Include []ZoneIncludeField
+
+	// VanityNameserverSetID filters zones using a given vanity nameserver set.
+	VanityNameserverSetID *VanityNameserverSetID
 }
 
 // ZoneIncludeField represents optional zone response expansions.

@@ -212,3 +212,40 @@ func (s *VanityNameserversService) ListZonesReferencingSet(ctx context.Context, 
 
 	return &result, nil
 }
+
+// SetRenewalMode changes whether a vanity nameserver set renews at the end of
+// its current period. RenewalModeExpire cancels at period end and serves out
+// the remaining term; RenewalModeRenew un-cancels.
+func (s *VanityNameserversService) SetRenewalMode(ctx context.Context, setID models.VanityNameserverSetID, mode models.RenewalMode) (*models.VanityNameserverSet, error) {
+	path := s.client.http.BuildPath("vanity-nameserver-sets", url.PathEscape(string(setID)))
+
+	resp, err := s.client.http.Patch(ctx, path, &models.SetRenewalModeRequest{RenewalMode: mode})
+	if err != nil {
+		return nil, err
+	}
+
+	var result models.VanityNameserverSet
+	if err := s.client.http.DecodeResponse(resp, &result); err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
+// RetrySet re-runs provisioning for a set left in the FAILED state. The retry
+// is asynchronous; poll the set to follow it.
+func (s *VanityNameserversService) RetrySet(ctx context.Context, setID models.VanityNameserverSetID) (*models.VanityNameserverSet, error) {
+	path := s.client.http.BuildPath("vanity-nameserver-sets", url.PathEscape(string(setID)), "retry")
+
+	resp, err := s.client.http.Post(ctx, path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var result models.VanityNameserverSet
+	if err := s.client.http.DecodeResponse(resp, &result); err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}

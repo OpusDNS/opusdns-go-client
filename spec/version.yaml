@@ -1,0 +1,5 @@
+# Which published OpenAPI specification spec/openapi.yaml was taken from.
+# Written by `make spec-sync`; do not edit by hand.
+npm_version: 1.147.0
+info_version: 2026-09-01-130544
+api_spec_commit: 4d2218565abc6b751ec2e43de4077b0f63fb15ee

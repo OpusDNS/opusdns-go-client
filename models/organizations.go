@@ -6,6 +6,30 @@ import "time"
 // OrganizationID is a TypeID for organizations.
 type OrganizationID = TypeID
 
+// BillingMetadata carries an organization's payment terms.
+type BillingMetadata struct {
+	// BillingModel is the payment terms for the organization.
+	BillingModel *string `json:"billing_model,omitempty"`
+
+	// CreditLimit is the credit limit for the organization.
+	CreditLimit *int `json:"credit_limit,omitempty"`
+
+	// CustomerNumber is the customer account number for the organization.
+	CustomerNumber *int `json:"customer_number,omitempty"`
+}
+
+// BillingMode says whether an organization is billed through its parent or on
+// its own account.
+type BillingMode string
+
+const (
+	// BillingModeConsolidated bills the organization through its parent.
+	BillingModeConsolidated BillingMode = "consolidated"
+
+	// BillingModeIndependent bills the organization on its own account.
+	BillingModeIndependent BillingMode = "independent"
+)
+
 // OrganizationStatus represents the status of an organization.
 type OrganizationStatus string
 
@@ -78,6 +102,18 @@ type Organization struct {
 
 	// DefaultLocale is the default locale for the organization.
 	DefaultLocale *string `json:"default_locale,omitempty"`
+
+	// BillingMode says whether the organization is billed through its parent
+	// or on its own account. Only present on organization detail responses.
+	BillingMode *BillingMode `json:"billing_mode,omitempty"`
+
+	// AccountBalance is the organization's wallet balance. Only present on
+	// organization detail responses.
+	AccountBalance *string `json:"account_balance,omitempty"`
+
+	// BillingMetadata carries the organization's payment terms. Only present
+	// on organization detail responses.
+	BillingMetadata *BillingMetadata `json:"billing_metadata,omitempty"`
 
 	// Attributes contains organization attributes.
 	Attributes []OrganizationAttribute `json:"attributes,omitempty"`
@@ -179,6 +215,10 @@ type OrganizationCreateRequest struct {
 
 	// DefaultLocale is the default locale for the organization.
 	DefaultLocale *string `json:"default_locale,omitempty"`
+
+	// BillingMode selects consolidated or independent billing for the new
+	// sub-organization. Defaults to consolidated when omitted.
+	BillingMode *BillingMode `json:"billing_mode,omitempty"`
 
 	// Users contains optional initial users to create with the organization.
 	Users []UserCreateRequest `json:"users,omitempty"`
@@ -350,6 +390,9 @@ const (
 	BillingProductTypeDomainForward    BillingTransactionProductType = "domain_forward"
 	BillingProductTypeAccountWallet    BillingTransactionProductType = "account_wallet"
 	BillingProductTypeVanityNameserver BillingTransactionProductType = "vanity_nameserver"
+	BillingProductTypeWhitelabel       BillingTransactionProductType = "whitelabel_branding"
+	BillingProductTypeWhitelabelPlus   BillingTransactionProductType = "whitelabel_branding_plus"
+	BillingProductTypeRASDomain        BillingTransactionProductType = "ras_domain_lifecycle"
 )
 
 // BillingTransactionAction represents the action in a transaction.
@@ -363,6 +406,7 @@ const (
 	BillingActionTrade       BillingTransactionAction = "trade"
 	BillingActionApplication BillingTransactionAction = "application"
 	BillingActionServiceFee  BillingTransactionAction = "service_fee"
+	BillingActionUpgradeFee  BillingTransactionAction = "upgrade_fee"
 	BillingActionWalletTopUp BillingTransactionAction = "wallet_top_up"
 )
 
@@ -483,6 +527,17 @@ type ListTransactionsOptions struct {
 	CreatedBefore *time.Time
 }
 
+// InvoiceDocumentType distinguishes an invoice from a payment receipt.
+type InvoiceDocumentType string
+
+const (
+	// InvoiceDocumentTypeInvoice marks a billing invoice.
+	InvoiceDocumentTypeInvoice InvoiceDocumentType = "invoice"
+
+	// InvoiceDocumentTypeReceipt marks a payment receipt.
+	InvoiceDocumentTypeReceipt InvoiceDocumentType = "receipt"
+)
+
 // InvoiceResponseStatus represents the status of an invoice.
 type InvoiceResponseStatus string
 
@@ -519,6 +574,9 @@ const (
 type Invoice struct {
 	// ExternalID is the Lago (external) ID for this invoice.
 	ExternalID string `json:"external_id"`
+
+	// DocumentType says whether this is an invoice or a payment receipt.
+	DocumentType InvoiceDocumentType `json:"document_type"`
 
 	// Number is the human-readable invoice number.
 	Number string `json:"number"`
@@ -557,6 +615,16 @@ type Invoice struct {
 	FileURL *string `json:"file_url,omitempty"`
 }
 
+// ListInvoicesOptions paginates a list of billing documents. Receipts share
+// the invoice shape and are listed with the same options.
+type ListInvoicesOptions struct {
+	// Page is the page number to retrieve (1-indexed).
+	Page int
+
+	// PageSize is the number of documents per page.
+	PageSize int
+}
+
 // InvoiceListResponse represents the paginated response when listing invoices.
 type InvoiceListResponse struct {
 	// Results contains the list of invoices for the current page.
@@ -564,4 +632,100 @@ type InvoiceListResponse struct {
 
 	// Pagination contains the pagination metadata.
 	Pagination Pagination `json:"pagination"`
+}
+
+// UsageProduct is a metered product with a usage series.
+type UsageProduct string
+
+// UsageProductAIInference meters AI inference tokens and requests.
+const UsageProductAIInference UsageProduct = "ai_inference"
+
+// UsageGranularity is the bucket size of a usage series.
+type UsageGranularity string
+
+const (
+	// UsageGranularityDay buckets usage per day.
+	UsageGranularityDay UsageGranularity = "day"
+
+	// UsageGranularityWeek buckets usage per week.
+	UsageGranularityWeek UsageGranularity = "week"
+
+	// UsageGranularityMonth buckets usage per month.
+	UsageGranularityMonth UsageGranularity = "month"
+)
+
+// UsageOptions narrows a usage query to a date range. Dates are sent as
+// YYYY-MM-DD. Granularity applies to the series only, not to the summary.
+type UsageOptions struct {
+	// StartDate is the first day to report on.
+	StartDate *time.Time
+
+	// EndDate is the last day to report on.
+	EndDate *time.Time
+
+	// Granularity is the bucket size of the series.
+	Granularity UsageGranularity
+}
+
+// AIInferenceUsageSeries is AI inference usage bucketed over time.
+type AIInferenceUsageSeries struct {
+	// Product is the metered product.
+	Product UsageProduct `json:"product"`
+
+	// Granularity is the bucket size.
+	Granularity UsageGranularity `json:"granularity"`
+
+	// StartDate is the first day covered, as YYYY-MM-DD.
+	StartDate string `json:"start_date"`
+
+	// EndDate is the last day covered, as YYYY-MM-DD.
+	EndDate string `json:"end_date"`
+
+	// Buckets are the per-period usage buckets.
+	Buckets []AIInferenceUsageBucket `json:"buckets"`
+}
+
+// AIInferenceUsageSummary is AI inference usage totalled over a date range.
+type AIInferenceUsageSummary struct {
+	// Product is the metered product.
+	Product UsageProduct `json:"product"`
+
+	// StartDate is the first day covered, as YYYY-MM-DD.
+	StartDate string `json:"start_date"`
+
+	// EndDate is the last day covered, as YYYY-MM-DD.
+	EndDate string `json:"end_date"`
+
+	// Groups are the per-model totals.
+	Groups []AIInferenceUsageGroup `json:"groups"`
+}
+
+// AIInferenceUsageBucket is the usage of one period.
+type AIInferenceUsageBucket struct {
+	// PeriodStart is the first day of the bucket, as YYYY-MM-DD.
+	PeriodStart string `json:"period_start"`
+
+	// Groups are the per-model totals within the bucket.
+	Groups []AIInferenceUsageGroup `json:"groups"`
+}
+
+// AIInferenceUsageGroup is the usage of one model.
+type AIInferenceUsageGroup struct {
+	// Model is the model the usage is attributed to.
+	Model string `json:"model"`
+
+	// InputTokens is the number of input tokens.
+	InputTokens int64 `json:"input_tokens"`
+
+	// OutputTokens is the number of output tokens.
+	OutputTokens int64 `json:"output_tokens"`
+
+	// CacheReadTokens is the number of tokens read from the prompt cache.
+	CacheReadTokens int64 `json:"cache_read_tokens"`
+
+	// CacheWriteTokens is the number of tokens written to the prompt cache.
+	CacheWriteTokens int64 `json:"cache_write_tokens"`
+
+	// RequestCount is the number of requests.
+	RequestCount int64 `json:"request_count"`
 }

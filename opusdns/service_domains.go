@@ -84,9 +84,6 @@ func (s *DomainsService) ListDomainsPage(ctx context.Context, opts *models.ListD
 		if opts.IsPremium != nil {
 			query.Set("is_premium", strconv.FormatBool(*opts.IsPremium))
 		}
-		if opts.RenewalMode != nil {
-			query.Set("renewal_mode", string(*opts.RenewalMode))
-		}
 		if opts.CreatedAfter != nil {
 			query.Set("created_after", opts.CreatedAfter.Format(time.RFC3339))
 		}
@@ -126,8 +123,20 @@ func (s *DomainsService) ListDomainsPage(ctx context.Context, opts *models.ListD
 		for _, include := range opts.Include {
 			query.Add("include", string(include))
 		}
-		if opts.Status != "" {
-			query.Set("status", string(opts.Status))
+		for _, statusTag := range opts.StatusTags {
+			query.Add("status_tags", string(statusTag))
+		}
+		if opts.StatusTagMode != "" {
+			query.Set("status_tag_mode", string(opts.StatusTagMode))
+		}
+		if opts.ReadOnly != nil {
+			query.Set("read_only", strconv.FormatBool(*opts.ReadOnly))
+		}
+		if opts.TransferredAfter != nil {
+			query.Set("transferred_after", opts.TransferredAfter.Format(time.RFC3339))
+		}
+		if opts.TransferredBefore != nil {
+			query.Set("transferred_before", opts.TransferredBefore.Format(time.RFC3339))
 		}
 	}
 
@@ -395,4 +404,43 @@ func (s *DomainsService) CheckDomains(ctx context.Context, domains []string) (*m
 	}
 
 	return &result, nil
+}
+
+// ResolveOutboundTransfer approves or rejects a pending outbound transfer, that
+// is a transfer of one of your domains away to another registrar. The domain is
+// referenced by either its ID or its name.
+func (s *DomainsService) ResolveOutboundTransfer(ctx context.Context, domainRef string, req *models.OutboundTransferRequest) (*models.OutboundTransferResponse, error) {
+	path := s.client.http.BuildPath("domains", url.PathEscape(domainRef), "transfer", "outbound")
+
+	resp, err := s.client.http.Post(ctx, path, req)
+	if err != nil {
+		return nil, err
+	}
+
+	var result models.OutboundTransferResponse
+	if err := s.client.http.DecodeResponse(resp, &result); err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
+// GetClaimsNotices retrieves the trademark claims notices for a claims key
+// returned by an availability check. A notice must be shown to the registrant,
+// who acknowledges it by passing its acceptance hash when registering. The
+// API takes one key per request, so the result holds at most one notice.
+func (s *DomainsService) GetClaimsNotices(ctx context.Context, claimsKey string) ([]models.ClaimsNotice, error) {
+	path := s.client.http.BuildPath("domains", "claims-notices")
+
+	resp, err := s.client.http.Post(ctx, path, &models.ClaimsNoticesRequest{ClaimsKeys: []string{claimsKey}})
+	if err != nil {
+		return nil, err
+	}
+
+	var result models.ClaimsNoticesResponse
+	if err := s.client.http.DecodeResponse(resp, &result); err != nil {
+		return nil, err
+	}
+
+	return result.ClaimsNotices, nil
 }
