@@ -115,8 +115,7 @@ client, err := opusdns.NewClient()
 Every request carries `X-OpusDNS-Client: opusdns-go-client/<version>`, which the API uses to
 attribute the call to an origin channel in its own usage analytics. It names the client library
 and its version and nothing else — no request content, and nothing about you or your account
-beyond what the API already sees. It is informational: it is never used for authentication,
-authorization or rate limiting.
+beyond what the API already sees.
 
 The version comes from the released binary when you use the CLI, and otherwise from the module
 version recorded in your program's build info.
