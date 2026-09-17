@@ -104,10 +104,33 @@ client, err := opusdns.NewClient()
 | `WithMaxRetries(n)` | Max retries for transient failures | `3` |
 | `WithRetryWait(min, max)` | Retry backoff bounds | `1s`, `30s` |
 | `WithHTTPClient(client)` | Use custom HTTP client | - |
-| `WithUserAgent(ua)` | Custom User-Agent string | `opusdns-go-client/1.0.0` |
+| `WithUserAgent(ua)` | Custom User-Agent string | `opusdns-go-client/<version>` |
+| `WithClientToken(token)` | `X-OpusDNS-Client` product token; `""` omits the header | `opusdns-go-client/<version>` |
 | `WithDebug(enabled)` | Enable debug logging | `false` |
 | `WithLogger(logger)` | Custom logger for debug output | stdout |
 | `WithTTL(ttl)` | Default TTL for DNS records | `60` |
+
+### Client identification
+
+Every request carries `X-OpusDNS-Client: opusdns-go-client/<version>`, which the API uses to
+attribute the call to an origin channel in its own usage analytics. It names the client library
+and its version and nothing else — no request content, and nothing about you or your account
+beyond what the API already sees.
+
+The version comes from the released binary when you use the CLI, and otherwise from the module
+version recorded in your program's build info.
+
+Embedding this library in a product of your own? Declare it instead, and your product shows up as
+its own channel:
+
+```go
+client, err := opusdns.NewClient(
+    opusdns.WithAPIKey("opk_..."),
+    opusdns.WithClientToken("acme-provisioner/2.1"),
+)
+```
+
+`opusdns.WithClientToken("")` omits the header entirely.
 
 ## Services
 
