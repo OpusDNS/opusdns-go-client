@@ -4,6 +4,9 @@ package opusdns
 import (
 	"net/http"
 	"os"
+	"regexp"
+	"runtime/debug"
+	"sync"
 	"time"
 )
 
@@ -42,9 +45,89 @@ var (
 	Version = "dev"
 )
 
-// UserAgent returns the default user agent string.
+const (
+	// ProductName is the client name the API knows this library by. It is the first half
+	// of both the User-Agent and the X-OpusDNS-Client product token.
+	ProductName = "opusdns-go-client"
+
+	// unknownVersion is what both fall back to when no usable version can be determined.
+	unknownVersion = "dev"
+
+	// modulePath is this module, looked up in the build info of whatever binary embeds it.
+	modulePath = "github.com/opusdns/opusdns-go-client"
+)
+
+// versionPattern is the charset the API accepts for the version half of the client product
+// token. A value outside it is dropped on their side rather than stored, so anything that
+// does not match is replaced with unknownVersion here instead of being sent as noise.
+var versionPattern = regexp.MustCompile(`^[A-Za-z0-9._+-]{1,64}$`)
+
+var (
+	resolvedVersionOnce sync.Once
+	resolvedVersion     string
+)
+
+// ResolvedVersion returns the version this build reports to the API.
+//
+// Releases set Version through ldflags, which covers the CLI. That does nothing for a program
+// that imports this package, so when Version is still the default the module version recorded
+// in the importing binary is used instead - otherwise every library consumer would report
+// "dev" and the version dimension would be empty for exactly the callers it is most useful for.
+func ResolvedVersion() string {
+	resolvedVersionOnce.Do(func() {
+		resolvedVersion = resolveVersion(Version, debug.ReadBuildInfo)
+	})
+	return resolvedVersion
+}
+
+// resolveVersion takes its inputs as arguments so it can be tested without a real build.
+func resolveVersion(ldflagsVersion string, readBuildInfo func() (*debug.BuildInfo, bool)) string {
+	if ldflagsVersion != unknownVersion && versionPattern.MatchString(ldflagsVersion) {
+		return ldflagsVersion
+	}
+
+	info, ok := readBuildInfo()
+	if !ok || info == nil {
+		return unknownVersion
+	}
+
+	// In a consumer's binary this module is a dependency; in our own CLI built without
+	// ldflags it is the main module.
+	candidate := ""
+	for _, dep := range info.Deps {
+		if dep != nil && dep.Path == modulePath {
+			candidate = dep.Version
+			if dep.Replace != nil {
+				candidate = dep.Replace.Version
+			}
+			break
+		}
+	}
+	if candidate == "" && info.Main.Path == modulePath {
+		candidate = info.Main.Version
+	}
+
+	// An unversioned build reports "(devel)", whose parentheses are outside the accepted
+	// charset. Reporting "dev" says the same thing in a value the API will keep.
+	if !versionPattern.MatchString(candidate) {
+		return unknownVersion
+	}
+	return candidate
+}
+
+// GetUserAgent returns the default user agent string.
 func GetUserAgent() string {
-	return "opusdns-go-client/" + Version
+	return ProductName + "/" + ResolvedVersion()
+}
+
+// GetClientToken returns the default value for the X-OpusDNS-Client header: an RFC 9110
+// product token naming this library and its version.
+//
+// The API uses it to attribute a request to an origin channel for its own analytics. It is
+// informational, never an authentication or authorization signal, and carries nothing about
+// the caller beyond which client library made the call.
+func GetClientToken() string {
+	return ProductName + "/" + ResolvedVersion()
 }
 
 // Environment variable names for configuration.
@@ -99,8 +182,14 @@ type Config struct {
 	HTTPClient *http.Client
 
 	// UserAgent is the user agent string to use for API requests.
-	// Default: opusdns-go-client/1.0.0
+	// Default: opusdns-go-client/<version>
 	UserAgent string
+
+	// ClientToken is sent as the X-OpusDNS-Client header, which the API uses to attribute
+	// a request to an origin channel for its own analytics. It is informational only.
+	// Set it to the empty string to omit the header.
+	// Default: opusdns-go-client/<version>
+	ClientToken string
 
 	// Debug enables debug logging of HTTP requests and responses.
 	// Can also be enabled via OPUSDNS_DEBUG=true environment variable.
@@ -183,6 +272,17 @@ func WithUserAgent(userAgent string) Option {
 	}
 }
 
+// WithClientToken sets the X-OpusDNS-Client product token identifying the calling client.
+//
+// The default names this library, which is what most callers want. Pass a token of your own
+// ("acme-provisioner/2.1", say) when this library is embedded in a product that should be
+// attributed in its own right, or "" to send no header at all.
+func WithClientToken(token string) Option {
+	return func(c *Config) {
+		c.ClientToken = token
+	}
+}
+
 // WithDebug enables debug logging.
 func WithDebug(debug bool) Option {
 	return func(c *Config) {
@@ -209,6 +309,7 @@ func NewConfig(opts ...Option) *Config {
 		RetryWaitMin: DefaultRetryWaitMin,
 		RetryWaitMax: DefaultRetryWaitMax,
 		UserAgent:    GetUserAgent(),
+		ClientToken:  GetClientToken(),
 	}
 
 	// Apply environment variables

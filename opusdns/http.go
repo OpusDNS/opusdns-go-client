@@ -185,6 +185,11 @@ func (c *HTTPClient) doRequest(ctx context.Context, req *Request) (*Response, er
 	// and now treats the header as a no-op, but sending it keeps responses
 	// unambiguous on any environment still on the old serialization.
 	httpReq.Header.Set(datetimeFormatHeader, datetimeFormatRFC3339)
+	// Names the calling client so the API can attribute the request to an origin channel.
+	// Analytics only on their side, and omitted entirely when the caller clears it.
+	if c.config.ClientToken != "" {
+		httpReq.Header.Set(clientHeader, c.config.ClientToken)
+	}
 
 	if req.Body != nil {
 		contentType := req.ContentType
@@ -274,6 +279,8 @@ const (
 	datetimeFormatHeader = "X-Datetime-Format"
 	// datetimeFormatRFC3339 is the only value the API defines for that header.
 	datetimeFormatRFC3339 = "rfc3339"
+	// clientHeader carries the RFC 9110 product token identifying the calling client.
+	clientHeader = "X-OpusDNS-Client"
 )
 
 // timestampRegex matches ISO 8601 timestamps without timezone info (e.g., "2026-01-23T08:26:55")
