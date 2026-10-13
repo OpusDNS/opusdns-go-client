@@ -181,10 +181,6 @@ func (c *HTTPClient) doRequest(ctx context.Context, req *Request) (*Response, er
 	httpReq.Header.Set("X-Api-Key", c.config.APIKey)
 	httpReq.Header.Set("User-Agent", c.config.UserAgent)
 	httpReq.Header.Set("Accept", "application/json")
-	// Ask for RFC 3339 datetimes. The API made this the default on 2026-09-01
-	// and now treats the header as a no-op, but sending it keeps responses
-	// unambiguous on any environment still on the old serialization.
-	httpReq.Header.Set(datetimeFormatHeader, datetimeFormatRFC3339)
 	// Names the calling client so the API can attribute the request to an origin channel.
 	// Analytics only on their side, and omitted entirely when the caller clears it.
 	if c.config.ClientToken != "" {
@@ -275,10 +271,6 @@ func (c *HTTPClient) Delete(ctx context.Context, path string) (*Response, error)
 }
 
 const (
-	// datetimeFormatHeader opts in to RFC 3339 datetime serialization.
-	datetimeFormatHeader = "X-Datetime-Format"
-	// datetimeFormatRFC3339 is the only value the API defines for that header.
-	datetimeFormatRFC3339 = "rfc3339"
 	// clientHeader carries the RFC 9110 product token identifying the calling client.
 	clientHeader = "X-OpusDNS-Client"
 )
