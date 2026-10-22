@@ -542,22 +542,22 @@ func TestDomainsService_RestoreDomain(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, 1, req.Period)
 
-		_ = json.NewEncoder(w).Encode(models.Domain{
-			DomainID: "domain_123",
-			Name:     "example.com",
-		})
+		_, _ = w.Write([]byte(`{"domain_id":"domain_123","name":"example.com","restored_at":"2026-10-22T09:30:00Z"}`))
 	}))
 	defer server.Close()
 
 	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
 	require.NoError(t, err)
 
-	domain, err := client.Domains.RestoreDomain(context.Background(), "example.com", &models.DomainRestoreRequest{
+	result, err := client.Domains.RestoreDomain(context.Background(), "example.com", &models.DomainRestoreRequest{
 		Period: 1,
 	})
 
 	require.NoError(t, err)
-	assert.Equal(t, "example.com", domain.Name)
+	assert.Equal(t, models.DomainID("domain_123"), result.DomainID)
+	assert.Equal(t, "example.com", result.Name)
+	require.NotNil(t, result.RestoredAt)
+	assert.Equal(t, time.Date(2026, 10, 22, 9, 30, 0, 0, time.UTC), result.RestoredAt.UTC())
 }
 
 func TestDomainsService_GetSummary(t *testing.T) {

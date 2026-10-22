@@ -435,9 +435,10 @@ domain, err := client.Domains.UpdateDomain(ctx, "example.com", &models.DomainUpd
 err := client.Domains.DeleteDomain(ctx, "example.com")
 
 // Restore is valid while the domain is still in the redemption grace period
-domain, err := client.Domains.RestoreDomain(ctx, "example.com", &models.DomainRestoreRequest{
+result, err := client.Domains.RestoreDomain(ctx, "example.com", &models.DomainRestoreRequest{
     Period: 1,
 })
+fmt.Println("restored at", result.RestoredAt)
 ```
 
 ### Domain DNSSEC

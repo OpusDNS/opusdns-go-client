@@ -637,6 +637,18 @@ type DomainRestoreRequest struct {
 	Period int `json:"period,omitempty"`
 }
 
+// DomainRestoreResult is the outcome of restoring a domain from redemption.
+type DomainRestoreResult struct {
+	// DomainID is the ID of the restored domain.
+	DomainID DomainID `json:"domain_id"`
+
+	// Name is the domain name.
+	Name string `json:"name"`
+
+	// RestoredAt is when the domain was restored.
+	RestoredAt *time.Time `json:"restored_at,omitempty"`
+}
+
 // DomainDNSSECRequest represents a legacy request to configure DNSSEC for a domain.
 //
 // Deprecated: Use DomainDNSSECDataCreate with DomainsService.PutDNSSEC.
