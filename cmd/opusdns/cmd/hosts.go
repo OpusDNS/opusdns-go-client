@@ -85,16 +85,8 @@ var hostsDeleteCmd = &cobra.Command{
 
 		reference := args[0]
 
-		force, _ := cmd.Flags().GetBool("force")
-		if !force {
-			fmt.Printf("Are you sure you want to delete host '%s'?\n", reference)
-			fmt.Print("Type 'yes' to confirm: ")
-			var confirm string
-			_, _ = fmt.Scanln(&confirm)
-			if confirm != "yes" {
-				fmt.Println("Aborted.")
-				return nil
-			}
+		if err := confirm(cmd, fmt.Sprintf("Are you sure you want to delete host '%s'?", reference)); err != nil {
+			return err
 		}
 
 		if err := getClient().Hosts.DeleteHost(ctx, reference); err != nil {
@@ -110,12 +102,14 @@ func init() {
 	rootCmd.AddCommand(hostsCmd)
 
 	hostsCmd.AddCommand(hostsCreateCmd)
-	hostsCreateCmd.Flags().StringArray("ip", nil, "IP address for the host (repeatable)")
+	hostsCreateCmd.Flags().StringArray("ip", nil, "IP address for the host (repeatable, at least one)")
+	_ = hostsCreateCmd.MarkFlagRequired("ip")
 
 	hostsCmd.AddCommand(hostsGetCmd)
 
 	hostsCmd.AddCommand(hostsUpdateCmd)
-	hostsUpdateCmd.Flags().StringArray("ip", nil, "IP address for the host (repeatable)")
+	hostsUpdateCmd.Flags().StringArray("ip", nil, "Full replacement set of IP addresses (repeatable, at least one)")
+	_ = hostsUpdateCmd.MarkFlagRequired("ip")
 
 	hostsCmd.AddCommand(hostsDeleteCmd)
 	hostsDeleteCmd.Flags().BoolP("force", "f", false, "Skip confirmation prompt")

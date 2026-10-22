@@ -133,16 +133,8 @@ var domainsRenewCmd = &cobra.Command{
 			period = 1
 		}
 
-		force, _ := cmd.Flags().GetBool("force")
-		if !force {
-			fmt.Printf("Are you sure you want to renew '%s' for %d year(s)?\n", domainName, period)
-			fmt.Print("Type 'yes' to confirm: ")
-			var confirm string
-			_, _ = fmt.Scanln(&confirm)
-			if confirm != "yes" {
-				fmt.Println("Aborted.")
-				return nil
-			}
+		if err := confirm(cmd, fmt.Sprintf("Are you sure you want to renew '%s' for %d year(s)?", domainName, period)); err != nil {
+			return err
 		}
 
 		result, err := getClient().Domains.RenewDomain(ctx, domainName, &models.DomainRenewRequest{
@@ -253,16 +245,8 @@ var domainsCancelTransferCmd = &cobra.Command{
 
 		domain := args[0]
 
-		force, _ := cmd.Flags().GetBool("force")
-		if !force {
-			fmt.Printf("Are you sure you want to cancel the transfer of '%s'? This deletes the domain object.\n", domain)
-			fmt.Print("Type 'yes' to confirm: ")
-			var confirm string
-			_, _ = fmt.Scanln(&confirm)
-			if confirm != "yes" {
-				fmt.Println("Aborted.")
-				return nil
-			}
+		if err := confirm(cmd, fmt.Sprintf("Are you sure you want to cancel the transfer of '%s'? This deletes the domain object.", domain)); err != nil {
+			return err
 		}
 
 		if err := getClient().Domains.CancelTransfer(ctx, domain); err != nil {

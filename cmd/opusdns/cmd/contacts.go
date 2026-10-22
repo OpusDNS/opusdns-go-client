@@ -176,16 +176,8 @@ var contactsDeleteCmd = &cobra.Command{
 
 		contactID := models.ContactID(args[0])
 
-		force, _ := cmd.Flags().GetBool("force")
-		if !force {
-			fmt.Printf("Are you sure you want to delete contact '%s'? This action cannot be undone.\n", contactID)
-			fmt.Print("Type 'yes' to confirm: ")
-			var confirm string
-			_, _ = fmt.Scanln(&confirm)
-			if confirm != "yes" {
-				fmt.Println("Aborted.")
-				return nil
-			}
+		if err := confirm(cmd, fmt.Sprintf("Are you sure you want to delete contact '%s'? This action cannot be undone.", contactID)); err != nil {
+			return err
 		}
 
 		err := getClient().Contacts.DeleteContact(ctx, contactID)
