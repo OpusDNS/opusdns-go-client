@@ -173,7 +173,20 @@ type DomainSuggestion struct {
 
 	// ConnectedAccount is the organization's own registry account (AMS) the
 	// domain would be registered on, or nil when OpusDNS registers it.
-	ConnectedAccount *DomainConnectedAccount `json:"connected_account,omitempty"`
+	ConnectedAccount *DomainAMSAccount `json:"connected_account,omitempty"`
+}
+
+// DomainAMSAccount is an organization's own registry account (AMS), as a
+// domain suggestion names it (DomainAmsAccountResponse).
+type DomainAMSAccount struct {
+	// Type is the account type ("ams").
+	Type string `json:"type"`
+
+	// Registry is the registry backend (e.g. "verisign", "denic").
+	Registry string `json:"registry"`
+
+	// RegistryAccountID is the organization's registry account.
+	RegistryAccountID TypeID `json:"registry_account_id"`
 }
 
 // DomainSearchSuggestionPriceData represents pricing information for a domain suggestion.

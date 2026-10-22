@@ -207,9 +207,11 @@ const (
 	EmailVerificationCanceled EmailVerificationStatus = "canceled"
 )
 
-// ContactVerification represents a contact verification response.
-// It models both ContactVerificationResponse and ContactVerificationApiResponse;
-// Token is only populated for the API verification type.
+// ContactVerification represents a contact verification response. It models
+// three schemas: ContactVerificationEmailResponse and
+// ContactVerificationApiResponse, which RequestVerification receives, and
+// ContactVerificationResponse, which GetVerificationStatus receives. Only
+// ContactVerificationApiResponse carries a token.
 type ContactVerification struct {
 	// ContactVerificationID is the unique identifier for the verification.
 	ContactVerificationID TypeID `json:"contact_verification_id,omitempty"`
@@ -223,7 +225,8 @@ type ContactVerification struct {
 	// Status is the verification status.
 	Status EmailVerificationStatus `json:"status,omitempty"`
 
-	// Token is the token to verify the email address (API verification only).
+	// Token is the token to verify the email address. Only RequestVerification
+	// with VerificationTypeAPI returns it; it is nil everywhere else.
 	Token *string `json:"token,omitempty"`
 
 	// VerifiedOn is when the verification was verified.
@@ -342,8 +345,9 @@ type ContactAttributeDefinition struct {
 
 	// Description provides a human-readable description.
 	//
-	// Deprecated: The API does not send a description, so it is always empty.
-	Description string `json:"description,omitempty"`
+	// Deprecated: The API does not send a description, so the client no
+	// longer decodes one and it is always empty.
+	Description string `json:"-"`
 }
 
 // ConditionOperator compares an attribute with the value of an

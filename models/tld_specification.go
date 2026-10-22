@@ -303,13 +303,26 @@ type TLDContacts struct {
 	SupportedPostalTypes []string `json:"supported_postal_types,omitempty"`
 
 	// SupportedRoles are the contact roles a registration takes.
-	SupportedRoles []ContactConfig `json:"supported_roles,omitempty"`
+	SupportedRoles []TLDContactRole `json:"supported_roles,omitempty"`
 
 	// TransferSupportedRoles are the contact roles a transfer takes.
-	TransferSupportedRoles []ContactConfig `json:"transfer_supported_roles,omitempty"`
+	TransferSupportedRoles []TLDContactRole `json:"transfer_supported_roles,omitempty"`
 
 	// UpdateSupportedRoles are the contact roles an update can change.
-	UpdateSupportedRoles []ContactConfig `json:"update_supported_roles,omitempty"`
+	UpdateSupportedRoles []TLDContactRole `json:"update_supported_roles,omitempty"`
+}
+
+// TLDContactRole is how many contacts of one role an operation takes
+// (ContactConfigBase). A role with Min > 0 is required.
+type TLDContactRole struct {
+	// Type is the contact role.
+	Type DomainContactType `json:"type"`
+
+	// Min is the minimum number of contacts of this role.
+	Min int `json:"min"`
+
+	// Max is the maximum number of contacts of this role.
+	Max int `json:"max"`
 }
 
 // TLDRegistrantChangePolicy describes the rules of a registrant change.
@@ -509,7 +522,17 @@ type TLDVerificationPolicy struct {
 
 	// RequiredClaims are the claims an identity verification must prove
 	// (identity policy only).
-	RequiredClaims []string `json:"required_claims,omitempty"`
+	RequiredClaims []TLDRequiredClaim `json:"required_claims,omitempty"`
+}
+
+// TLDRequiredClaim is a claim an identity verification must prove, and the
+// proofs accepted for it (RequiredClaim).
+type TLDRequiredClaim struct {
+	// Claim is what must be proven (e.g. NAME, ADDRESS).
+	Claim ContactVerificationClaim `json:"claim"`
+
+	// AcceptedProofs are the proofs that count. Empty means any proof.
+	AcceptedProofs []ContactVerificationProof `json:"accepted_proofs,omitempty"`
 }
 
 // TLDVerificationCommunication describes the reminders a verification sends.

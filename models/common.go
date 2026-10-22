@@ -1,7 +1,10 @@
 // Package models contains all the data types for the OpusDNS API.
 package models
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 // SortOrder represents the sort direction.
 type SortOrder string
@@ -69,15 +72,30 @@ type Pagination struct {
 	// HasPreviousPage indicates whether there are previous pages available.
 	HasPreviousPage bool `json:"has_previous_page"`
 
-	// TotalCount is the total number of items across all pages.
+	// TotalCount is the total number of items across all pages. The API has
+	// no total_count; decoding copies TotalItems into it.
+	//
 	// Deprecated: Use TotalItems instead.
-	TotalCount int `json:"total_count,omitempty"`
+	TotalCount int `json:"-"`
 
 	// TotalItems is the total number of items across all pages.
 	TotalItems int `json:"total_items,omitempty"`
 
 	// PageSize is the number of items per page.
 	PageSize int `json:"page_size,omitempty"`
+}
+
+// UnmarshalJSON decodes PaginationMetadata and fills the deprecated
+// TotalCount from total_items. Pagination must stay a named field, never an
+// embedded one: an embedded Pagination would lend this method to the
+// enclosing struct and decode only the pagination part of it.
+func (p *Pagination) UnmarshalJSON(data []byte) error {
+	type plain Pagination
+	if err := json.Unmarshal(data, (*plain)(p)); err != nil {
+		return err
+	}
+	p.TotalCount = p.TotalItems //nolint:staticcheck // keeps the deprecated alias populated
+	return nil
 }
 
 // ListOptions contains common options for listing resources.

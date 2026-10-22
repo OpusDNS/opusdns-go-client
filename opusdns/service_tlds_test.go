@@ -141,11 +141,18 @@ const tldSpecificationBody = `{
 	                  "removal_process": null, "requires_manual_request": true},
 	"reserved_domains": {"supported": false, "source": null, "url": null},
 	"verification_policies": {
-		"email": {"enabled": true, "contact_roles": ["registrant"], "trigger": ["create"],
+		"email_verification": {"enabled": true, "contact_roles": ["registrant"], "trigger": ["create"],
 		          "suspension_on_failure": true, "suspension_delay": "P15D",
 		          "validity_period": {"value": 1, "unit": "y"},
 		          "verification_method": "link",
-		          "communication": {"type": "email", "timedelta": ["P1D", "P7D"]}}
+		          "communication": {"type": "email", "timedelta": ["P1D", "P7D"]}},
+		"identity_verification": {"enabled": true, "contact_roles": ["registrant"], "trigger": ["create"],
+		          "suspension_on_failure": false, "suspension_delay": "P30D",
+		          "validity_period": null,
+		          "required_claims": [
+		              {"claim": "NAME", "accepted_proofs": ["IDCARD", "PASSPORT"]},
+		              {"claim": "ADDRESS", "accepted_proofs": null}
+		          ]}
 	},
 	"whois": {"whois_server": "whois.denic.de"}
 }`
@@ -199,8 +206,8 @@ func TestTLDsService_GetTLD(t *testing.T) {
 	require.Len(t, attribute.Conditions, 1)
 	assert.Equal(t, models.ConditionOperatorIn, attribute.Conditions[0].Operator)
 	assert.Equal(t, []interface{}{"ORG"}, attribute.Conditions[0].Value)
-	require.Len(t, spec.Contacts.SupportedRoles, 1)
-	assert.Equal(t, 1, spec.Contacts.SupportedRoles[0].Min)
+	assert.Equal(t, []models.TLDContactRole{{Type: models.DomainContactTypeRegistrant, Min: 1, Max: 1}},
+		spec.Contacts.SupportedRoles)
 
 	require.NotNil(t, spec.LaunchPhases)
 	require.NotNil(t, spec.LaunchPhases.GeneralAvailability.StartDate)
@@ -218,12 +225,24 @@ func TestTLDsService_GetTLD(t *testing.T) {
 	require.NotNil(t, spec.Whois)
 	assert.Equal(t, "whois.denic.de", *spec.Whois.WhoisServer)
 
-	policy, ok := spec.VerificationPolicies["email"]
+	policy, ok := spec.VerificationPolicies["email_verification"]
 	require.True(t, ok)
 	assert.True(t, policy.Enabled)
 	assert.Equal(t, "P15D", policy.SuspensionDelay)
 	require.NotNil(t, policy.Communication)
 	assert.Equal(t, []string{"P1D", "P7D"}, policy.Communication.Timedelta)
+
+	// required_claims is an array of RequiredClaim objects, not of strings.
+	identity, ok := spec.VerificationPolicies["identity_verification"]
+	require.True(t, ok)
+	assert.Nil(t, identity.ValidityPeriod)
+	assert.Equal(t, []models.TLDRequiredClaim{
+		{
+			Claim:          models.ContactVerificationClaimName,
+			AcceptedProofs: []models.ContactVerificationProof{models.ContactVerificationProofIDCard, models.ContactVerificationProofPassport},
+		},
+		{Claim: models.ContactVerificationClaimAddress},
+	}, identity.RequiredClaims)
 }
 
 func TestTLDsService_GetPortfolio(t *testing.T) {
@@ -365,8 +384,15 @@ func TestAvailabilityService_GetSuggestions(t *testing.T) {
 				"renewal_price": null,
 				"marketplace": {"name": "fruits"},
 				"connected_account": null
+			}, {
+				"domain": "example.net", "available": true, "premium": false,
+				"price": {"amount": null, "currency": "USD", "period": {"value": 1, "unit": "y"}},
+				"renewal_price": null,
+				"marketplace": {"name": "fruits"},
+				"connected_account": {"type": "ams", "registry": "verisign",
+				                      "registry_account_id": "registry_account_01h45ytscbebyvny4gc8cr8ma2"}
 			}],
-			"meta": {"total": 1, "processing_time_ms": 30}
+			"meta": {"total": 2, "processing_time_ms": 30}
 		}`))
 	}))
 	defer server.Close()
@@ -380,7 +406,7 @@ func TestAvailabilityService_GetSuggestions(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	require.Len(t, result.Suggestions, 1)
+	require.Len(t, result.Suggestions, 2)
 	suggestion := result.Suggestions[0]
 	assert.Equal(t, "example.com", suggestion.Domain)
 	assert.True(t, suggestion.Available)
@@ -389,7 +415,15 @@ func TestAvailabilityService_GetSuggestions(t *testing.T) {
 	assert.Equal(t, models.DomainPeriod{Value: 1, Unit: models.PeriodUnitYear}, suggestion.Price.Period)
 	require.NotNil(t, suggestion.Marketplace)
 	assert.Equal(t, "fruits", suggestion.Marketplace.Name)
-	assert.Equal(t, 1, result.Meta.Total)
+	assert.Nil(t, suggestion.ConnectedAccount)
+
+	// connected_account is a DomainAmsAccountResponse.
+	assert.Equal(t, &models.DomainAMSAccount{
+		Type:              "ams",
+		Registry:          "verisign",
+		RegistryAccountID: "registry_account_01h45ytscbebyvny4gc8cr8ma2",
+	}, result.Suggestions[1].ConnectedAccount)
+	assert.Equal(t, 2, result.Meta.Total)
 }
 
 func TestTLDsService_GetTLDWithOptions(t *testing.T) {
