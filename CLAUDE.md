@@ -32,10 +32,13 @@ The module targets **Go 1.21+**. CI runs the test and build matrices on Go 1.21,
 The API contract is vendored under `spec/`: the published OpenAPI document, the
 revision it came from, and `spec/coverage.yaml`, which records for every operation
 whether the client implements it, has deferred it, or excludes it on purpose.
-`TestSpecCoverage` and `TestSpecModels` (in `opusdns/spec_coverage_test.go`) run
-with the normal test suite and fail when the client and the spec disagree — an
-untriaged new endpoint, a route the API no longer serves, or a struct field it no
-longer sends. Noticing that the vendored spec is itself behind what `api-spec`
+`TestSpecCoverage`, `TestSpecModels` and `TestSpecOperations` (in
+`opusdns/spec_coverage_test.go`) run with the normal test suite and fail when the
+client and the spec disagree — an untriaged new endpoint, a route the API no
+longer serves, a struct field it no longer sends, or a method whose request body,
+query keys or decoded response type does not match its operation. Unit tests that
+mock the API must use spec-shaped JSON, not the client's own structs, or they hide
+exactly this kind of drift. Noticing that the vendored spec is itself behind what `api-spec`
 publishes is manual and needs the network: run `make spec-outdated` before a
 release or before adding a service method.
 
