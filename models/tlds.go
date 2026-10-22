@@ -1,13 +1,10 @@
 // Package models contains all the data types for the OpusDNS API.
 package models
 
-import "time"
-
-// NOTE: The structs in this file (TLD, TLDDetails, TLDPricing, etc.) are a
-// simplified convenience view of the TLD data. The spec's TldSpecificationResponse
-// is significantly larger and more deeply nested than what is modeled here; the
-// fields below cover common cases but do not fully represent every nested
-// TLD-specification sub-object. Extend as needed.
+// NOTE: The TLD struct in this file is a flattened convenience view that
+// ListTLDs builds from the TLD list; only Name, Type and Available are filled
+// in. The full specification of one TLD is TLDSpecification, which GetTLD
+// returns (see tld_specification.go).
 
 // TLDInfo represents the basic TLD name and type information.
 type TLDInfo struct {
@@ -187,16 +184,14 @@ type TLDListResponse struct {
 	TLDConfigurations []TLDConfiguration `json:"tlds"`
 }
 
-// TLDPortfolio represents a collection of TLDs available to an organization.
-type TLDPortfolio struct {
-	// TLDs contains the list of available TLDs.
-	TLDs []TLD `json:"tlds"`
+// TLDPortfolioEntry is one TLD of an organization's portfolio
+// (TldResponseShort).
+type TLDPortfolioEntry struct {
+	// TLD is the TLD name without the leading dot (e.g. "com", "de").
+	TLD string `json:"tld"`
 
-	// Total is the total number of TLDs in the portfolio.
-	Total int `json:"total"`
-
-	// UpdatedOn is when the portfolio was last updated.
-	UpdatedOn *time.Time `json:"updated_on,omitempty"`
+	// Type is the TLD type (gTLD or ccTLD).
+	Type TLDType `json:"type"`
 }
 
 // GetTLDOptions overrides which TLD specification variant the API resolves.
@@ -213,63 +208,53 @@ type GetTLDOptions struct {
 	Version string
 }
 
-// ListTLDsOptions contains options for listing TLDs.
+// ListTLDsOptions contains options for listing TLDs. The endpoint is not
+// paginated and filters only by TLD name.
 type ListTLDsOptions struct {
+	// TLDs limits the list to these TLDs (names without the leading dot).
+	TLDs []string
+
 	// Page is the page number to retrieve (1-indexed).
+	//
+	// Deprecated: The endpoint is not paginated. The API ignored this field,
+	// so the client no longer sends it.
 	Page int
 
 	// PageSize is the number of TLDs per page.
+	//
+	// Deprecated: The endpoint is not paginated. The API ignored this field,
+	// so the client no longer sends it.
 	PageSize int
 
 	// Search is an optional search query to filter TLDs by name.
+	//
+	// Deprecated: The API ignored this filter, so the client no longer sends
+	// it. Use TLDs to select TLDs by name.
 	Search string
 
 	// Type filters by TLD type.
+	//
+	// Deprecated: The API ignored this filter, so the client no longer sends
+	// it. Filter the result on TLD.Type instead.
 	Type TLDType
 
 	// Available filters by availability status.
+	//
+	// Deprecated: The API ignored this filter, so the client no longer sends
+	// it. ListTLDs already leaves out TLDs that are not enabled.
 	Available *bool
 
 	// RegistrationEnabled filters by registration enabled status.
+	//
+	// Deprecated: The API ignored this filter, so the client no longer sends
+	// it.
 	RegistrationEnabled *bool
 
 	// DNSSECSupported filters by DNSSEC support.
+	//
+	// Deprecated: The API ignored this filter, so the client no longer sends
+	// it. Read TLDSpecification.DNSConfiguration from GetTLD instead.
 	DNSSECSupported *bool
-}
-
-// TLDDetails represents detailed information about a TLD.
-type TLDDetails struct {
-	TLD
-
-	// Description provides a description of the TLD.
-	Description *string `json:"description,omitempty"`
-
-	// Registry is the name of the registry operator.
-	Registry *string `json:"registry,omitempty"`
-
-	// LaunchDate is when the TLD was launched.
-	LaunchDate *time.Time `json:"launch_date,omitempty"`
-
-	// WhoisServer is the WHOIS server for the TLD.
-	WhoisServer *string `json:"whois_server,omitempty"`
-
-	// RDAPServer is the RDAP server for the TLD.
-	RDAPServer *string `json:"rdap_server,omitempty"`
-
-	// SupportedIDNScripts is a list of supported IDN scripts.
-	SupportedIDNScripts []string `json:"supported_idn_scripts,omitempty"`
-
-	// ProhibitedCharacters is a list of characters not allowed in domain names.
-	ProhibitedCharacters []string `json:"prohibited_characters,omitempty"`
-
-	// MinDomainLength is the minimum domain name length (SLD).
-	MinDomainLength int `json:"min_domain_length,omitempty"`
-
-	// MaxDomainLength is the maximum domain name length (SLD).
-	MaxDomainLength int `json:"max_domain_length,omitempty"`
-
-	// Phases contains information about launch phases (if applicable).
-	Phases []TLDPhase `json:"phases,omitempty"`
 }
 
 // LaunchPhaseType represents the type of a TLD launch phase.
@@ -285,24 +270,3 @@ const (
 	// LaunchPhaseEAP is the Early Access Program launch phase.
 	LaunchPhaseEAP LaunchPhaseType = "eap"
 )
-
-// TLDPhase represents a launch phase for a TLD.
-type TLDPhase struct {
-	// Name is the phase name (e.g., "sunrise", "landrush", "eap").
-	Name LaunchPhaseType `json:"name"`
-
-	// Status is the phase status (e.g., "active", "completed", "upcoming").
-	Status string `json:"status"`
-
-	// StartDate is when the phase starts.
-	StartDate *time.Time `json:"start_date,omitempty"`
-
-	// EndDate is when the phase ends.
-	EndDate *time.Time `json:"end_date,omitempty"`
-
-	// AllocationMethod is how domains are allocated during this phase.
-	AllocationMethod AllocationMethodType `json:"allocation_method,omitempty"`
-
-	// Requirements describes any special requirements for this phase.
-	Requirements *string `json:"requirements,omitempty"`
-}

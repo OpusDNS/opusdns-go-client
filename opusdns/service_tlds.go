@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/url"
 	"strconv"
+	"strings"
 
 	"github.com/opusdns/opusdns-go-client/models"
 )
@@ -13,35 +14,17 @@ type TLDsService struct {
 	client *Client
 }
 
-// ListTLDs retrieves all available TLDs.
+// ListTLDs retrieves the TLDs available to the organization.
 // The API returns a nested structure where each TLD configuration contains
-// an array of TLD info objects. This method flattens that structure.
+// an array of TLD info objects. This method flattens that structure and
+// leaves out TLDs whose configuration is not enabled. The endpoint is not
+// paginated; opts.TLDs limits the list to the named TLDs.
 func (s *TLDsService) ListTLDs(ctx context.Context, opts *models.ListTLDsOptions) ([]models.TLD, error) {
 	path := s.client.http.BuildPath("tlds", "")
 
 	query := url.Values{}
-	if opts != nil {
-		if opts.Page > 0 {
-			query.Set("page", strconv.Itoa(opts.Page))
-		}
-		if opts.PageSize > 0 {
-			query.Set("page_size", strconv.Itoa(opts.PageSize))
-		}
-		if opts.Search != "" {
-			query.Set("search", opts.Search)
-		}
-		if opts.Type != "" {
-			query.Set("type", string(opts.Type))
-		}
-		if opts.Available != nil {
-			query.Set("available", strconv.FormatBool(*opts.Available))
-		}
-		if opts.RegistrationEnabled != nil {
-			query.Set("registration_enabled", strconv.FormatBool(*opts.RegistrationEnabled))
-		}
-		if opts.DNSSECSupported != nil {
-			query.Set("dnssec_supported", strconv.FormatBool(*opts.DNSSECSupported))
-		}
+	if opts != nil && len(opts.TLDs) > 0 {
+		query.Set("tlds", strings.Join(opts.TLDs, ","))
 	}
 
 	resp, err := s.client.http.Get(ctx, path, query)
@@ -74,15 +57,15 @@ func (s *TLDsService) ListTLDs(ctx context.Context, opts *models.ListTLDsOptions
 	return tlds, nil
 }
 
-// GetTLD retrieves details for a specific TLD, using the specification the
+// GetTLD retrieves the specification of a TLD, using the specification the
 // caller's organization is pinned to.
-func (s *TLDsService) GetTLD(ctx context.Context, tld string) (*models.TLDDetails, error) {
+func (s *TLDsService) GetTLD(ctx context.Context, tld string) (*models.TLDSpecification, error) {
 	return s.GetTLDWithOptions(ctx, tld, nil)
 }
 
-// GetTLDWithOptions retrieves details for a specific TLD, optionally overriding
-// which specification variant is resolved.
-func (s *TLDsService) GetTLDWithOptions(ctx context.Context, tld string, opts *models.GetTLDOptions) (*models.TLDDetails, error) {
+// GetTLDWithOptions retrieves the specification of a TLD, optionally
+// overriding which specification variant is resolved.
+func (s *TLDsService) GetTLDWithOptions(ctx context.Context, tld string, opts *models.GetTLDOptions) (*models.TLDSpecification, error) {
 	path := s.client.http.BuildPath("tlds", url.PathEscape(tld))
 
 	query := url.Values{}
@@ -103,16 +86,16 @@ func (s *TLDsService) GetTLDWithOptions(ctx context.Context, tld string, opts *m
 		return nil, err
 	}
 
-	var details models.TLDDetails
-	if err := s.client.http.DecodeResponse(resp, &details); err != nil {
+	var spec models.TLDSpecification
+	if err := s.client.http.DecodeResponse(resp, &spec); err != nil {
 		return nil, err
 	}
 
-	return &details, nil
+	return &spec, nil
 }
 
-// GetPortfolio retrieves the TLD portfolio for the organization.
-func (s *TLDsService) GetPortfolio(ctx context.Context) (*models.TLDPortfolio, error) {
+// GetPortfolio retrieves the TLDs in the organization's portfolio.
+func (s *TLDsService) GetPortfolio(ctx context.Context) ([]models.TLDPortfolioEntry, error) {
 	path := s.client.http.BuildPath("tlds", "portfolio")
 
 	resp, err := s.client.http.Get(ctx, path, nil)
@@ -120,12 +103,12 @@ func (s *TLDsService) GetPortfolio(ctx context.Context) (*models.TLDPortfolio, e
 		return nil, err
 	}
 
-	var portfolio models.TLDPortfolio
+	var portfolio []models.TLDPortfolioEntry
 	if err := s.client.http.DecodeResponse(resp, &portfolio); err != nil {
 		return nil, err
 	}
 
-	return &portfolio, nil
+	return portfolio, nil
 }
 
 // AvailabilityService provides methods for checking domain availability.
@@ -133,26 +116,49 @@ type AvailabilityService struct {
 	client *Client
 }
 
-// CheckAvailability checks the availability of multiple domains.
+// MaxAvailabilityDomains is the number of domains the API checks in one
+// availability request. CheckAvailability splits longer lists.
+const MaxAvailabilityDomains = 50
+
+// CheckAvailability checks the availability of multiple domains. Lists longer
+// than MaxAvailabilityDomains are checked in several requests, one after the
+// other; the results keep the order of domains, and Meta adds up the totals
+// and processing times of all requests.
 func (s *AvailabilityService) CheckAvailability(ctx context.Context, domains []string) (*models.AvailabilityResponse, error) {
+	if len(domains) == 0 {
+		return nil, &ValidationError{Field: "domains", Message: "at least one domain is required"}
+	}
+
 	path := s.client.http.BuildPath("availability")
 
-	query := url.Values{}
-	for _, domain := range domains {
-		query.Add("domains", domain)
+	merged := &models.AvailabilityResponse{}
+	for start := 0; start < len(domains); start += MaxAvailabilityDomains {
+		end := start + MaxAvailabilityDomains
+		if end > len(domains) {
+			end = len(domains)
+		}
+
+		query := url.Values{}
+		for _, domain := range domains[start:end] {
+			query.Add("domains", domain)
+		}
+
+		resp, err := s.client.http.Get(ctx, path, query)
+		if err != nil {
+			return nil, err
+		}
+
+		var result models.AvailabilityResponse
+		if err := s.client.http.DecodeResponse(resp, &result); err != nil {
+			return nil, err
+		}
+
+		merged.Results = append(merged.Results, result.Results...)
+		merged.Meta.Total += result.Meta.Total
+		merged.Meta.ProcessingTimeMs += result.Meta.ProcessingTimeMs
 	}
 
-	resp, err := s.client.http.Get(ctx, path, query)
-	if err != nil {
-		return nil, err
-	}
-
-	var result models.AvailabilityResponse
-	if err := s.client.http.DecodeResponse(resp, &result); err != nil {
-		return nil, err
-	}
-
-	return &result, nil
+	return merged, nil
 }
 
 // CheckSingleAvailability is a convenience method for checking a single domain.
