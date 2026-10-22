@@ -8,8 +8,12 @@ package opusdns
 // spec/coverage.yaml as implemented, deferred or excluded, so a newly published
 // endpoint fails the build until somebody makes a decision about it.
 //
-// TestSpecModels answers "do the hand-written response structs still match the
-// schemas they were written against?".
+// TestSpecOperations answers "does every implemented method send and read what
+// its operation describes?": the request body, the query parameters and the
+// response body, compared field by field and kind by kind.
+//
+// TestSpecModels compares the types listed under `models:` in the manifest with
+// the schemas they mirror, and enforces `models.strict`.
 //
 // See SPEC_SYNC.md for the workflow around these tests.
 
@@ -27,7 +31,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/opusdns/opusdns-go-client/models"
 	"gopkg.in/yaml.v3"
 )
 
@@ -47,34 +50,6 @@ const (
 	ignoreDirective = "//speccheck:ignore"
 )
 
-// modelRegistry names the response structs TestSpecModels can check. Go cannot
-// look up a type by name at run time, so every type referenced from the
-// `models.mappings` block of spec/coverage.yaml has to be listed here.
-var modelRegistry = map[string]interface{}{
-	"Contact":                models.Contact{},
-	"ContactAttributeSet":    models.ContactAttributeSet{},
-	"Domain":                 models.Domain{},
-	"DomainForward":          models.DomainForward{},
-	"DomainSummary":          models.DomainSummary{},
-	"EmailForward":           models.EmailForward{},
-	"Event":                  models.Event{},
-	"Host":                   models.Host{},
-	"IPRestriction":          models.IPRestriction{},
-	"Invoice":                models.Invoice{},
-	"JobBatchRetryResponse":  models.JobBatchRetryResponse{},
-	"JobBatchStatusResponse": models.JobBatchStatusResponse{},
-	"JobResponse":            models.JobResponse{},
-	"Organization":           models.Organization{},
-	"Report":                 models.Report{},
-	"Tag":                    models.Tag{},
-	"TokenResponse":          models.TokenResponse{},
-	"User":                   models.User{},
-	"VanityNameserverSet":    models.VanityNameserverSet{},
-	"Whitelabel":             models.Whitelabel{},
-	"Zone":                   models.Zone{},
-	"ZoneSummary":            models.ZoneSummary{},
-}
-
 // ---------------------------------------------------------------------------
 // Vendored specification
 // ---------------------------------------------------------------------------
@@ -85,30 +60,55 @@ type specDoc struct {
 	} `yaml:"info"`
 	Paths      map[string]specPathItem `yaml:"paths"`
 	Components struct {
-		Schemas map[string]specSchema `yaml:"schemas"`
+		Schemas    map[string]*specSchema    `yaml:"schemas"`
+		Parameters map[string]*specParameter `yaml:"parameters"`
 	} `yaml:"components"`
 }
 
 type specPathItem struct {
-	Get    *specOperation `yaml:"get"`
-	Post   *specOperation `yaml:"post"`
-	Put    *specOperation `yaml:"put"`
-	Patch  *specOperation `yaml:"patch"`
-	Delete *specOperation `yaml:"delete"`
+	Parameters []*specParameter `yaml:"parameters"`
+	Get        *specOperation   `yaml:"get"`
+	Post       *specOperation   `yaml:"post"`
+	Put        *specOperation   `yaml:"put"`
+	Patch      *specOperation   `yaml:"patch"`
+	Delete     *specOperation   `yaml:"delete"`
 }
 
 type specOperation struct {
-	OperationID string   `yaml:"operationId"`
-	Tags        []string `yaml:"tags"`
-	Deprecated  bool     `yaml:"deprecated"`
+	OperationID string                  `yaml:"operationId"`
+	Tags        []string                `yaml:"tags"`
+	Deprecated  bool                    `yaml:"deprecated"`
+	Parameters  []*specParameter        `yaml:"parameters"`
+	RequestBody *specRequestBody        `yaml:"requestBody"`
+	Responses   map[string]specResponse `yaml:"responses"`
+
+	// pathParameters are the parameters declared on the path item, which
+	// apply to every operation on it.
+	pathParameters []*specParameter
 }
 
-type specSchema struct {
-	Properties map[string]yaml.Node `yaml:"properties"`
-	AllOf      []struct {
-		Ref string `yaml:"$ref"`
-	} `yaml:"allOf"`
+type specParameter struct {
+	Ref      string      `yaml:"$ref"`
+	Name     string      `yaml:"name"`
+	In       string      `yaml:"in"`
+	Required bool        `yaml:"required"`
+	Schema   *specSchema `yaml:"schema"`
 }
+
+type specRequestBody struct {
+	Required bool                 `yaml:"required"`
+	Content  map[string]specMedia `yaml:"content"`
+}
+
+type specResponse struct {
+	Content map[string]specMedia `yaml:"content"`
+}
+
+type specMedia struct {
+	Schema *specSchema `yaml:"schema"`
+}
+
+const jsonMediaType = "application/json"
 
 func (p specPathItem) byVerb() map[string]*specOperation {
 	all := map[string]*specOperation{
@@ -129,10 +129,60 @@ func (d *specDoc) operations() map[string]specOperation {
 	ops := make(map[string]specOperation, len(d.Paths))
 	for path, item := range d.Paths {
 		for verb, op := range item.byVerb() {
-			ops[verb+" "+path] = *op
+			withPath := *op
+			withPath.pathParameters = item.Parameters
+			ops[verb+" "+path] = withPath
 		}
 	}
 	return ops
+}
+
+// queryParameters returns the operation's query parameters by name, with
+// $ref resolved against components.parameters.
+func (d *specDoc) queryParameters(op specOperation) map[string]*specParameter {
+	out := map[string]*specParameter{}
+	for _, param := range append(append([]*specParameter{}, op.pathParameters...), op.Parameters...) {
+		if param != nil && param.Ref != "" {
+			param = d.Components.Parameters[strings.TrimPrefix(param.Ref, "#/components/parameters/")]
+		}
+		if param != nil && param.In == "query" {
+			out[param.Name] = param
+		}
+	}
+	return out
+}
+
+// requestSchema returns the JSON request body schema, if the operation takes one.
+func (op specOperation) requestSchema() *specSchema {
+	if op.RequestBody == nil {
+		return nil
+	}
+	return op.RequestBody.Content[jsonMediaType].Schema
+}
+
+// responseSchema returns the JSON bodies of the operation's 2xx responses, as a
+// union when there is more than one (renew answers 200 or 202 with different
+// bodies), and the status codes they belong to.
+func (op specOperation) responseSchema() (*specSchema, string) {
+	codes := make([]string, 0, len(op.Responses))
+	for code := range op.Responses {
+		codes = append(codes, code)
+	}
+	sort.Strings(codes)
+	var (
+		schemas []*specSchema
+		with    []string
+	)
+	for _, code := range codes {
+		if !strings.HasPrefix(code, "2") {
+			continue
+		}
+		if media, ok := op.Responses[code].Content[jsonMediaType]; ok && media.Schema != nil {
+			schemas = append(schemas, media.Schema)
+			with = append(with, code)
+		}
+	}
+	return oneSchema(schemas), strings.Join(with, "/")
 }
 
 func loadSpec(t *testing.T) *specDoc {
@@ -192,6 +242,9 @@ type coverageEntry struct {
 type coverageModels struct {
 	// Mappings is Go type name (package models) -> spec schema name.
 	Mappings map[string]string `yaml:"mappings"`
+	// Requests is Go request type name (package models) -> the request
+	// schema it encodes.
+	Requests map[string]string `yaml:"requests"`
 	// Strict lists Go types for which a property present in the spec but
 	// missing from the struct is an error rather than a warning.
 	Strict []string `yaml:"strict"`
@@ -627,6 +680,16 @@ func TestSpecCoverage(t *testing.T) {
 		t.Errorf("ORPHAN    %s builds %q, which is not in the spec (%s)", name, route.route, route.pos)
 	}
 
+	// (e) A method that opted out of the route check is still bound to the
+	// operations it serves through the manifest; only the route comparison is
+	// skipped. Without an entry nothing would check it at all.
+	for _, name := range sortedBoolKeys(ignoredRoutes) {
+		if _, ok := claimed[name]; !ok {
+			t.Errorf("UNCLAIMED %s opts out of the route check with %s, but no implemented coverage.yaml entry names it; "+
+				"add it under `method:` of every operation it serves", name, ignoreDirective)
+		}
+	}
+
 	if len(unmapped) > 0 {
 		writeStubs(t, unmapped, specOps, byRoute)
 	}
@@ -724,122 +787,393 @@ func sortedRouteNames(m map[string]clientRoute) []string {
 // TestSpecModels
 // ---------------------------------------------------------------------------
 
+// TestSpecModels checks the types named under `models.mappings`. Most types are
+// already reached through TestSpecOperations; a mapping pins a type to its
+// schema explicitly, and is what `models.strict` hangs off.
 func TestSpecModels(t *testing.T) {
 	spec := loadSpec(t)
 	coverage := loadCoverage(t)
+	pkgs := loadGoPackages(t)
+	index := &schemaIndex{schemas: spec.Components.Schemas}
+	models := manifestModels(t, coverage, pkgs)
 
-	strict := make(map[string]bool, len(coverage.Models.Strict))
+	decode := newShapeChecker(index, decoding, models, "")
+	encode := newShapeChecker(index, encoding, models, "")
+	for _, section := range []struct {
+		name     string
+		mappings map[string]string
+		checker  *shapeChecker
+	}{
+		{"models.mappings", coverage.Models.Mappings, decode},
+		{"models.requests", coverage.Models.Requests, encode},
+	} {
+		for _, goName := range sortedStrings(section.mappings) {
+			schemaName := section.mappings[goName]
+			goType, ok := pkgs.lookupModel(goName)
+			if !ok {
+				t.Errorf("%s: %s names %q, which is not a type in package models", coveragePath, section.name, goName)
+				continue
+			}
+			if _, ok := spec.Components.Schemas[schemaName]; !ok {
+				t.Errorf("%s: schema %q (mapped from models.%s) is not in the spec", coveragePath, schemaName, goName)
+				continue
+			}
+			section.checker.where = "models." + goName + " ~ " + schemaName
+			section.checker.check(goType, &specSchema{Ref: componentSchemaPrefix + schemaName}, "models."+goName)
+		}
+	}
+	report(t, decode)
+	report(t, encode)
+}
+
+// manifestModels reads models.mappings and models.strict, keyed by qualified
+// Go type name.
+func manifestModels(t *testing.T, coverage *coverageDoc, pkgs *goPackages) modelSchemas {
+	t.Helper()
+	models := modelSchemas{
+		canonical:  make(map[string]string, len(coverage.Models.Mappings)),
+		strict:     make(map[string]bool, len(coverage.Models.Strict)),
+		deprecated: pkgs.deprecated,
+	}
+	for goName, schemaName := range coverage.Models.Mappings {
+		models.canonical["models."+goName] = schemaName
+	}
 	for _, name := range coverage.Models.Strict {
 		if _, ok := coverage.Models.Mappings[name]; !ok {
 			t.Errorf("%s: models.strict lists %q, which has no mapping", coveragePath, name)
 		}
-		strict[name] = true
+		models.strict["models."+name] = true
 	}
+	return models
+}
 
-	for _, goName := range sortedStrings(coverage.Models.Mappings) {
-		schemaName := coverage.Models.Mappings[goName]
-
-		sample, ok := modelRegistry[goName]
-		if !ok {
-			t.Errorf("%s: models.mappings names %q, which is not in modelRegistry (%s)",
-				coveragePath, goName, "opusdns/spec_coverage_test.go")
-			continue
-		}
-		properties, ok := schemaProperties(spec.Components.Schemas, schemaName, 0)
-		if !ok {
-			t.Errorf("%s: schema %q (mapped from models.%s) is not in the spec",
-				coveragePath, schemaName, goName)
-			continue
-		}
-		if len(properties) == 0 {
-			t.Logf("WARN      schema %s has no properties (a union type?); skipping models.%s", schemaName, goName)
-			continue
-		}
-
-		fields := jsonFields(reflect.TypeOf(sample))
-		for _, field := range sortedBoolKeys(fields) {
-			if !properties[field] {
-				t.Errorf("DROPPED   models.%s has json field %q, which %s no longer declares; "+
-					"it now decodes to the zero value", goName, field, schemaName)
-			}
-		}
-		for _, property := range sortedBoolKeys(properties) {
-			if fields[property] {
-				continue
-			}
-			if strict[goName] {
-				t.Errorf("MISSING   %s declares %q, which models.%s does not carry", schemaName, property, goName)
-				continue
-			}
-			t.Logf("WARN      %s declares %q, which models.%s does not carry", schemaName, property, goName)
-		}
+func report(t *testing.T, c *shapeChecker) {
+	t.Helper()
+	for _, message := range c.errors {
+		t.Error(message)
+	}
+	for _, message := range c.warns {
+		t.Log(message)
 	}
 }
 
-// schemaProperties collects a schema's own properties plus those of the schemas
-// it composes with allOf.
-func schemaProperties(schemas map[string]specSchema, name string, depth int) (map[string]bool, bool) {
-	schema, ok := schemas[name]
-	if !ok {
-		return nil, false
-	}
-	properties := make(map[string]bool, len(schema.Properties))
-	for property := range schema.Properties {
-		properties[property] = true
-	}
-	if depth < 2 {
-		for _, composed := range schema.AllOf {
-			ref := strings.TrimPrefix(composed.Ref, "#/components/schemas/")
-			if ref == "" || ref == composed.Ref {
-				continue
+// ---------------------------------------------------------------------------
+// TestSpecOperations
+// ---------------------------------------------------------------------------
+
+// TestSpecOperations checks every method an implemented manifest entry names
+// against its operation: the request body it sends, the query parameters it
+// sets and the type it decodes the response into.
+func TestSpecOperations(t *testing.T) {
+	spec := loadSpec(t)
+	coverage := loadCoverage(t)
+	pkgs := loadGoPackages(t)
+	index := &schemaIndex{schemas: spec.Components.Schemas}
+	models := manifestModels(t, coverage, pkgs)
+	specOps := spec.operations()
+
+	decode := newShapeChecker(index, decoding, models, "")
+	encode := newShapeChecker(index, encoding, models, "")
+	checked := 0
+	for _, key := range sortedKeys(coverage.Operations) {
+		entry := coverage.Operations[key]
+		op, ok := specOps[key]
+		if entry.Status != statusImplemented || !ok {
+			continue // TestSpecCoverage reports stale and malformed entries
+		}
+		for _, ref := range entry.Method {
+			fn := pkgs.methods[ref]
+			if fn == nil {
+				continue // TestSpecCoverage reports methods that do not exist
 			}
-			inherited, ok := schemaProperties(schemas, ref, depth+1)
+			call := pkgs.requestOf(fn)
+			if call == nil {
+				continue // a wrapper; the method that issues the request is checked
+			}
+			checked++
+			where := key + " " + ref
+			checkRequestBody(t, encode, pkgs, op, call, where)
+			checkQuery(t, spec, op, call, where)
+			checkResponse(t, decode, op, call, where)
+		}
+	}
+	report(t, decode)
+	report(t, encode)
+	if checked == 0 {
+		t.Fatalf("no service method issues a request; the request helpers may have been renamed")
+	}
+	t.Logf("checked %d methods against the request and response of their operations", checked)
+}
+
+// methodCall is what one service method sends and reads, taken from its body.
+type methodCall struct {
+	verb      string
+	body      ast.Expr // nil when the request carries no body
+	bodyKnown bool     // false when the body could not be read off the call
+	queryKeys map[string]bool
+	decodes   []types.Type
+}
+
+// requestOf reads the request a service method issues, or returns nil when it
+// issues none itself.
+func (p *goPackages) requestOf(fn *ast.FuncDecl) *methodCall {
+	_, recvVar, ok := serviceReceiver(fn)
+	if !ok {
+		return nil
+	}
+	httpExpr := recvVar + ".client.http"
+
+	call := &methodCall{bodyKnown: true}
+	ast.Inspect(fn.Body, func(n ast.Node) bool {
+		expr, ok := n.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		sel, ok := expr.Fun.(*ast.SelectorExpr)
+		if !ok || types.ExprString(sel.X) != httpExpr {
+			return true
+		}
+		switch sel.Sel.Name {
+		case "Get", "Delete":
+			call.verb = strings.ToUpper(sel.Sel.Name)
+		case "Post", "Put", "Patch":
+			call.verb = strings.ToUpper(sel.Sel.Name)
+			if len(expr.Args) == 3 {
+				call.body = expr.Args[2]
+			}
+		case "Do":
+			call.verb = verbFromRequest(expr.Args)
+			call.body, call.bodyKnown = bodyFromRequest(expr.Args)
+		case "DecodeResponse":
+			if len(expr.Args) == 2 && !isNilLiteral(expr.Args[1]) {
+				if target := p.info.TypeOf(expr.Args[1]); target != nil {
+					call.decodes = append(call.decodes, derefType(target))
+				}
+			}
+		}
+		return true
+	})
+	if call.verb == "" {
+		return nil
+	}
+	call.queryKeys = p.queryKeys(fn)
+	return call
+}
+
+// bodyFromRequest reads Body out of a `&Request{...}` argument.
+func bodyFromRequest(args []ast.Expr) (ast.Expr, bool) {
+	for _, arg := range args {
+		if unary, ok := arg.(*ast.UnaryExpr); ok {
+			arg = unary.X
+		}
+		lit, ok := arg.(*ast.CompositeLit)
+		if !ok {
+			continue
+		}
+		for _, elt := range lit.Elts {
+			kv, ok := elt.(*ast.KeyValueExpr)
 			if !ok {
 				continue
 			}
-			for property := range inherited {
-				properties[property] = true
+			if key, ok := kv.Key.(*ast.Ident); ok && key.Name == "Body" {
+				return kv.Value, true
 			}
 		}
+		return nil, true
 	}
-	return properties, true
+	return nil, false
 }
 
-// jsonFields lists the json field names a struct decodes, following embedded
-// structs.
-func jsonFields(rt reflect.Type) map[string]bool {
-	fields := make(map[string]bool)
+// queryKeys collects the literal keys a method sets on url.Values, in its own
+// body and in the package functions it calls (query builders such as
+// objectLogsQuery), but not inside the HTTP client.
+//
+// A builder shared by two operations may set a key only for one of them,
+// behind a bool parameter (usageQuery's withGranularity). When the method
+// passes the constant false for such a parameter, the branches it guards are
+// skipped.
+func (p *goPackages) queryKeys(fn *ast.FuncDecl) map[string]bool {
+	keys := map[string]bool{}
+	visited := map[*ast.FuncDecl]bool{}
 
-	var walk func(reflect.Type)
-	walk = func(rt reflect.Type) {
-		for rt.Kind() == reflect.Pointer {
-			rt = rt.Elem()
-		}
-		if rt.Kind() != reflect.Struct {
+	var walk func(node ast.Node, falseParams map[types.Object]bool)
+	visit := func(decl *ast.FuncDecl, call *ast.CallExpr) {
+		if visited[decl] {
 			return
 		}
-		for i := 0; i < rt.NumField(); i++ {
-			field := rt.Field(i)
-			tag := field.Tag.Get("json")
-			if tag == "-" {
-				continue
+		visited[decl] = true
+		falseParams := map[types.Object]bool{}
+		if call != nil {
+			i := 0
+			for _, field := range decl.Type.Params.List {
+				for _, name := range field.Names {
+					if i < len(call.Args) && isConstFalse(p.info, call.Args[i]) {
+						falseParams[p.info.Defs[name]] = true
+					}
+					i++
+				}
 			}
-			name := strings.Split(tag, ",")[0]
-			if field.Anonymous && name == "" {
-				walk(field.Type)
-				continue
+		}
+		walk(decl.Body, falseParams)
+	}
+	walk = func(node ast.Node, falseParams map[types.Object]bool) {
+		ast.Inspect(node, func(n ast.Node) bool {
+			switch n := n.(type) {
+			case *ast.IfStmt:
+				if isFalseUnder(p.info, n.Cond, falseParams) {
+					if n.Else != nil {
+						walk(n.Else, falseParams)
+					}
+					return false
+				}
+			case *ast.CallExpr:
+				var ident *ast.Ident
+				switch fun := n.Fun.(type) {
+				case *ast.Ident:
+					ident = fun
+				case *ast.SelectorExpr:
+					ident = fun.Sel
+					if (ident.Name == "Set" || ident.Name == "Add") && len(n.Args) == 2 && isURLValues(p.info.TypeOf(fun.X)) {
+						if lit, ok := n.Args[0].(*ast.BasicLit); ok && lit.Kind == token.STRING {
+							if key, err := strconv.Unquote(lit.Value); err == nil {
+								keys[key] = true
+							}
+						}
+					}
+				}
+				if ident == nil {
+					return true
+				}
+				callee, ok := p.info.Uses[ident].(*types.Func)
+				if !ok || isHTTPClientMethod(callee) {
+					return true
+				}
+				if decl := p.decls[callee]; decl != nil {
+					visit(decl, n)
+				}
 			}
-			if field.PkgPath != "" {
-				continue // unexported
-			}
-			if name == "" {
-				name = field.Name
-			}
-			fields[name] = true
+			return true
+		})
+	}
+	visit(fn, nil)
+	return keys
+}
+
+func isConstFalse(info *types.Info, expr ast.Expr) bool {
+	tv, ok := info.Types[expr]
+	return ok && tv.Value != nil && tv.Value.String() == "false"
+}
+
+// isFalseUnder reports whether cond is false whenever the parameters in
+// falseParams are false.
+func isFalseUnder(info *types.Info, cond ast.Expr, falseParams map[types.Object]bool) bool {
+	switch cond := cond.(type) {
+	case *ast.ParenExpr:
+		return isFalseUnder(info, cond.X, falseParams)
+	case *ast.Ident:
+		return falseParams[info.Uses[cond]] || isConstFalse(info, cond)
+	case *ast.BinaryExpr:
+		return cond.Op == token.LAND && (isFalseUnder(info, cond.X, falseParams) || isFalseUnder(info, cond.Y, falseParams))
+	}
+	return isConstFalse(info, cond)
+}
+
+func isURLValues(t types.Type) bool {
+	return t != nil && types.TypeString(derefType(t), nil) == "net/url.Values"
+}
+
+func isHTTPClientMethod(fn *types.Func) bool {
+	sig, ok := fn.Type().(*types.Signature)
+	if !ok || sig.Recv() == nil {
+		return false
+	}
+	named, ok := derefType(sig.Recv().Type()).(*types.Named)
+	return ok && named.Obj().Name() == "HTTPClient"
+}
+
+func isNilLiteral(expr ast.Expr) bool {
+	ident, ok := expr.(*ast.Ident)
+	return ok && ident.Name == "nil"
+}
+
+func checkRequestBody(t *testing.T, encode *shapeChecker, pkgs *goPackages, op specOperation, call *methodCall, where string) {
+	t.Helper()
+	if !call.bodyKnown {
+		t.Logf("NOTE      %s: request body not read off the call; not checked", where)
+		return
+	}
+	required := op.RequestBody != nil && op.RequestBody.Required
+	if call.body == nil || isNilLiteral(call.body) {
+		if required {
+			t.Errorf("NOBODY    %s: the operation requires a request body, but the method sends none", where)
+		}
+		return
+	}
+	bodyType := pkgs.info.TypeOf(call.body)
+	if bodyType == nil {
+		return
+	}
+	if op.RequestBody == nil {
+		t.Errorf("BODY      %s: sends a request body (%s), but the operation takes none", where, typeName(bodyType))
+		return
+	}
+	schema := op.requestSchema()
+	if schema == nil {
+		return // not a JSON body
+	}
+	encode.where = where + " request"
+	encode.check(bodyType, schema, typeName(derefType(bodyType)))
+}
+
+func checkQuery(t *testing.T, spec *specDoc, op specOperation, call *methodCall, where string) {
+	t.Helper()
+	params := spec.queryParameters(op)
+	for _, key := range sortedBoolKeys(call.queryKeys) {
+		if _, ok := params[key]; !ok {
+			t.Errorf("QUERY     %s: sends query parameter %q, which the operation does not declare, so the API ignores it", where, key)
 		}
 	}
-	walk(rt)
-	return fields
+	names := make([]string, 0, len(params))
+	for name := range params {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		if params[name].Required && !call.queryKeys[name] {
+			t.Errorf("QUERY     %s: the operation requires query parameter %q, which the method never sends", where, name)
+		}
+	}
+}
+
+func checkResponse(t *testing.T, decode *shapeChecker, op specOperation, call *methodCall, where string) {
+	t.Helper()
+	if len(call.decodes) == 0 {
+		return // the method returns no body, or streams it
+	}
+	schema, code := op.responseSchema()
+	if schema == nil {
+		t.Errorf("RESPONSE  %s: decodes into %s, but the operation returns no JSON body", where, typeName(call.decodes[0]))
+		return
+	}
+	if len(call.decodes) == 1 {
+		decode.where = where + " response " + code
+		decode.check(call.decodes[0], schema, typeName(call.decodes[0]))
+		return
+	}
+	// Several targets, e.g. a fallback for another body shape: one of them has
+	// to read the documented response.
+	var failures []string
+	for _, target := range call.decodes {
+		trial := newShapeChecker(decode.index, decoding, decode.models, where+" response "+code)
+		trial.check(target, schema, typeName(target))
+		if len(trial.errors) == 0 {
+			return
+		}
+		failures = append(failures, trial.errors...)
+	}
+	for _, failure := range failures {
+		t.Error(failure)
+	}
 }
 
 func sortedStrings(m map[string]string) []string {

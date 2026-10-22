@@ -773,13 +773,29 @@ operations:
 # Every Go type here must also be listed in modelRegistry in
 # opusdns/spec_coverage_test.go.
 models:
+  # Go type (package models) -> the schema it mirrors. TestSpecOperations
+  # already compares every type a method sends or decodes with its operation;
+  # a mapping names the type's canonical schema. Where a type is shared and
+  # another operation sends a subset of that schema, a field the subset lacks
+  # is a warning, not DROPPED. Mappings are also what models.strict refers to.
   mappings:
+    AvailabilityResponse: common__models__availability__datasource__DomainAvailabilityResponse
+    BillingTransaction: BillingTransactionResponse
+    CommandError: CommandError
     Contact: ContactResponse
     ContactAttributeSet: ContactAttributeSetResponse
+    ContactVerification: ContactVerificationApiResponse
+    CreateJobBatchResponse: CreateJobBatchResponse
+    DNSChanges: DnsChangesResponse
     Domain: DomainResponse
+    DomainAvailability: DomainAvailability
     DomainForward: DomainForward
+    DomainSuggestResponse: DomainSearchResponse
+    DomainSuggestion: DomainSearchSuggestionWithPrice
     DomainSummary: DomainSummaryResponse
+    DuplicateCommand: DuplicateCommand
     EmailForward: EmailForwardResponse
+    EmailForwardLog: EmailForwardLog
     Event: EventResponse
     Host: HostResponse
     IPRestriction: IpRestrictionResponse
@@ -787,15 +803,52 @@ models:
     JobBatchRetryResponse: JobBatchRetryResponse
     JobBatchStatusResponse: JobBatchStatusResponse
     JobResponse: JobResponse
+    ObjectLog: ObjectLog
     Organization: OrganizationWithBillingData
+    OrganizationAttribute: OrganizationAttributeResponse
+    ProductPricing: GetPricesResponse
+    RRSet: DnsRrsetResponse
+    RecordData: DnsRecordResponse
     Report: PublicReportRes
+    RoleDefinition: PublicRoleDefinition
+    TLDPortfolioEntry: TldResponseShort
+    TLDSpecification: TldSpecificationResponse
     Tag: TagResponse
     TokenResponse: OrganizationTokenResponse
     User: UserPublicWithAttributes
+    UserProfile: UserProfile
+    UserWithRole: UserPublicWithRole
     VanityNameserverSet: VanityNameserverSetSummaryDTO
+    VanityNameserverSetDefaultResponse: SetVanityNameserverSetDefaultRes
     Whitelabel: WhitelabelBrandingResponse
     Zone: DnsZoneResponse
     ZoneSummary: DnsZoneSummary
+  # Request types (package models) -> the request schema they encode. Checked
+  # in the encoding direction: a field the schema does not declare, a required
+  # property the struct lacks, a kind that differs, a required bool behind
+  # omitempty, or an optional field whose unset zero value the spec rejects is
+  # an error. TestSpecOperations does the same for every request body it finds;
+  # these entries pin the types whose shape is easy to get wrong.
+  requests:
+    ContactAttributeSetCreateRequest: ContactAttributeSetCreate
+    CustomRoleCreateRequest: CustomRoleCreate
+    DomainCreateRequest: DomainCreate
+    DomainRenewRequest: DomainRenewRequest
+    DomainRestoreRequest: DomainRestoreRequest
+    DomainTransferRequest: DomainTransferIn
+    DomainTransitRequest: DomainTransitRequest
+    DomainUpdateRequest: DomainUpdate
+    DomainWithdrawRequest: DomainWithdrawRequest
+    HostCreateRequest: HostCreate
+    HostUpdateRequest: HostUpdate
+    JobBatchRequest: JobBatchRequest
+    OrganizationAttributeCreate: OrganizationAttributeUpdate
+    OrganizationUpdateRequest: OrganizationUpdate
+    RecordPatch: DnsRrsetWithOneRecordPatch
+    RecordPatchOperation: DnsRecordPatchOp
+    RecordPatchRequest: DnsZoneRecordsPatchOps
+    VanityNameserverSetCreateRequest: VanityNameserverSetCreate
+    ZoneCreateRequest: DnsZoneCreate
   # Types where a property the spec declares but the struct lacks is an error,
   # not a warning. A type belongs here once its fields are complete.
   strict:

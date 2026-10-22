@@ -46,10 +46,11 @@ ref itself. It fails when that spec has no npm release yet. These lookups go
 to the GitHub API, which allows 60 unauthenticated requests an hour; set
 `GITHUB_TOKEN` if you hit the limit.
 
-## The two checks
+## The checks
 
-Both live in `opusdns/spec_coverage_test.go` and run as part of `go test ./...`,
-offline, against the vendored copy.
+They live in `opusdns/spec_coverage_test.go` (with the shape comparison in
+`opusdns/spec_shape_test.go`) and run as part of `go test ./...`, offline,
+against the vendored copy.
 
 **`TestSpecCoverage`** compares three things: the operations in the spec, the
 entries in `spec/coverage.yaml`, and the routes the code actually builds. The
@@ -63,38 +64,78 @@ calls `BuildPath` once and issues one request, which is enough to reconstruct
 | `STALE` | `coverage.yaml` names an operation the API no longer serves. |
 | `MISMATCH` | The Go method builds a different route than the manifest claims. |
 | `ORPHAN` | The client calls a route that is not in the spec at all. |
-| `UNCLAIMED` | The client implements a route no manifest entry points at. |
+| `UNCLAIMED` | The client implements a route no manifest entry points at, or a `//speccheck:ignore` method no implemented entry names. |
 | `MISSING` | A manifest entry names a method that builds no route. |
 
 A method whose path cannot be read off a single `BuildPath` call opts out with a
 `//speccheck:ignore` directive in its doc comment, written with no space after
 the slashes so it stays out of the rendered documentation. It still has to
-appear in the manifest, and the reflect check still applies; only the route
-comparison is skipped. `Domains.RequestAuthCode` is the current example: the TLD
-is a path segment there, so one method serves nine spec paths.
+appear in the manifest (`UNCLAIMED` otherwise), and the reflect check and
+`TestSpecOperations` still apply; only the route comparison is skipped.
+`Domains.RequestAuthCode` is the current example: the TLD is a path segment
+there, so one method serves nine spec paths.
 
-**`TestSpecModels`** compares the `json` tags of the hand-written response
-structs with the properties of the schemas they mirror, for the mappings listed
-under `models:` in the manifest. It is deliberately asymmetric:
+**`TestSpecOperations`** reads every method that an implemented manifest entry
+names, with `go/types`, and compares what it does with its operation:
 
-- A struct field the spec no longer declares is an **error** (`DROPPED`). That
-  field can only ever decode to the zero value now, which is the failure mode
-  that silently produces wrong data.
-- A property the struct does not carry is a **warning**, because the client has
-  never mirrored every field. Move a type into `models.strict` once its fields
-  are complete and the warning becomes an error too.
+- the request body it passes to `Post`/`Put`/`Patch`/`Do`, against the
+  operation's JSON request schema;
+- the query parameters it sets (literal keys of `url.Values.Set`/`Add`, in the
+  method and in the package functions it calls), against the operation's query
+  parameters;
+- the type it hands to `DecodeResponse`, against the JSON body of the
+  operation's 2xx responses (a union when there are several, as for renew).
 
-Every Go type named under `models.mappings` must also appear in `modelRegistry`
-in the test file: Go cannot look a type up by name at run time.
+Types are compared recursively: nested structs, slices, maps and pointers,
+following `$ref`, `allOf`, `anyOf` and `oneOf`. A union is checked as a union:
+a response struct may carry the fields of every alternative; a request struct
+has to match one alternative on its own, including its discriminator.
 
-Not checked: query parameters, headers, request bodies, enum values and status
-codes. Read the OpenAPI changes report on the sync PR for those.
+| Label | Meaning |
+|---|---|
+| `KIND` | The Go type encodes a different kind of JSON value than the schema allows: a number for an object, an object for an array, ... |
+| `DROPPED` | A response field the schema does not declare. It always decodes to the zero value. |
+| `UNKNOWN` | A request field the schema does not declare. The API ignores or rejects it. |
+| `MISSING` | A required request property the struct does not carry, or a property a `models.strict` type lacks. |
+| `OMITTED` | A required bool behind `omitempty`, so `false` is never sent. |
+| `ZERO` | An optional field without `omitempty` whose zero value the schema rejects (`""` for `minLength: 6`), so leaving it unset fails. |
+| `NOBODY` | The operation requires a request body and the method sends none. |
+| `BODY` | The method sends a body the operation does not take. |
+| `QUERY` | The method sends a query parameter the operation does not declare, or never sends a required one. |
+| `RESPONSE` | The method decodes a body the operation does not return. |
+
+**`TestSpecModels`** checks the types listed under `models:` in the manifest:
+
+- `models.mappings` names the schema a response type mirrors. Most types are
+  reached through `TestSpecOperations` anyway; a mapping makes the schema the
+  type's canonical one. A type shared between operations may get only a subset
+  of that schema from some of them (organization lists carry no balance); a
+  field the subset lacks is then a warning, not `DROPPED`.
+- `models.requests` does the same for request types, in the encoding
+  direction.
+- A property a response struct does not carry is a **warning**, because the
+  client has never mirrored every field. Move a type into `models.strict` once
+  its fields are complete and the warning becomes an error, against its
+  canonical schema.
+- A response field documented `Deprecated:` that the spec no longer declares is
+  a warning: that is how a field is retired without breaking callers.
+
+Types are looked up by name in package `models` with `go/types`, so a mapping
+needs no registration in the test file.
+
+`TestShapeCheckerCatchesDrift` keeps the comparison honest: it feeds it small
+reproductions of the bugs these checks were written after.
+
+Not checked: headers, enum values, status codes, path parameter types and query
+keys that are not string literals. Read the OpenAPI changes report on the sync
+PR for those.
 
 ## Two things can drift, and they are caught differently
 
-**The client against the vendored spec.** `TestSpecCoverage` and
-`TestSpecModels` run in the ordinary test suite, so every pull request and every
-push to `main` already catches this. Nothing extra is needed.
+**The client against the vendored spec.** `TestSpecCoverage`,
+`TestSpecOperations` and `TestSpecModels` run in the ordinary test suite, so
+every pull request and every push to `main` already catches this. Nothing extra
+is needed.
 
 **The vendored spec against what is published.** Nothing catches this on its
 own. The vendored copy is a snapshot: it only moves when somebody runs
@@ -138,9 +179,10 @@ copies for a readable summary.
      the method that calls `BuildPath` first under `method:`.
    - `deferred` — in scope, not done yet. Say why in `reason:`.
    - `excluded` — deliberately out of scope. Say why in `reason:`.
-3. Fix every `STALE`, `MISMATCH`, `ORPHAN` and `DROPPED` line. Those are bugs:
-   the client is calling something the API does not serve, or reading a field it
-   no longer sends.
+3. Fix every error line (`STALE`, `MISMATCH`, `ORPHAN`, `DROPPED`, `KIND`,
+   `UNKNOWN`, `QUERY`, ...). Those are bugs: the client is calling something the
+   API does not serve, reading a field it no longer sends, or sending something
+   it does not take.
 4. `make spec-check` until green, then `go test ./...`.
 5. Commit `spec/` together with the code it needed. They belong in one change:
    the vendored spec is the evidence for what the code was written against.
