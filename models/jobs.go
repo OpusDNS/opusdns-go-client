@@ -79,6 +79,44 @@ type CommandError struct {
 
 	// Error is the error message.
 	Error string `json:"error"`
+
+	// InstanceIndex is the index within a bulk command's instances for a
+	// per-instance failure. Nil when the whole command failed.
+	InstanceIndex *int `json:"instance_index,omitempty"`
+
+	// ResourceKey identifies the resource of a per-instance failure (zone
+	// name, domain name or contact email).
+	ResourceKey *string `json:"resource_key,omitempty"`
+
+	// Code is the stable error code for known failure modes (for example
+	// "ERROR_BATCH_EMPTY"). Nil for ad-hoc failures.
+	Code *string `json:"code,omitempty"`
+
+	// Type is the RFC 9457 problem type identifier (for example "batch-empty").
+	Type *string `json:"type,omitempty"`
+}
+
+// DuplicateCommand describes a command that was skipped because its
+// idempotency key matched a previously submitted job.
+type DuplicateCommand struct {
+	// Index is the zero-based index of the duplicate command in the request.
+	Index int `json:"index"`
+
+	// ExistingJobID is the job created earlier for the same idempotency key.
+	ExistingJobID JobID `json:"existing_job_id"`
+
+	// ExistingBatchID is the batch the existing job belongs to. Use it to
+	// check status: the response's BatchID returns 404 when no new jobs were
+	// created.
+	ExistingBatchID *BatchID `json:"existing_batch_id,omitempty"`
+
+	// InstanceIndex is the index within a bulk command's instances for a
+	// per-instance duplicate.
+	InstanceIndex *int `json:"instance_index,omitempty"`
+
+	// ResourceKey identifies the resource of the duplicate (zone name, domain
+	// name or contact email).
+	ResourceKey *string `json:"resource_key,omitempty"`
 }
 
 // CreateJobBatchResponse represents the response when creating a new job batch.
@@ -92,14 +130,23 @@ type CreateJobBatchResponse struct {
 	// JobsFailed is the number of jobs that failed to create.
 	JobsFailed int `json:"jobs_failed"`
 
+	// JobsDuplicated is the number of commands skipped because their
+	// idempotency key matched a previously submitted job. See Duplicates.
+	JobsDuplicated int `json:"jobs_duplicated"`
+
 	// TotalCommands is the total number of commands in the batch.
 	TotalCommands int `json:"total_commands"`
 
-	// StatusURL is the URL to check batch status.
+	// StatusURL is the URL to check batch status. It returns 404 when
+	// JobsCreated is 0; follow Duplicates[].ExistingBatchID instead.
 	StatusURL string `json:"status_url"`
 
 	// Errors contains details of any failed commands.
 	Errors []CommandError `json:"errors,omitempty"`
+
+	// Duplicates lists the commands skipped as duplicates, with pointers to
+	// the existing jobs and batches.
+	Duplicates []DuplicateCommand `json:"duplicates,omitempty"`
 }
 
 // JobBatchStatusResponse represents the detailed status of a job batch.
