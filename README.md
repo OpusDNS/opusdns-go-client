@@ -165,7 +165,7 @@ The client provides access to the following services:
 zones, err := client.DNS.ListZones(ctx, nil)
 
 // List with filtering and sorting
-zones, err := client.DNS.ListZones(ctx, &models.ListZonesOptions{
+zones, err = client.DNS.ListZones(ctx, &models.ListZonesOptions{
     Search:       "example",
     DNSSECStatus: models.DNSSECStatusEnabled,
     SortBy:       models.ZoneSortByCreatedOn,
@@ -182,8 +182,11 @@ fmt.Printf("Page %d of %d\n", resp.Pagination.CurrentPage, resp.Pagination.Total
 
 ### Create a Zone
 
+`CreateZone` returns the changeset the API applied (the zone itself, its SOA and NS
+records, and any records you passed). Call `GetZone` to read the zone.
+
 ```go
-zone, err := client.DNS.CreateZone(ctx, &models.ZoneCreateRequest{
+changes, err := client.DNS.CreateZone(ctx, &models.ZoneCreateRequest{
     Name: "example.com",
     RRSets: []models.RRSetCreate{
         {
@@ -200,6 +203,9 @@ zone, err := client.DNS.CreateZone(ctx, &models.ZoneCreateRequest{
         },
     },
 })
+fmt.Printf("Created %s with %d changes\n", changes.ZoneName, changes.NumChanges)
+
+zone, err := client.DNS.GetZone(ctx, "example.com")
 ```
 
 ### Manage Records
@@ -214,7 +220,7 @@ err := client.DNS.UpsertRecord(ctx, "example.com", models.Record{
 })
 
 // Delete a record
-err := client.DNS.DeleteRecord(ctx, "example.com", models.Record{
+err = client.DNS.DeleteRecord(ctx, "example.com", models.Record{
     Name:  "www",
     Type:  models.RRSetTypeA,
     TTL:   3600,
@@ -222,7 +228,7 @@ err := client.DNS.DeleteRecord(ctx, "example.com", models.Record{
 })
 
 // Batch operations (atomic)
-err := client.DNS.PatchRecords(ctx, "example.com", []models.RecordOperation{
+err = client.DNS.PatchRecords(ctx, "example.com", []models.RecordOperation{
     {
         Op: models.RecordOpUpsert,
         Record: models.Record{
@@ -274,8 +280,14 @@ err = client.DNS.PatchRRSets(ctx, "example.com", []models.RRSetPatchOp{
 changes, err := client.DNS.EnableDNSSEC(ctx, "example.com")
 fmt.Printf("DNSSEC enabled with %d changes\n", changes.NumChanges)
 
+// The zone is signed now, but the DS record may not be at the registry yet.
+// Until it is, validating resolvers treat the zone as unsigned.
+if p := changes.DNSSECRegistryPublish; p != nil && *p == models.DnssecRegistryPublishDeferred {
+    fmt.Println("The registry has not accepted the DS record yet; it is being retried")
+}
+
 // Disable DNSSEC
-changes, err := client.DNS.DisableDNSSEC(ctx, "example.com")
+changes, err = client.DNS.DisableDNSSEC(ctx, "example.com")
 ```
 
 ## Domain Registration
@@ -467,52 +479,49 @@ err = client.Domains.DisableDNSSEC(ctx, "example.com")
 ## Email Forwarding
 
 ```go
-// Create email forwarding for a domain
+// Create email forwarding for a domain (it is created disabled unless Enabled is set)
 emailFwd, err := client.EmailForwards.CreateEmailForward(ctx, &models.EmailForwardCreateRequest{
     Hostname: "example.com",
+    Enabled:  models.BoolPtr(true),
     Aliases: []models.EmailForwardAliasCreate{
         {
-            LocalPart:    "info",
-            Destinations: []string{"john@gmail.com"},
+            Alias:     "info",
+            ForwardTo: []string{"john@gmail.com"},
         },
         {
-            LocalPart:    "*", // Catch-all
-            Destinations: []string{"catchall@company.com"},
+            Alias:     "*", // Catch-all
+            ForwardTo: []string{"catchall@company.com"},
         },
     },
 })
 
 // Add another alias
 alias, err := client.EmailForwards.CreateAlias(ctx, emailFwd.EmailForwardID, &models.EmailForwardAliasCreate{
-    LocalPart:    "support",
-    Destinations: []string{"support@company.com", "backup@company.com"},
+    Alias:     "support",
+    ForwardTo: []string{"support@company.com", "backup@company.com"},
 })
 ```
 
 ## Domain Forwarding (URL Redirects)
 
 ```go
+// Redirect http:// and https:// requests for old-domain.com to new-domain.com
+redirect := models.HttpRedirectRequest{
+    RequestPath:    "/",
+    TargetProtocol: models.HttpProtocolHTTPS,
+    TargetHostname: "new-domain.com",
+    TargetPath:     "/",
+    RedirectCode:   models.RedirectCodePermanent, // 301
+}
 forward, err := client.DomainForwards.CreateDomainForward(ctx, &models.DomainForwardCreateRequest{
     Hostname: "old-domain.com",
-    Configs: []models.DomainForwardConfigCreate{
-        {
-            Protocol:       models.DomainForwardProtocolHTTP,
-            DestinationURL: "https://new-domain.com",
-            ForwardType:    models.DomainForwardTypePermanent, // 301 redirect
-            IncludePath:    true,
-            IncludeQuery:   true,
-        },
-        {
-            Protocol:       models.DomainForwardProtocolHTTPS,
-            DestinationURL: "https://new-domain.com",
-            ForwardType:    models.DomainForwardTypePermanent,
-            IncludePath:    true,
-            IncludeQuery:   true,
-        },
-    },
+    Enabled:  true,
+    HTTP:     &models.DomainForwardProtocolSetRequest{Redirects: []models.HttpRedirectRequest{redirect}},
+    HTTPS:    &models.DomainForwardProtocolSetRequest{Redirects: []models.HttpRedirectRequest{redirect}},
 })
 
 // Traffic metrics, overall and broken down
+opts := &models.DomainForwardMetricsOptions{Hostname: "old-domain.com", TimeRange: models.TimeRange7D}
 metrics, err := client.DomainForwards.GetMetrics(ctx, opts)
 geo, err := client.DomainForwards.GetGeoStats(ctx, opts)
 series, err := client.DomainForwards.GetTimeSeries(ctx, opts)
