@@ -1,9 +1,10 @@
 package opusdns
 
 import (
+	"bytes"
 	"context"
-	"fmt"
 	"io"
+	"net/http"
 	"net/url"
 	"strconv"
 	"time"
@@ -124,35 +125,35 @@ func (s *ReportsService) GetReport(ctx context.Context, reportID models.ReportID
 // DownloadReport downloads a completed report as a ZIP file.
 // Returns the raw bytes of the ZIP file. The report must be in COMPLETED status.
 // Returns ErrConflict (409) if the report is not ready for download.
+// For a large report, DownloadReportToWriter avoids holding it in memory.
 func (s *ReportsService) DownloadReport(ctx context.Context, reportID models.ReportID) ([]byte, error) {
-	path := s.client.http.BuildPath("reports", string(reportID), "download")
-
-	resp, err := s.client.http.Get(ctx, path, nil)
-	if err != nil {
+	var buf bytes.Buffer
+	if err := s.DownloadReportToWriter(ctx, reportID, &buf); err != nil {
 		return nil, err
 	}
-
-	if resp.StatusCode >= 400 {
-		if decErr := s.client.http.DecodeResponse(resp, nil); decErr != nil {
-			return nil, decErr
-		}
-		return nil, fmt.Errorf("opusdns: report download failed with status %d", resp.StatusCode)
-	}
-
-	return resp.Body, nil
+	return buf.Bytes(), nil
 }
 
-// DownloadReportToWriter downloads a completed report and writes it to the given writer.
-// This is useful for streaming the report directly to a file.
+// DownloadReportToWriter downloads a completed report and streams it to the
+// given writer, e.g. a file, without holding the whole report in memory.
+//
+// With the default HTTP client, the configured HTTP timeout bounds only the
+// wait for the download to start; the transfer itself runs until it completes
+// or ctx ends. If it fails midway, w has already received part of the report.
 func (s *ReportsService) DownloadReportToWriter(ctx context.Context, reportID models.ReportID, w io.Writer) error {
-	data, err := s.DownloadReport(ctx, reportID)
+	path := s.client.http.BuildPath("reports", url.PathEscape(string(reportID)), "download")
+
+	resp, err := s.client.http.Do(ctx, &Request{
+		Method: http.MethodGet,
+		Path:   path,
+		Output: w,
+	})
 	if err != nil {
 		return err
 	}
 
-	_, err = w.Write(data)
-	if err != nil {
-		return fmt.Errorf("opusdns: failed to write report data: %w", err)
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		return responseError(resp)
 	}
 
 	return nil

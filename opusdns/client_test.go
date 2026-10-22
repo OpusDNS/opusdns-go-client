@@ -125,7 +125,7 @@ func TestRetryPolicy(t *testing.T) {
 		}{
 			{http.MethodGet, 4},
 			{http.MethodPut, 4},
-			{http.MethodDelete, 4},
+			{http.MethodDelete, 1},
 			{http.MethodPost, 1},
 			{http.MethodPatch, 1},
 		} {
@@ -181,7 +181,9 @@ func TestRetryPolicy(t *testing.T) {
 		}{
 			{"GET after the request was sent", http.MethodGet, "read", 4},
 			{"POST after the request was sent", http.MethodPost, "read", 1},
+			{"DELETE after the request was sent", http.MethodDelete, "read", 1},
 			{"POST before the connection opened", http.MethodPost, "dial", 4},
+			{"DELETE before the connection opened", http.MethodDelete, "dial", 4},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
 				attempts := 0

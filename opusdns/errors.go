@@ -1,11 +1,14 @@
-// Package client provides a Go client library for the OpusDNS API.
 package opusdns
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
+	"strings"
+	"time"
 )
 
 // Standard sentinel errors for common error conditions.
@@ -19,7 +22,9 @@ var (
 	// ErrForbidden is returned when access to a resource is forbidden.
 	ErrForbidden = errors.New("opusdns: forbidden - insufficient permissions")
 
-	// ErrRateLimited is returned when rate limited (after retries exhausted).
+	// ErrRateLimited is matched by an HTTP 429 the client did not retry: retries
+	// ran out, the API asked to wait longer than RetryWaitMax (see
+	// APIError.RetryAfter), or the context ended while waiting to retry.
 	ErrRateLimited = errors.New("opusdns: rate limited - too many requests")
 
 	// ErrBadRequest is returned when the request is malformed.
@@ -28,13 +33,20 @@ var (
 	// ErrConflict is returned when there is a resource conflict.
 	ErrConflict = errors.New("opusdns: conflict - resource already exists or state conflict")
 
-	// ErrTimeout is returned when a request times out.
+	// ErrTimeout is matched by a request that ran out of time: its context's
+	// deadline passed, or the HTTP client's timeout fired. For the former,
+	// errors.Is(err, context.DeadlineExceeded) holds as well.
 	ErrTimeout = errors.New("opusdns: request timeout")
 
 	// ErrZoneNotFound is returned when a zone cannot be found for a given FQDN.
+	//
+	// Deprecated: no method returns it. A zone that does not exist is reported
+	// as ErrNotFound.
 	ErrZoneNotFound = errors.New("opusdns: no matching zone found for FQDN")
 
-	// ErrInvalidInput is returned when input validation fails.
+	// ErrInvalidInput is matched by input the client or the API rejected: a
+	// ValidationError or ConfigError from the client, or an HTTP 422 from the
+	// API, whose APIError.Errors says which fields failed.
 	ErrInvalidInput = errors.New("opusdns: invalid input")
 
 	// ErrServerError is returned when the server returns an internal error.
@@ -46,17 +58,33 @@ type APIError struct {
 	// StatusCode is the HTTP status code.
 	StatusCode int `json:"status_code"`
 
-	// ErrorCode is the API-specific error code (e.g., "zone_not_found").
+	// ErrorCode is the API-specific error code (e.g., "ERROR_USER_EXISTS"),
+	// from the problem's "code" field.
 	ErrorCode string `json:"error_code,omitempty"`
 
-	// Message is the human-readable error message.
+	// Message is the human-readable error message: the problem's detail, or,
+	// for a validation error, the fields that failed.
 	Message string `json:"message,omitempty"`
+
+	// Title is the problem's short summary (e.g., "Authentication Error").
+	Title string `json:"title,omitempty"`
+
+	// Type identifies the kind of problem (e.g., "request-validation-failed").
+	Type string `json:"type,omitempty"`
+
+	// Errors lists the fields that failed validation (HTTP 422).
+	Errors []FieldError `json:"errors,omitempty"`
 
 	// Details contains additional error details from the API.
 	Details map[string]interface{} `json:"details,omitempty"`
 
-	// RequestID is the unique identifier for the request (from X-Request-ID header).
+	// RequestID identifies the request to OpusDNS support, from the
+	// X-Server-Request-ID header.
 	RequestID string `json:"request_id,omitempty"`
+
+	// RetryAfter is how long the API asked the caller to wait before trying
+	// again, from the Retry-After header. Zero when the response had none.
+	RetryAfter time.Duration `json:"retry_after,omitempty"`
 
 	// RawBody contains the raw response body (not serialized to JSON).
 	RawBody string `json:"-"`
@@ -98,6 +126,8 @@ func (e *APIError) Is(target error) bool {
 		return e.StatusCode == http.StatusBadRequest
 	case ErrConflict:
 		return e.StatusCode == http.StatusConflict
+	case ErrInvalidInput:
+		return e.StatusCode == http.StatusUnprocessableEntity
 	case ErrServerError:
 		return e.StatusCode >= 500
 	}
@@ -119,6 +149,8 @@ func (e *APIError) Unwrap() error {
 		return ErrBadRequest
 	case http.StatusConflict:
 		return ErrConflict
+	case http.StatusUnprocessableEntity:
+		return ErrInvalidInput
 	default:
 		if e.StatusCode >= 500 {
 			return ErrServerError
@@ -145,51 +177,93 @@ func (e *APIError) IsServerError() bool {
 	return e.StatusCode >= 500
 }
 
+// FieldError is one field that failed validation (HTTP 422).
+type FieldError struct {
+	// Loc locates the field, e.g. ["body", "postal_code"].
+	Loc []interface{} `json:"loc"`
+
+	// Msg says what is wrong with it.
+	Msg string `json:"msg"`
+
+	// Type classifies the failure (e.g., "missing", "invalid_postal_code").
+	Type string `json:"type"`
+}
+
+// Field returns Loc joined with dots, e.g. "body.postal_code".
+func (e FieldError) Field() string {
+	parts := make([]string, len(e.Loc))
+	for i, part := range e.Loc {
+		parts[i] = fmt.Sprint(part)
+	}
+	return strings.Join(parts, ".")
+}
+
 // NewAPIError creates an APIError from an HTTP response and body.
+//
+// The API answers with an RFC 9457 problem: "code", "title", "detail" and
+// "type", plus "errors" for a validation error. Each field is read on its own,
+// so one of an unexpected type does not lose the others.
 func NewAPIError(resp *http.Response, body []byte) *APIError {
 	apiErr := &APIError{
 		StatusCode: resp.StatusCode,
 		RawBody:    string(body),
+		RequestID:  firstNonEmpty(resp.Header.Get("X-Server-Request-ID"), resp.Header.Get("X-Request-ID")),
+	}
+	apiErr.RetryAfter, _ = parseRetryAfter(resp.Header.Get("Retry-After"))
+
+	var fields map[string]json.RawMessage
+	if len(body) == 0 || json.Unmarshal(body, &fields) != nil {
+		return apiErr
+	}
+	str := func(key string) string {
+		var s string
+		_ = json.Unmarshal(fields[key], &s)
+		return s
 	}
 
-	// Try to get request ID from headers
-	if reqID := resp.Header.Get("X-Request-ID"); reqID != "" {
-		apiErr.RequestID = reqID
-	}
-	if reqID := resp.Header.Get("X-Request-Id"); reqID != "" && apiErr.RequestID == "" {
-		apiErr.RequestID = reqID
-	}
-
-	// Try to parse error details from body
-	if len(body) > 0 {
-		var parsed struct {
-			ErrorCode string                 `json:"error_code"`
-			Message   string                 `json:"message"`
-			Error     string                 `json:"error"`
-			Detail    string                 `json:"detail"`
-			Details   map[string]interface{} `json:"details"`
-		}
-		if err := json.Unmarshal(body, &parsed); err == nil {
-			apiErr.ErrorCode = parsed.ErrorCode
-			apiErr.Details = parsed.Details
-
-			// Try different message fields
-			if parsed.Message != "" {
-				apiErr.Message = parsed.Message
-			} else if parsed.Error != "" {
-				apiErr.Message = parsed.Error
-			} else if parsed.Detail != "" {
-				apiErr.Message = parsed.Detail
-			}
+	apiErr.ErrorCode = firstNonEmpty(str("code"), str("error_code"))
+	apiErr.Title = str("title")
+	apiErr.Type = str("type")
+	_ = json.Unmarshal(fields["details"], &apiErr.Details)
+	if json.Unmarshal(fields["errors"], &apiErr.Errors) != nil || len(apiErr.Errors) == 0 {
+		// FastAPI's own validation error lists the fields under "detail".
+		apiErr.Errors = nil
+		if json.Unmarshal(fields["detail"], &apiErr.Errors) != nil {
+			apiErr.Errors = nil
 		}
 	}
+	apiErr.Message = firstNonEmpty(str("message"), str("detail"), str("error"), describeFieldErrors(apiErr.Errors), apiErr.Title)
 
 	return apiErr
 }
 
+// describeFieldErrors joins failed fields into one message, e.g.
+// "body.postal_code: '93053' is not a valid postal code for country 'NL'".
+func describeFieldErrors(fieldErrors []FieldError) string {
+	descriptions := make([]string, 0, len(fieldErrors))
+	for _, fieldErr := range fieldErrors {
+		if field := fieldErr.Field(); field != "" {
+			descriptions = append(descriptions, field+": "+fieldErr.Msg)
+		} else {
+			descriptions = append(descriptions, fieldErr.Msg)
+		}
+	}
+	return strings.Join(descriptions, "; ")
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
 // RequestError represents an error that occurred while making a request.
 type RequestError struct {
-	// Op is the operation that was attempted (e.g., "marshal", "create", "execute", "read").
+	// Op is the operation that was attempted: "marshal", "create", "execute",
+	// "read", or "stream" (copying a body to Request.Output).
 	Op string
 
 	// URL is the URL that was requested.
@@ -207,6 +281,21 @@ func (e *RequestError) Error() string {
 // Unwrap returns the underlying error.
 func (e *RequestError) Unwrap() error {
 	return e.Err
+}
+
+// Is reports a request that timed out as ErrTimeout.
+func (e *RequestError) Is(target error) bool {
+	return target == ErrTimeout && isTimeout(e.Err)
+}
+
+// isTimeout reports whether err is a context deadline or a network timeout,
+// such as the HTTP client's.
+func isTimeout(err error) bool {
+	if errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+	var netErr net.Error
+	return errors.As(err, &netErr) && netErr.Timeout()
 }
 
 // ValidationError represents a validation error for input data.

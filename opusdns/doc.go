@@ -1,4 +1,4 @@
-// Package client provides a Go client library for the OpusDNS API.
+// Package opusdns provides a Go client library for the OpusDNS API.
 //
 // OpusDNS is a DNS and domain management platform. This client library provides
 // a convenient way to interact with the OpusDNS API from Go applications.
@@ -11,8 +11,8 @@
 //
 // Create a client using your API key:
 //
-//	client, err := client.NewClient(
-//	    client.WithAPIKey("opk_your_api_key_here"),
+//	c, err := opusdns.NewClient(
+//	    opusdns.WithAPIKey("opk_your_api_key_here"),
 //	)
 //	if err != nil {
 //	    log.Fatal(err)
@@ -20,7 +20,7 @@
 //
 //	// List all DNS zones
 //	ctx := context.Background()
-//	zones, err := client.DNS.ListZones(ctx, nil)
+//	zones, err := c.DNS.ListZones(ctx, nil)
 //	if err != nil {
 //	    log.Fatal(err)
 //	}
@@ -33,12 +33,12 @@
 //
 // The client can be configured using functional options:
 //
-//	c, err := client.NewClient(
-//	    client.WithAPIKey("opk_..."),
-//	    client.WithAPIEndpoint("https://api.opusdns.com"),
-//	    client.WithHTTPTimeout(60 * time.Second),
-//	    client.WithMaxRetries(5),
-//	    client.WithDebug(true),
+//	c, err := opusdns.NewClient(
+//	    opusdns.WithAPIKey("opk_..."),
+//	    opusdns.WithAPIEndpoint("https://api.opusdns.com"),
+//	    opusdns.WithHTTPTimeout(60 * time.Second),
+//	    opusdns.WithMaxRetries(5),
+//	    opusdns.WithDebug(true),
 //	)
 //
 // Configuration can also be loaded from environment variables:
@@ -46,20 +46,23 @@
 //   - OPUSDNS_API_ENDPOINT: Custom API endpoint (optional)
 //   - OPUSDNS_DEBUG: Enable debug logging ("true" or "1")
 //
+// Debug logging goes to standard error unless a Logger is set, and masks
+// secrets such as API keys, client secrets, tokens and auth codes.
+//
 // # Services
 //
 // The client provides access to various services:
 //
-//   - client.DNS: Zone and record management
-//   - client.Domains: Domain registration and management
-//   - client.Contacts: Contact management
-//   - client.EmailForwards: Email forwarding configuration
-//   - client.DomainForwards: Domain/URL forwarding configuration
-//   - client.TLDs: TLD information and portfolio
-//   - client.Availability: Domain availability checking
-//   - client.Organizations: Organization management
-//   - client.Users: User management
-//   - client.Events: Event and audit log access
+//   - c.DNS: Zone and record management
+//   - c.Domains: Domain registration and management
+//   - c.Contacts: Contact management
+//   - c.EmailForwards: Email forwarding configuration
+//   - c.DomainForwards: Domain/URL forwarding configuration
+//   - c.TLDs: TLD information and portfolio
+//   - c.Availability: Domain availability checking
+//   - c.Organizations: Organization management
+//   - c.Users: User management
+//   - c.Events: Event and audit log access
 //
 // # Error Handling
 //
@@ -67,15 +70,15 @@
 //
 //	zone, err := c.DNS.GetZone(ctx, "example.com")
 //	if err != nil {
-//	    if errors.Is(err, client.ErrNotFound) {
+//	    if errors.Is(err, opusdns.ErrNotFound) {
 //	        // Zone doesn't exist
 //	        log.Println("Zone not found")
-//	    } else if errors.Is(err, client.ErrUnauthorized) {
+//	    } else if errors.Is(err, opusdns.ErrUnauthorized) {
 //	        // Invalid API key
 //	        log.Println("Invalid API key")
-//	    } else if apiErr, ok := client.IsAPIError(err); ok {
+//	    } else if apiErr, ok := opusdns.IsAPIError(err); ok {
 //	        // Handle specific API error
-//	        log.Printf("API error %d: %s", apiErr.StatusCode, apiErr.Message)
+//	        log.Printf("API error %d [%s]: %s", apiErr.StatusCode, apiErr.ErrorCode, apiErr.Message)
 //	    } else {
 //	        // Other error (network, etc.)
 //	        log.Printf("Error: %v", err)
@@ -101,10 +104,11 @@
 //
 // Create, update, and delete DNS records:
 //
-//	// Create a zone
-//	zone, err := c.DNS.CreateZone(ctx, &models.ZoneCreateRequest{
+//	// Create a zone, then read it back
+//	_, err = c.DNS.CreateZone(ctx, &models.ZoneCreateRequest{
 //	    Name: "example.com",
 //	})
+//	zone, err := c.DNS.GetZone(ctx, "example.com")
 //
 //	// Add a record
 //	err = c.DNS.UpsertRecord(ctx, "example.com", models.Record{
@@ -129,10 +133,11 @@
 //	if avail.Status.IsAvailable() {
 //	    // Register the domain
 //	    domain, err := c.Domains.CreateDomain(ctx, &models.DomainCreateRequest{
-//	        Name:   "example.com",
-//	        Period: 1,
-//	        Contacts: map[models.DomainContactType]models.ContactHandle{
-//	            models.DomainContactTypeRegistrant: {ContactID: contactID},
+//	        Name:        "example.com",
+//	        Period:      models.DomainPeriod{Value: 1, Unit: models.PeriodUnitYear},
+//	        RenewalMode: models.RenewalModeRenew,
+//	        Contacts: map[models.DomainContactType][]models.ContactHandle{
+//	            models.DomainContactTypeRegistrant: {{ContactID: contactID}},
 //	        },
 //	    })
 //	}
@@ -143,15 +148,19 @@
 //
 // # Rate Limiting and Retries
 //
-// The client automatically handles rate limiting (HTTP 429) by retrying with
-// exponential backoff. Server errors and network failures are retried only for
-// idempotent methods (GET, PUT, DELETE); POST and PATCH are not resent once
-// the API may have acted on them. You can configure the retry behavior:
+// The client retries a rate limited request (HTTP 429) after the wait the
+// API asks for in Retry-After, or with exponential backoff when it names
+// none. A 429 holds back only the request that received it. When the API asks
+// to wait longer than RetryWaitMax, the client returns the error at once, with
+// the requested wait in APIError.RetryAfter. Server errors and network failures
+// are retried only for GET, PUT and other methods that are safe to send twice;
+// POST, PATCH and DELETE are not resent once the API may have acted on them.
+// You can configure the retry behavior:
 //
-//	c, err := client.NewClient(
-//	    client.WithAPIKey("opk_..."),
-//	    client.WithMaxRetries(5),
-//	    client.WithRetryWait(1*time.Second, 30*time.Second),
+//	c, err := opusdns.NewClient(
+//	    opusdns.WithAPIKey("opk_..."),
+//	    opusdns.WithMaxRetries(5),
+//	    opusdns.WithRetryWait(1*time.Second, 30*time.Second),
 //	)
 //
 // # API Documentation

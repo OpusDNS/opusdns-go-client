@@ -1,8 +1,9 @@
-// Package client provides a Go client library for the OpusDNS API.
 package opusdns
 
 import (
+	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"regexp"
 	"runtime/debug"
@@ -159,28 +160,37 @@ type Config struct {
 	// Default: 60
 	TTL int
 
-	// HTTPTimeout is the timeout for HTTP requests.
+	// HTTPTimeout is the timeout for each HTTP request the default HTTP client
+	// sends. For a report download it bounds the wait for the response to
+	// start; the transfer itself is bounded by the context only.
+	// It has no effect when HTTPClient is set.
 	// Default: 30s
 	HTTPTimeout time.Duration
 
 	// MaxRetries is the maximum number of retries for transient failures (429, 5xx).
-	// POST and PATCH requests are retried only after a 429 or when the
+	// POST, PATCH and DELETE requests are retried only after a 429 or when the
 	// connection could not be opened, never after a 5xx. Set to 0 to disable
-	// retries.
+	// retries; the client then never waits.
 	// Default: 3
 	MaxRetries int
 
-	// RetryWaitMin is the minimum wait time between retries.
+	// RetryWaitMin is the wait before the first retry. It doubles with each
+	// further retry.
 	// Default: 1s
 	RetryWaitMin time.Duration
 
-	// RetryWaitMax is the maximum wait time between retries.
+	// RetryWaitMax is the maximum wait time between retries. It also caps the
+	// Retry-After the client waits out: a response asking to wait longer is
+	// returned straight away, with the requested wait in APIError.RetryAfter.
 	// Default: 30s
 	RetryWaitMax time.Duration
 
 	// HTTPClient allows providing a custom HTTP client.
-	// If nil, a default client with the configured timeout will be used.
-	// Use this to configure custom transport settings, proxies, etc.
+	// If nil, a default client with the configured timeout will be used, which
+	// honours the HTTP_PROXY, HTTPS_PROXY and NO_PROXY environment variables.
+	// Use this to configure custom transport settings, proxies, etc. The client
+	// sends requests through a copy of it whose redirect policy keeps the API
+	// key from other hosts; its Timeout applies to report downloads in full.
 	HTTPClient *http.Client
 
 	// UserAgent is the user agent string to use for API requests.
@@ -193,12 +203,14 @@ type Config struct {
 	// Default: opusdns-go-client/<version>
 	ClientToken string
 
-	// Debug enables debug logging of HTTP requests and responses.
+	// Debug enables debug logging of HTTP requests and responses. Secrets in
+	// bodies and query strings (API keys, client secrets, tokens, auth codes,
+	// passwords) are masked.
 	// Can also be enabled via OPUSDNS_DEBUG=true environment variable.
 	Debug bool
 
 	// Logger is the logger to use for debug output.
-	// If nil, logs will be written to stdout.
+	// If nil, logs will be written to standard error.
 	Logger Logger
 }
 
@@ -347,8 +359,20 @@ func (c *Config) Validate() error {
 	if c.APIKey == "" {
 		return &ConfigError{Field: "APIKey", Message: "API key is required (set via config or OPUSDNS_API_KEY env var)"}
 	}
+	if !validHeaderValue(c.APIKey) {
+		return &ConfigError{Field: "APIKey", Message: "API key contains a control character, such as a trailing newline"}
+	}
+	if !validHeaderValue(c.UserAgent) {
+		return &ConfigError{Field: "UserAgent", Message: "user agent contains a control character"}
+	}
+	if !validHeaderValue(c.ClientToken) {
+		return &ConfigError{Field: "ClientToken", Message: "client token contains a control character"}
+	}
 	if c.APIEndpoint == "" {
 		return &ConfigError{Field: "APIEndpoint", Message: "API endpoint is required"}
+	}
+	if endpoint, err := url.Parse(c.APIEndpoint); err != nil || (endpoint.Scheme != "https" && endpoint.Scheme != "http") || endpoint.Host == "" {
+		return &ConfigError{Field: "APIEndpoint", Message: fmt.Sprintf("must be an absolute http or https URL, such as %s; got %q", DefaultAPIEndpoint, c.APIEndpoint)}
 	}
 	if c.APIVersion == "" {
 		return &ConfigError{Field: "APIVersion", Message: "API version is required"}
@@ -374,7 +398,8 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-// Clone creates a deep copy of the configuration.
+// Clone returns a shallow copy of the configuration. HTTPClient and Logger
+// are shared with the original, not copied.
 func (c *Config) Clone() *Config {
 	clone := *c
 	return &clone
