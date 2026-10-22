@@ -16,8 +16,9 @@ import (
 )
 
 const (
-	envIntegrationZone    = "OPUSDNS_INTEGRATION_ZONE"
-	envIntegrationTimeout = "OPUSDNS_INTEGRATION_TIMEOUT"
+	envIntegrationZone            = "OPUSDNS_INTEGRATION_ZONE"
+	envIntegrationTimeout         = "OPUSDNS_INTEGRATION_TIMEOUT"
+	envIntegrationAllowProduction = "OPUSDNS_INTEGRATION_ALLOW_PRODUCTION"
 
 	integrationRecordName = "www"
 	integrationRecordData = "192.0.2.123"
@@ -70,6 +71,7 @@ func TestRealAPIDNSZoneLifecycle(t *testing.T) {
 		t.Skipf("set %s to a unique disposable zone name to run the DNS write lifecycle", envIntegrationZone)
 	}
 	validateIntegrationZoneName(t, zoneName)
+	refuseProductionWrites(t)
 
 	client := newIntegrationClient(t)
 	ctx, cancel := newIntegrationContext(t)
@@ -99,19 +101,20 @@ func TestRealAPIDNSZoneLifecycle(t *testing.T) {
 		}
 	}()
 
-	zone, err := client.DNS.CreateZone(ctx, &models.ZoneCreateRequest{Name: zoneName})
-	if err != nil {
+	// The created zone is checked through GetZone below, not through what
+	// CreateZone returns.
+	if _, err := client.DNS.CreateZone(ctx, &models.ZoneCreateRequest{Name: zoneName}); err != nil {
 		fatalRealAPIError(t, "create zone "+zoneName, err)
 	}
 	created = true
-	if zone.Name != "" && !sameDNSName(zone.Name, zoneName) {
-		t.Fatalf("created zone name mismatch: got %q, want %q", zone.Name, zoneName)
-	}
-	t.Logf("POST /v1/dns -> OK: %s", zoneSummary(zone))
+	t.Logf("POST /v1/dns -> OK: created %s", zoneName)
 
-	zone, err = client.DNS.GetZone(ctx, zoneName+".")
+	zone, err := client.DNS.GetZone(ctx, zoneName+".")
 	if err != nil {
 		fatalRealAPIError(t, "get created zone "+zoneName+" with trailing dot", err)
+	}
+	if !sameDNSName(zone.Name, zoneName) {
+		t.Fatalf("created zone name mismatch: got %q, want %q", zone.Name, zoneName)
 	}
 	t.Logf("GET /v1/dns/%s. -> OK: %s", zoneName, zoneSummary(zone))
 
@@ -130,6 +133,9 @@ func TestRealAPIDNSZoneLifecycle(t *testing.T) {
 	if err != nil {
 		fatalRealAPIError(t, "get zone after A record upsert "+zoneName, err)
 	}
+	if !zoneHasRecord(zone, zoneName, record) {
+		t.Fatalf("zone %q has no %s %s %s after upsert: %s", zoneName, record.Name, record.Type, record.RData, zoneSummary(zone))
+	}
 	t.Logf("GET /v1/dns/%s -> OK after record upsert: %s", zoneName, zoneSummary(zone))
 
 	if err := client.DNS.DeleteRecord(ctx, zoneName, record); err != nil {
@@ -140,6 +146,9 @@ func TestRealAPIDNSZoneLifecycle(t *testing.T) {
 	zone, err = client.DNS.GetZone(ctx, zoneName)
 	if err != nil {
 		fatalRealAPIError(t, "get zone after A record delete "+zoneName, err)
+	}
+	if zoneHasRecord(zone, zoneName, record) {
+		t.Fatalf("zone %q still has %s %s %s after delete: %s", zoneName, record.Name, record.Type, record.RData, zoneSummary(zone))
 	}
 	t.Logf("GET /v1/dns/%s -> OK after record delete: %s", zoneName, zoneSummary(zone))
 
@@ -209,6 +218,28 @@ func integrationTimeout(t *testing.T) time.Duration {
 	return timeout
 }
 
+// refuseProductionWrites stops the write lifecycle from running against the
+// production API by accident: the library defaults to production when
+// OPUSDNS_API_ENDPOINT is unset.
+func refuseProductionWrites(t *testing.T) {
+	t.Helper()
+
+	endpoint := os.Getenv(opusdns.EnvAPIEndpoint)
+	if endpoint == "" {
+		endpoint = opusdns.DefaultAPIEndpoint
+	}
+	host := endpoint
+	if i := strings.Index(host, "://"); i >= 0 {
+		host = host[i+3:]
+	}
+	host = strings.SplitN(host, "/", 2)[0]
+	host = strings.SplitN(host, ":", 2)[0]
+	host = strings.TrimSuffix(host, ".")
+	if strings.EqualFold(host, "api.opusdns.com") && os.Getenv(envIntegrationAllowProduction) != "1" {
+		t.Fatalf("refusing to run the DNS write lifecycle against production (%s); use the sandbox or set %s=1", endpoint, envIntegrationAllowProduction)
+	}
+}
+
 func validateIntegrationZoneName(t *testing.T, zoneName string) {
 	t.Helper()
 
@@ -239,6 +270,28 @@ func zoneSummary(zone *models.Zone) string {
 		zone.DNSSECStatus,
 		len(zone.RRSets),
 	)
+}
+
+// zoneHasRecord reports whether zone holds record. The API may name an RRset
+// relative to the zone or fully qualified, so both forms match.
+func zoneHasRecord(zone *models.Zone, zoneName string, record models.Record) bool {
+	if zone == nil {
+		return false
+	}
+	want := normalizeDNSName(record.Name)
+	wantFQDN := want + "." + normalizeDNSName(zoneName)
+	for _, rrset := range zone.RRSets {
+		name := normalizeDNSName(rrset.Name)
+		if rrset.Type != record.Type || (name != want && name != wantFQDN) {
+			continue
+		}
+		for _, rr := range rrset.Records {
+			if strings.TrimSpace(rr.RData) == record.RData {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func sameDNSName(left, right string) bool {
