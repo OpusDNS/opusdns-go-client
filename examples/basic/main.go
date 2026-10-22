@@ -91,7 +91,7 @@ func listZonesExample(ctx context.Context, client *opusdns.Client) {
 func zoneManagementExample(ctx context.Context, client *opusdns.Client, zoneName string) {
 	// Create a new zone
 	fmt.Printf("Creating zone: %s\n", zoneName)
-	zone, err := client.DNS.CreateZone(ctx, &models.ZoneCreateRequest{
+	changes, err := client.DNS.CreateZone(ctx, &models.ZoneCreateRequest{
 		Name: zoneName,
 		RRSets: []models.RRSetCreate{
 			{
@@ -106,7 +106,7 @@ func zoneManagementExample(ctx context.Context, client *opusdns.Client, zoneName
 		log.Printf("Failed to create zone: %v", err)
 		return
 	}
-	fmt.Printf("✓ Zone created: %s\n", zone.Name)
+	fmt.Printf("✓ Zone created: %s (%d changes)\n", zoneName, changes.NumChanges)
 
 	// Add a TXT record
 	fmt.Println("Adding TXT record...")
@@ -152,7 +152,7 @@ func zoneManagementExample(ctx context.Context, client *opusdns.Client, zoneName
 
 	// Get zone details with records
 	fmt.Println("Fetching zone details...")
-	zone, err = client.DNS.GetZone(ctx, zoneName)
+	zone, err := client.DNS.GetZone(ctx, zoneName)
 	if err != nil {
 		log.Printf("Failed to get zone: %v", err)
 	} else {

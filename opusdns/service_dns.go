@@ -80,16 +80,16 @@ func (s *DNSService) ListZonesPage(ctx context.Context, opts *models.ListZonesOp
 			query.Set("dnssec_status", string(opts.DNSSECStatus))
 		}
 		if opts.CreatedAfter != nil {
-			query.Set("created_after", opts.CreatedAfter.Format(time.RFC3339))
+			query.Set("created_after", opts.CreatedAfter.Format(time.RFC3339Nano))
 		}
 		if opts.CreatedBefore != nil {
-			query.Set("created_before", opts.CreatedBefore.Format(time.RFC3339))
+			query.Set("created_before", opts.CreatedBefore.Format(time.RFC3339Nano))
 		}
 		if opts.UpdatedAfter != nil {
-			query.Set("updated_after", opts.UpdatedAfter.Format(time.RFC3339))
+			query.Set("updated_after", opts.UpdatedAfter.Format(time.RFC3339Nano))
 		}
 		if opts.UpdatedBefore != nil {
-			query.Set("updated_before", opts.UpdatedBefore.Format(time.RFC3339))
+			query.Set("updated_before", opts.UpdatedBefore.Format(time.RFC3339Nano))
 		}
 		for _, include := range opts.Include {
 			query.Add("include", string(include))
@@ -145,8 +145,12 @@ func (s *DNSService) GetZoneWithOptions(ctx context.Context, name string, opts *
 	return &zone, nil
 }
 
-// CreateZone creates a new DNS zone.
-func (s *DNSService) CreateZone(ctx context.Context, req *models.ZoneCreateRequest) (*models.Zone, error) {
+// CreateZone creates a new DNS zone. The API answers with the changeset that
+// created the zone, not with the zone itself; call GetZone to read the zone.
+// When the zone is created with DNSSEC enabled, check
+// DNSChanges.DNSSECRegistryPublish: the zone exists even when publishing the DS
+// record to the registry failed.
+func (s *DNSService) CreateZone(ctx context.Context, req *models.ZoneCreateRequest) (*models.DNSChanges, error) {
 	path := s.client.http.BuildPath("dns")
 
 	resp, err := s.client.http.Post(ctx, path, req)
@@ -154,12 +158,12 @@ func (s *DNSService) CreateZone(ctx context.Context, req *models.ZoneCreateReque
 		return nil, err
 	}
 
-	var zone models.Zone
-	if err := s.client.http.DecodeResponse(resp, &zone); err != nil {
+	var changes models.DNSChanges
+	if err := s.client.http.DecodeResponse(resp, &changes); err != nil {
 		return nil, err
 	}
 
-	return &zone, nil
+	return &changes, nil
 }
 
 // DeleteZone deletes a DNS zone.
@@ -252,6 +256,11 @@ func (s *DNSService) DeleteRecord(ctx context.Context, zoneName string, record m
 }
 
 // EnableDNSSEC enables DNSSEC for a zone.
+//
+// The zone is signed when the call returns, but the DS record may not be at the
+// parent yet: DNSChanges.DNSSECRegistryPublish is DnssecRegistryPublishDeferred
+// when the registry submission is still being retried (the API answers 202).
+// When a concurrent disable withdrew the DS, the API answers 409 instead.
 func (s *DNSService) EnableDNSSEC(ctx context.Context, zoneName string) (*models.DNSChanges, error) {
 	zoneName = strings.TrimSuffix(zoneName, ".")
 	path := s.client.http.BuildPath("dns", url.PathEscape(zoneName), "dnssec", "enable")

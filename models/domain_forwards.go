@@ -317,7 +317,11 @@ type ListDomainForwardsOptions struct {
 	// Search is an optional search query to filter by hostname.
 	Search string
 
-	// Enabled filters by enabled status.
+	// Enabled is not sent: the API has no enabled filter for domain forwards,
+	// so it used to be ignored and the list contained disabled forwards too.
+	// Filter the results on DomainForward.Enabled instead.
+	//
+	// Deprecated: the API does not support this filter. It has no effect.
 	Enabled *bool
 }
 

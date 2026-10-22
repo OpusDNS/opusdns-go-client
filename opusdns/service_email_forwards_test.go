@@ -302,9 +302,26 @@ func TestEmailForwardsService_ListEmailForwardsByZone(t *testing.T) {
 		assert.Equal(t, "www.example.com.", forwards[1].Hostname)
 	})
 
+	t.Run("returns the real decode error", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			_, _ = w.Write([]byte(`{"zone_id": "zone_123", "zone_name": "example.com.", "email_forwards": [{"hostname": "example.com.", "enabled": "yes"}]}`))
+		}))
+		defer server.Close()
+
+		client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+		require.NoError(t, err)
+
+		_, err = client.EmailForwards.ListEmailForwardsByZone(context.Background(), "example.com")
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "of type bool")
+		assert.NotContains(t, err.Error(), "[]models.EmailForward")
+	})
+
 	t.Run("falls back to bare list response", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			assert.Equal(t, "GET", r.Method)
+			// A trailing dot is trimmed, as for every other zone path.
 			assert.Equal(t, "/v1/dns/example.com/email-forwards", r.URL.Path)
 
 			_ = json.NewEncoder(w).Encode([]models.EmailForward{
@@ -316,7 +333,7 @@ func TestEmailForwardsService_ListEmailForwardsByZone(t *testing.T) {
 		client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
 		require.NoError(t, err)
 
-		forwards, err := client.EmailForwards.ListEmailForwardsByZone(context.Background(), "example.com")
+		forwards, err := client.EmailForwards.ListEmailForwardsByZone(context.Background(), "example.com.")
 
 		require.NoError(t, err)
 		require.Len(t, forwards, 1)
@@ -369,4 +386,33 @@ func TestEmailForwardsService_ListZones(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, zones, 1)
 	assert.Equal(t, "example.com", zones[0].ZoneName)
+}
+
+func TestEmailForwardsService_EscapesIDs(t *testing.T) {
+	var paths []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		paths = append(paths, r.URL.EscapedPath())
+		if r.Method == http.MethodDelete {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	defer server.Close()
+
+	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+	require.NoError(t, err)
+
+	// An ID that contains a slash stays one path segment instead of addressing
+	// another resource.
+	ctx := context.Background()
+	_, err = client.EmailForwards.GetEmailForward(ctx, "x/aliases/y")
+	require.NoError(t, err)
+	err = client.EmailForwards.DeleteAlias(ctx, "email_forward_1", "a/b")
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{
+		"/v1/email-forwards/x%2Faliases%2Fy",
+		"/v1/email-forwards/email_forward_1/aliases/a%2Fb",
+	}, paths)
 }

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/opusdns/opusdns-go-client/models"
 	"github.com/stretchr/testify/assert"
@@ -37,6 +38,21 @@ func TestDNSService_ListZones(t *testing.T) {
 		require.NoError(t, err)
 		assert.Len(t, zones, 2)
 		assert.Equal(t, "example.com", zones[0].Name)
+	})
+
+	t.Run("keeps sub-second precision in time filters", func(t *testing.T) {
+		after := time.Date(2026, 1, 23, 8, 26, 55, 123456000, time.UTC)
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assert.Equal(t, "2026-01-23T08:26:55.123456Z", r.URL.Query().Get("created_after"))
+			_ = json.NewEncoder(w).Encode(models.ZoneListResponse{})
+		}))
+		defer server.Close()
+
+		client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+		require.NoError(t, err)
+
+		_, err = client.DNS.ListZones(context.Background(), &models.ListZonesOptions{CreatedAfter: &after})
+		require.NoError(t, err)
 	})
 
 	t.Run("handles pagination", func(t *testing.T) {
@@ -134,55 +150,87 @@ func TestDNSService_GetZone(t *testing.T) {
 	assert.Equal(t, "example.com", zone.Name)
 }
 
+// createZoneResponse is the spec's minimal_setup_response example for POST /v1/dns:
+// the API answers with the changeset, not with the zone.
+const createZoneResponse = `{
+	"changes": [
+		{"action": "create_zone"},
+		{"action": "create_record", "record_data": "ns1.opusdns.com. hostmaster.opusdns.com. 2025101401 10800 3600 604800 300", "rrset_name": "example.com.", "rrset_type": "SOA", "ttl": 3600},
+		{"action": "create_record", "record_data": "ns1.opusdns.com.", "rrset_name": "example.com.", "rrset_type": "NS", "ttl": 3600},
+		{"action": "create_record", "record_data": "ns2.opusdns.net.", "rrset_name": "example.com.", "rrset_type": "NS", "ttl": 3600}
+	],
+	"changeset_id": "de28f689-b400-45b7-9f67-9f92d512935a",
+	"num_changes": 4,
+	"zone_name": "example.com."
+}`
+
 func TestDNSService_CreateZone(t *testing.T) {
-	t.Run("creates empty zone", func(t *testing.T) {
+	t.Run("returns the changeset", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			assert.Equal(t, "POST", r.Method)
 			assert.Equal(t, "/v1/dns", r.URL.Path)
 
-			var req models.ZoneCreateRequest
-			_ = json.NewDecoder(r.Body).Decode(&req)
-			assert.Equal(t, "newzone.com", req.Name)
-			assert.Empty(t, req.RRSets)
+			var body map[string]interface{}
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+			assert.Equal(t, map[string]interface{}{"name": "example.com"}, body)
 
+			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusCreated)
-			_ = json.NewEncoder(w).Encode(models.Zone{Name: "newzone.com"})
+			_, _ = w.Write([]byte(createZoneResponse))
 		}))
 		defer server.Close()
 
 		client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
 		require.NoError(t, err)
 
-		zone, err := client.DNS.CreateZone(context.Background(), &models.ZoneCreateRequest{
-			Name: "newzone.com",
+		changes, err := client.DNS.CreateZone(context.Background(), &models.ZoneCreateRequest{
+			Name: "example.com",
 		})
 
 		require.NoError(t, err)
-		assert.Equal(t, "newzone.com", zone.Name)
+		assert.Equal(t, "example.com.", changes.ZoneName)
+		assert.Equal(t, "de28f689-b400-45b7-9f67-9f92d512935a", changes.ChangesetID)
+		assert.Equal(t, 4, changes.NumChanges)
+		require.Len(t, changes.Changes, 4)
+		assert.Equal(t, models.DnsChangeActionCreateZone, changes.Changes[0].Action)
+		assert.Equal(t, models.RRSetTypeNS, changes.Changes[2].RRSetType)
+		assert.Equal(t, "ns1.opusdns.com.", changes.Changes[2].RecordData)
+		assert.Nil(t, changes.DNSSECRegistryPublish)
 	})
 
-	t.Run("creates zone with records", func(t *testing.T) {
+	t.Run("sends initial records", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			var req models.ZoneCreateRequest
-			_ = json.NewDecoder(r.Body).Decode(&req)
-			assert.NotEmpty(t, req.RRSets)
+			var body map[string]interface{}
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+			assert.Equal(t, []interface{}{
+				map[string]interface{}{
+					"name":    "www",
+					"type":    "A",
+					"ttl":     float64(3600),
+					"records": []interface{}{map[string]interface{}{"rdata": "1.2.3.4"}},
+				},
+			}, body["rrsets"])
+			assert.Equal(t, "enabled", body["dnssec_status"])
 
 			w.WriteHeader(http.StatusCreated)
-			_ = json.NewEncoder(w).Encode(models.Zone{Name: "newzone.com"})
+			_, _ = w.Write([]byte(`{"changes": [{"action": "create_zone"}], "changeset_id": "de28f689-b400-45b7-9f67-9f92d512935a", "dnssec_registry_publish": "failed", "num_changes": 1, "zone_name": "example.com."}`))
 		}))
 		defer server.Close()
 
 		client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
 		require.NoError(t, err)
 
-		_, err = client.DNS.CreateZone(context.Background(), &models.ZoneCreateRequest{
-			Name: "newzone.com",
+		changes, err := client.DNS.CreateZone(context.Background(), &models.ZoneCreateRequest{
+			Name:         "example.com",
+			DNSSECStatus: models.DNSSECStatusEnabled,
 			RRSets: []models.RRSetCreate{
 				{Name: "www", Type: models.RRSetTypeA, TTL: 3600, Records: []models.RecordCreate{{RData: "1.2.3.4"}}},
 			},
 		})
 
 		require.NoError(t, err)
+		require.NotNil(t, changes.DNSSECRegistryPublish)
+		assert.Equal(t, models.DnssecRegistryPublishFailed, *changes.DNSSECRegistryPublish)
 	})
 }
 
@@ -218,6 +266,37 @@ func TestDNSService_DNSSEC(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, 5, changes.NumChanges)
+	})
+
+	t.Run("enable with deferred registry publish", func(t *testing.T) {
+		// Shape of the spec's 202 example: the zone is signed, the DS is not at the
+		// parent yet.
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assert.Equal(t, "POST", r.Method)
+			assert.Equal(t, "/v1/dns/example.com/dnssec/enable", r.URL.Path)
+			w.WriteHeader(http.StatusAccepted)
+			_, _ = w.Write([]byte(`{
+				"changes": [
+					{"action": "create_record", "record_data": "41074 13 2 0f8ad1e9b0de2eb958ba571208951e71330e6d9e2afa3c84ec6bd16d77bfc718", "rrset_name": "example.com.", "rrset_type": "DS", "ttl": 300},
+					{"action": "enable_dnssec", "record_data": null, "rrset_name": null, "rrset_type": null, "ttl": null}
+				],
+				"changeset_id": "b89527a6-b46e-4d29-bd57-6a1b6b4915c7",
+				"dnssec_registry_publish": "deferred",
+				"num_changes": 2,
+				"zone_name": "example.com."
+			}`))
+		}))
+		defer server.Close()
+
+		client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+		require.NoError(t, err)
+
+		changes, err := client.DNS.EnableDNSSEC(context.Background(), "example.com.")
+
+		require.NoError(t, err)
+		require.NotNil(t, changes.DNSSECRegistryPublish)
+		assert.Equal(t, models.DnssecRegistryPublishDeferred, *changes.DNSSECRegistryPublish)
+		assert.Equal(t, models.DnsChangeActionEnableDNSSEC, changes.Changes[1].Action)
 	})
 
 	t.Run("disable", func(t *testing.T) {

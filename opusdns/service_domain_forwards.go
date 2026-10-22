@@ -1,9 +1,11 @@
 package opusdns
 
 import (
+	"bytes"
 	"context"
 	"net/url"
 	"strconv"
+	"strings"
 
 	"github.com/opusdns/opusdns-go-client/models"
 )
@@ -62,9 +64,6 @@ func (s *DomainForwardsService) ListDomainForwardsPage(ctx context.Context, opts
 		if opts.Search != "" {
 			query.Set("search", opts.Search)
 		}
-		if opts.Enabled != nil {
-			query.Set("enabled", strconv.FormatBool(*opts.Enabled))
-		}
 	}
 
 	resp, err := s.client.http.Get(ctx, path, query)
@@ -116,7 +115,7 @@ func (s *DomainForwardsService) CreateDomainForward(ctx context.Context, req *mo
 
 // UpdateDomainForwardConfig updates the configuration for a specific protocol.
 func (s *DomainForwardsService) UpdateDomainForwardConfig(ctx context.Context, hostname string, protocol models.HttpProtocol, req *models.DomainForwardProtocolSetRequest) (*models.DomainForward, error) {
-	path := s.client.http.BuildPath("domain-forwards", url.PathEscape(hostname), string(protocol))
+	path := s.client.http.BuildPath("domain-forwards", url.PathEscape(hostname), url.PathEscape(string(protocol)))
 
 	resp, err := s.client.http.Put(ctx, path, req)
 	if err != nil {
@@ -145,7 +144,7 @@ func (s *DomainForwardsService) DeleteDomainForward(ctx context.Context, hostnam
 
 // DeleteDomainForwardConfig deletes a specific protocol configuration.
 func (s *DomainForwardsService) DeleteDomainForwardConfig(ctx context.Context, hostname string, protocol models.HttpProtocol) error {
-	path := s.client.http.BuildPath("domain-forwards", url.PathEscape(hostname), string(protocol))
+	path := s.client.http.BuildPath("domain-forwards", url.PathEscape(hostname), url.PathEscape(string(protocol)))
 
 	resp, err := s.client.http.Delete(ctx, path)
 	if err != nil {
@@ -181,7 +180,7 @@ func (s *DomainForwardsService) DisableDomainForward(ctx context.Context, hostna
 
 // GetDomainForwardSet retrieves all redirects for a specific protocol of a hostname.
 func (s *DomainForwardsService) GetDomainForwardSet(ctx context.Context, hostname string, protocol models.HttpProtocol) (*models.DomainForwardSetResponse, error) {
-	path := s.client.http.BuildPath("domain-forwards", url.PathEscape(hostname), string(protocol))
+	path := s.client.http.BuildPath("domain-forwards", url.PathEscape(hostname), url.PathEscape(string(protocol)))
 
 	resp, err := s.client.http.Get(ctx, path, nil)
 	if err != nil {
@@ -228,6 +227,7 @@ func (s *DomainForwardsService) PatchRedirects(ctx context.Context, req *models.
 
 // ListDomainForwardsByZone retrieves domain forwards for a specific DNS zone.
 func (s *DomainForwardsService) ListDomainForwardsByZone(ctx context.Context, zoneName string) ([]models.DomainForward, error) {
+	zoneName = strings.TrimSuffix(zoneName, ".")
 	path := s.client.http.BuildPath("dns", url.PathEscape(zoneName), "domain-forwards")
 
 	resp, err := s.client.http.Get(ctx, path, nil)
@@ -235,18 +235,27 @@ func (s *DomainForwardsService) ListDomainForwardsByZone(ctx context.Context, zo
 		return nil, err
 	}
 
-	var zone models.DomainForwardZone
-	if err := s.client.http.DecodeResponse(resp, &zone); err == nil {
-		return zone.DomainForwards, nil
+	// Backwards-compatible fallback in case older API variants still return a raw list.
+	if isJSONArray(resp.Body) {
+		var result []models.DomainForward
+		if err := s.client.http.DecodeResponse(resp, &result); err != nil {
+			return nil, err
+		}
+		return result, nil
 	}
 
-	// Backwards-compatible fallback in case older API variants still return a raw list.
-	var result []models.DomainForward
-	if err := s.client.http.DecodeResponse(resp, &result); err != nil {
+	var zone models.DomainForwardZone
+	if err := s.client.http.DecodeResponse(resp, &zone); err != nil {
 		return nil, err
 	}
 
-	return result, nil
+	return zone.DomainForwards, nil
+}
+
+// isJSONArray reports whether body holds a JSON array rather than an object.
+func isJSONArray(body []byte) bool {
+	body = bytes.TrimLeft(body, " \t\r\n")
+	return len(body) > 0 && body[0] == '['
 }
 
 // GetMetrics retrieves aggregate domain-forward metrics.

@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/opusdns/opusdns-go-client/models"
@@ -83,7 +84,7 @@ func (s *EmailForwardsService) ListEmailForwardsPage(ctx context.Context, opts *
 
 // GetEmailForward retrieves a specific email forward by ID.
 func (s *EmailForwardsService) GetEmailForward(ctx context.Context, emailForwardID models.EmailForwardID) (*models.EmailForward, error) {
-	path := s.client.http.BuildPath("email-forwards", string(emailForwardID))
+	path := s.client.http.BuildPath("email-forwards", url.PathEscape(string(emailForwardID)))
 
 	resp, err := s.client.http.Get(ctx, path, nil)
 	if err != nil {
@@ -117,7 +118,7 @@ func (s *EmailForwardsService) CreateEmailForward(ctx context.Context, req *mode
 
 // DeleteEmailForward deletes email forwarding for a hostname.
 func (s *EmailForwardsService) DeleteEmailForward(ctx context.Context, emailForwardID models.EmailForwardID) error {
-	path := s.client.http.BuildPath("email-forwards", string(emailForwardID))
+	path := s.client.http.BuildPath("email-forwards", url.PathEscape(string(emailForwardID)))
 
 	resp, err := s.client.http.Delete(ctx, path)
 	if err != nil {
@@ -129,7 +130,7 @@ func (s *EmailForwardsService) DeleteEmailForward(ctx context.Context, emailForw
 
 // EnableEmailForward enables an email forward.
 func (s *EmailForwardsService) EnableEmailForward(ctx context.Context, emailForwardID models.EmailForwardID) error {
-	path := s.client.http.BuildPath("email-forwards", string(emailForwardID), "enable")
+	path := s.client.http.BuildPath("email-forwards", url.PathEscape(string(emailForwardID)), "enable")
 
 	resp, err := s.client.http.Patch(ctx, path, nil)
 	if err != nil {
@@ -141,7 +142,7 @@ func (s *EmailForwardsService) EnableEmailForward(ctx context.Context, emailForw
 
 // DisableEmailForward disables an email forward.
 func (s *EmailForwardsService) DisableEmailForward(ctx context.Context, emailForwardID models.EmailForwardID) error {
-	path := s.client.http.BuildPath("email-forwards", string(emailForwardID), "disable")
+	path := s.client.http.BuildPath("email-forwards", url.PathEscape(string(emailForwardID)), "disable")
 
 	resp, err := s.client.http.Patch(ctx, path, nil)
 	if err != nil {
@@ -153,7 +154,7 @@ func (s *EmailForwardsService) DisableEmailForward(ctx context.Context, emailFor
 
 // CreateAlias creates a new email alias.
 func (s *EmailForwardsService) CreateAlias(ctx context.Context, emailForwardID models.EmailForwardID, req *models.EmailForwardAliasCreate) (*models.EmailForwardAlias, error) {
-	path := s.client.http.BuildPath("email-forwards", string(emailForwardID), "aliases")
+	path := s.client.http.BuildPath("email-forwards", url.PathEscape(string(emailForwardID)), "aliases")
 
 	resp, err := s.client.http.Post(ctx, path, req)
 	if err != nil {
@@ -170,7 +171,7 @@ func (s *EmailForwardsService) CreateAlias(ctx context.Context, emailForwardID m
 
 // UpdateAlias updates an email alias.
 func (s *EmailForwardsService) UpdateAlias(ctx context.Context, emailForwardID models.EmailForwardID, aliasID models.EmailForwardAliasID, req *models.EmailForwardAliasUpdate) (*models.EmailForwardAlias, error) {
-	path := s.client.http.BuildPath("email-forwards", string(emailForwardID), "aliases", string(aliasID))
+	path := s.client.http.BuildPath("email-forwards", url.PathEscape(string(emailForwardID)), "aliases", url.PathEscape(string(aliasID)))
 
 	resp, err := s.client.http.Put(ctx, path, req)
 	if err != nil {
@@ -187,7 +188,7 @@ func (s *EmailForwardsService) UpdateAlias(ctx context.Context, emailForwardID m
 
 // DeleteAlias deletes an email alias.
 func (s *EmailForwardsService) DeleteAlias(ctx context.Context, emailForwardID models.EmailForwardID, aliasID models.EmailForwardAliasID) error {
-	path := s.client.http.BuildPath("email-forwards", string(emailForwardID), "aliases", string(aliasID))
+	path := s.client.http.BuildPath("email-forwards", url.PathEscape(string(emailForwardID)), "aliases", url.PathEscape(string(aliasID)))
 
 	resp, err := s.client.http.Delete(ctx, path)
 	if err != nil {
@@ -199,6 +200,7 @@ func (s *EmailForwardsService) DeleteAlias(ctx context.Context, emailForwardID m
 
 // ListEmailForwardsByZone retrieves email forwards for a specific DNS zone.
 func (s *EmailForwardsService) ListEmailForwardsByZone(ctx context.Context, zoneName string) ([]models.EmailForward, error) {
+	zoneName = strings.TrimSuffix(zoneName, ".")
 	path := s.client.http.BuildPath("dns", url.PathEscape(zoneName), "email-forwards")
 
 	resp, err := s.client.http.Get(ctx, path, nil)
@@ -206,30 +208,34 @@ func (s *EmailForwardsService) ListEmailForwardsByZone(ctx context.Context, zone
 		return nil, err
 	}
 
-	var zone models.EmailForwardZone
-	if err := s.client.http.DecodeResponse(resp, &zone); err == nil {
-		return zone.EmailForwards, nil
+	// Backwards-compatible fallback in case older API variants still return a raw list.
+	if isJSONArray(resp.Body) {
+		var result []models.EmailForward
+		if err := s.client.http.DecodeResponse(resp, &result); err != nil {
+			return nil, err
+		}
+		return result, nil
 	}
 
-	var result []models.EmailForward
-	if err := s.client.http.DecodeResponse(resp, &result); err != nil {
+	var zone models.EmailForwardZone
+	if err := s.client.http.DecodeResponse(resp, &zone); err != nil {
 		return nil, err
 	}
 
-	return result, nil
+	return zone.EmailForwards, nil
 }
 
 // GetMetrics retrieves metrics for a specific email forward.
 func (s *EmailForwardsService) GetMetrics(ctx context.Context, emailForwardID models.EmailForwardID, opts *models.EmailForwardMetricsOptions) (*models.EmailForwardMetrics, error) {
-	path := s.client.http.BuildPath("email-forwards", string(emailForwardID), "metrics")
+	path := s.client.http.BuildPath("email-forwards", url.PathEscape(string(emailForwardID)), "metrics")
 
 	query := url.Values{}
 	if opts != nil {
 		if opts.StartTime != nil {
-			query.Set("start_time", opts.StartTime.Format(time.RFC3339))
+			query.Set("start_time", opts.StartTime.Format(time.RFC3339Nano))
 		}
 		if opts.EndTime != nil {
-			query.Set("end_time", opts.EndTime.Format(time.RFC3339))
+			query.Set("end_time", opts.EndTime.Format(time.RFC3339Nano))
 		}
 	}
 

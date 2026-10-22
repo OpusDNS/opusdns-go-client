@@ -275,6 +275,34 @@ type RRSetUpdateRequest struct {
 	RRSets []RRSetCreate `json:"rrsets,omitempty"`
 }
 
+// DnssecRegistryPublishOutcome is the fate of the DS/DNSKEY submission to the
+// registry that follows signing a zone.
+type DnssecRegistryPublishOutcome string
+
+const (
+	// DnssecRegistryPublishPublished means the registry accepted the DS data.
+	DnssecRegistryPublishPublished DnssecRegistryPublishOutcome = "published"
+
+	// DnssecRegistryPublishDeferred means the zone is signed but the parent holds
+	// no DS yet. The registry rejected the submission because the public
+	// nameservers did not serve the new keys yet, and a background job retries
+	// it. Until then the zone resolves as unsigned.
+	DnssecRegistryPublishDeferred DnssecRegistryPublishOutcome = "deferred"
+
+	// DnssecRegistryPublishSkipped means nothing was submitted, for example
+	// because there was nothing to submit.
+	DnssecRegistryPublishSkipped DnssecRegistryPublishOutcome = "skipped"
+
+	// DnssecRegistryPublishWithdrawn means the zone stopped being signed while
+	// the DS was in flight, so the DS was taken back off the parent: the
+	// enablement did not take effect and must not be treated as a success.
+	DnssecRegistryPublishWithdrawn DnssecRegistryPublishOutcome = "withdrawn"
+
+	// DnssecRegistryPublishFailed means the zone is signed and nothing is working
+	// towards a DS at the parent. Only zone creation reports it.
+	DnssecRegistryPublishFailed DnssecRegistryPublishOutcome = "failed"
+)
+
 // DNSChanges represents the response from operations that modify DNS records.
 type DNSChanges struct {
 	// ChangesetID is the unique identifier for this changeset.
@@ -288,6 +316,14 @@ type DNSChanges struct {
 
 	// Changes contains the individual changes made.
 	Changes []DNSChange `json:"changes,omitempty"`
+
+	// DNSSECRegistryPublish reports what happened to the DS submission to the
+	// registry after the zone was signed, when the operation signed it (zone
+	// creation with DNSSEC enabled, EnableDNSSEC). It is nil when the response
+	// makes no statement about a registry DS submission. Anything other than
+	// DnssecRegistryPublishPublished means the parent does not (yet) hold a DS
+	// record, so validating resolvers still treat the zone as unsigned.
+	DNSSECRegistryPublish *DnssecRegistryPublishOutcome `json:"dnssec_registry_publish,omitempty"`
 }
 
 // DnsChangeAction represents the action performed in a single DNS changeset entry.
@@ -399,7 +435,8 @@ type ListZonesOptions struct {
 	// Name filters by exact zone name.
 	Name string
 
-	// Suffix filters by domain suffix (e.g., ".com").
+	// Suffix filters by TLD/suffix (e.g., "com", "io", "co.uk"). It matches at
+	// label boundaries only, so "io" does not match "radio.com".
 	Suffix string
 
 	// DNSSECStatus filters by DNSSEC status.

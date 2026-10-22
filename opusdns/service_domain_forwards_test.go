@@ -98,6 +98,38 @@ func TestDomainForwardsService_UpdateDomainForwardConfig(t *testing.T) {
 }
 
 func TestDomainForwardsService_ListDomainForwardsByZone(t *testing.T) {
+	t.Run("returns the real decode error", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			_, _ = w.Write([]byte(`{"zone_id": "zone_123", "zone_name": "example.com.", "domain_forwards": [{"hostname": "example.com.", "enabled": "yes"}]}`))
+		}))
+		defer server.Close()
+
+		client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+		require.NoError(t, err)
+
+		_, err = client.DomainForwards.ListDomainForwardsByZone(context.Background(), "example.com")
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "of type bool")
+		assert.NotContains(t, err.Error(), "[]models.DomainForward")
+	})
+
+	t.Run("falls back to bare list response", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			_, _ = w.Write([]byte(`[{"hostname": "example.com.", "enabled": true}]`))
+		}))
+		defer server.Close()
+
+		client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+		require.NoError(t, err)
+
+		forwards, err := client.DomainForwards.ListDomainForwardsByZone(context.Background(), "example.com")
+
+		require.NoError(t, err)
+		require.Len(t, forwards, 1)
+		assert.Equal(t, "example.com.", forwards[0].Hostname)
+	})
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "GET", r.Method)
 		assert.Equal(t, "/v1/dns/example.com/domain-forwards", r.URL.Path)
@@ -122,7 +154,8 @@ func TestDomainForwardsService_ListDomainForwardsByZone(t *testing.T) {
 	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
 	require.NoError(t, err)
 
-	forwards, err := client.DomainForwards.ListDomainForwardsByZone(context.Background(), "example.com")
+	// A trailing dot is trimmed, as for every other zone path.
+	forwards, err := client.DomainForwards.ListDomainForwardsByZone(context.Background(), "example.com.")
 
 	require.NoError(t, err)
 	require.Len(t, forwards, 2)
@@ -231,7 +264,9 @@ func TestDomainForwardsService_ListDomainForwardsPage(t *testing.T) {
 		assert.Equal(t, "/v1/domain-forwards", r.URL.Path)
 		assert.Equal(t, "2", r.URL.Query().Get("page"))
 		assert.Equal(t, "hostname", r.URL.Query().Get("sort_by"))
-		assert.Equal(t, "true", r.URL.Query().Get("enabled"))
+		// GET /v1/domain-forwards has no enabled filter; the deprecated option
+		// must not be sent.
+		assert.False(t, r.URL.Query().Has("enabled"))
 
 		_ = json.NewEncoder(w).Encode(models.DomainForwardListResponse{
 			Results: []models.DomainForward{
@@ -249,7 +284,7 @@ func TestDomainForwardsService_ListDomainForwardsPage(t *testing.T) {
 	resp, err := client.DomainForwards.ListDomainForwardsPage(context.Background(), &models.ListDomainForwardsOptions{
 		Page:    2,
 		SortBy:  models.DomainForwardSortByHostname,
-		Enabled: &enabled,
+		Enabled: &enabled, //nolint:staticcheck // checks that the deprecated filter is not sent
 	})
 	require.NoError(t, err)
 	require.Len(t, resp.Results, 1)
