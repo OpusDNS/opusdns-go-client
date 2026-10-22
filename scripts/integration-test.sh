@@ -8,6 +8,9 @@ OPUSDNS_API_KEY is required.
 Example:
   OPUSDNS_API_KEY="opk_..." ./scripts/integration-test.sh
 
+The tests run against the sandbox (https://sandbox.opusdns.com) unless
+OPUSDNS_API_ENDPOINT says otherwise, so use a sandbox API key.
+
 To include the DNS write lifecycle, also set OPUSDNS_INTEGRATION_ZONE to a unique disposable zone name.
 EOF
   exit 2
@@ -15,7 +18,7 @@ fi
 
 api_key="${OPUSDNS_API_KEY}"
 if [[ "${api_key}" == "opk_..." || "${api_key}" == *"your_api_key"* || "${api_key}" == *"your_preview_key"* ]]; then
-  echo "OPUSDNS_API_KEY still looks like a placeholder. Set it to a real preview1 API key value." >&2
+  echo "OPUSDNS_API_KEY still looks like a placeholder. Set it to a real API key for ${OPUSDNS_API_ENDPOINT:-the sandbox}." >&2
   exit 2
 fi
 if [[ "${api_key}" == Bearer\ * ]]; then
@@ -27,11 +30,22 @@ if [[ "${api_key}" == \"* || "${api_key}" == *\" || "${api_key}" == \'* || "${ap
   exit 2
 fi
 
-endpoint="${OPUSDNS_API_ENDPOINT:-https://api.opusdns.com}"
+# Default to the sandbox, like docker-compose.yml. The library itself defaults
+# to production, so the endpoint is always exported explicitly.
+endpoint="${OPUSDNS_API_ENDPOINT:-https://sandbox.opusdns.com}"
 if [[ "${endpoint}" != http://* && "${endpoint}" != https://* ]]; then
   endpoint="https://${endpoint}"
 fi
 export OPUSDNS_API_ENDPOINT="${endpoint}"
+
+host="${endpoint#*://}"
+host="${host%%/*}"
+host="${host%%:*}"
+if [[ "${host}" == "api.opusdns.com" && "${OPUSDNS_INTEGRATION_ALLOW_PRODUCTION:-}" != "1" ]]; then
+  echo "Refusing to run integration tests against production (${endpoint})." >&2
+  echo "Use the sandbox, or set OPUSDNS_INTEGRATION_ALLOW_PRODUCTION=1 if you really mean production." >&2
+  exit 2
+fi
 
 if [[ -n "${OPUSDNS_INTEGRATION_ZONE:-}" ]]; then
   echo "Running OpusDNS real API integration tests against ${endpoint}."

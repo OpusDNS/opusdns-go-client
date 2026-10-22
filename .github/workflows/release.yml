@@ -24,6 +24,17 @@ jobs:
         with:
           go-version: 'stable'
 
+      # A tag can point at a commit CI never ran on, so check it again here
+      # before anything is published.
+      - name: Verify go.mod is tidy
+        run: go mod tidy -diff
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Run tests
+        run: go test ./...
+
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v7
         with:

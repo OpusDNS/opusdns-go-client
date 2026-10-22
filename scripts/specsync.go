@@ -8,9 +8,10 @@
 //	go run scripts/specsync.go -ref <sha>      # pin to one api-spec commit
 //	go run scripts/specsync.go -spec-url <url> # any other source (debugging)
 //
-// Use `make spec-sync`, which is what CI runs, so a local refresh and an
-// automated one write identical bytes. This command is the single canonical
-// writer of spec/openapi.yaml and spec/version.yaml.
+// Use `make spec-sync`, so every refresh runs with the same flags and writes
+// identical bytes. Nothing in CI runs it: the sync is manual, see SPEC_SYNC.md.
+// This command is the single canonical writer of spec/openapi.yaml and
+// spec/version.yaml.
 //
 // The spec is stored byte-for-byte as published: a diff against a previous
 // sync is then exactly the upstream diff, and openapi-changes reads the YAML
@@ -27,6 +28,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -84,10 +86,7 @@ func main() {
 		fatal(err)
 	}
 
-	// The npm version always comes from main: api-spec commits the new spec
-	// first and runs `npm version minor` afterwards, so package.json at the
-	// dispatched commit still holds the previous number.
-	npmVersion, err := packageVersion()
+	npmVersion, err := npmVersionFor(commit)
 	if err != nil {
 		fatal(fmt.Errorf("read api-spec package.json: %w", err))
 	}
@@ -135,18 +134,8 @@ func reportCheck(before, after versionFile, spec []byte) {
 // resolveCommit turns a branch, tag or sha into a full commit sha, so the
 // vendored spec always records an immutable source revision.
 func resolveCommit(ref string) (string, error) {
-	url := fmt.Sprintf("https://api.github.com/repos/%s/commits/%s", specRepo, ref)
-	req, err := http.NewRequest(http.MethodGet, url, nil)
-	if err != nil {
-		return "", err
-	}
 	// This media type makes the API answer with the bare sha as plain text.
-	req.Header.Set("Accept", "application/vnd.github.sha")
-	if token := os.Getenv("GITHUB_TOKEN"); token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
-	}
-
-	body, err := do(req)
+	body, err := githubAPI("commits/"+ref, "application/vnd.github.sha")
 	if err != nil {
 		return "", err
 	}
@@ -157,8 +146,132 @@ func resolveCommit(ref string) (string, error) {
 	return sha, nil
 }
 
-func packageVersion() (string, error) {
-	body, err := fetch(rawURL("main", specRepoPkg))
+// npmVersionFor returns the version of the npm package that ships the spec as
+// it is at commit. api-spec commits a new spec first and runs `npm version
+// minor` in a separate commit afterwards, so package.json at a spec commit
+// still holds the previous number. The version that ships a spec is therefore
+// the first package.json change at or after the last spec change.
+//
+// With -spec-url there is no commit; the version then comes from main, which
+// is only right when the URL serves main's spec.
+func npmVersionFor(commit string) (string, error) {
+	if commit == "" {
+		return packageVersion("main")
+	}
+
+	specChange, err := lastChange(commit, specRepoSrc)
+	if err != nil {
+		return "", err
+	}
+	pkgChange, err := lastChange(commit, specRepoPkg)
+	if err != nil {
+		return "", err
+	}
+	after, err := isAtOrAfter(pkgChange, specChange)
+	if err != nil {
+		return "", err
+	}
+	if after {
+		return packageVersion(commit)
+	}
+
+	// The bump for this spec comes later. Walk main's package.json changes,
+	// newest first, back to the oldest one that still follows the spec change.
+	changes, err := changes("main", specRepoPkg)
+	if err != nil {
+		return "", err
+	}
+	bump, reached := "", false
+	for _, c := range changes {
+		after, err := isAtOrAfter(c, specChange)
+		if err != nil {
+			return "", err
+		}
+		if !after {
+			reached = true
+			break
+		}
+		bump = c
+	}
+	if bump == "" {
+		return "", fmt.Errorf("the spec at %s has no npm release yet", commit[:7])
+	}
+	if !reached && len(changes) == 100 {
+		return "", fmt.Errorf("more than 100 npm releases since %s; pass a newer -ref", commit[:7])
+	}
+	return packageVersion(bump)
+}
+
+// lastChange returns the newest commit at or before ref that touched path.
+func lastChange(ref, path string) (string, error) {
+	list, err := commitList(ref, path, 1)
+	if err != nil {
+		return "", err
+	}
+	if len(list) == 0 {
+		return "", fmt.Errorf("no commit at or before %s touches %s", ref, path)
+	}
+	return list[0], nil
+}
+
+// changes returns the commits at or before ref that touched path, newest first.
+func changes(ref, path string) ([]string, error) {
+	return commitList(ref, path, 100)
+}
+
+func commitList(ref, path string, perPage int) ([]string, error) {
+	q := url.Values{"sha": {ref}, "path": {path}, "per_page": {fmt.Sprint(perPage)}}
+	body, err := githubAPI("commits?"+q.Encode(), "application/vnd.github+json")
+	if err != nil {
+		return nil, err
+	}
+	var list []struct {
+		SHA string `json:"sha"`
+	}
+	if err := json.Unmarshal(body, &list); err != nil {
+		return nil, err
+	}
+	shas := make([]string, len(list))
+	for i, c := range list {
+		shas[i] = c.SHA
+	}
+	return shas, nil
+}
+
+// isAtOrAfter reports whether commit a is b or a descendant of b. Commit dates
+// cannot decide this: the spec commit and the version bump are made by one
+// workflow run, often within the same second.
+func isAtOrAfter(a, b string) (bool, error) {
+	if a == b {
+		return true, nil
+	}
+	body, err := githubAPI("compare/"+b+"..."+a, "application/vnd.github+json")
+	if err != nil {
+		return false, err
+	}
+	var cmp struct {
+		Status string `json:"status"`
+	}
+	if err := json.Unmarshal(body, &cmp); err != nil {
+		return false, err
+	}
+	return cmp.Status == "ahead" || cmp.Status == "identical", nil
+}
+
+func githubAPI(path, accept string) ([]byte, error) {
+	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("https://api.github.com/repos/%s/%s", specRepo, path), nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", accept)
+	if token := os.Getenv("GITHUB_TOKEN"); token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	return do(req)
+}
+
+func packageVersion(ref string) (string, error) {
+	body, err := fetch(rawURL(ref, specRepoPkg))
 	if err != nil {
 		return "", err
 	}
