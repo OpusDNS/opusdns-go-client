@@ -5,7 +5,8 @@ project_name: opusdns
 
 before:
   hooks:
-    - go mod tidy
+    # Check, never rewrite: a release must build exactly the tagged go.mod.
+    - go mod tidy -diff
 
 builds:
   - id: opusdns
@@ -34,11 +35,9 @@ archives:
       - goos: windows
         formats:
           - zip
-    name_template: >-
-      {{ .ProjectName }}_
-      v{{- .Version }}_
-      {{- .Os }}_
-      {{- .Arch }}
+    # One line on purpose: a folded block scalar joins its lines with spaces,
+    # which ended up inside the archive names.
+    name_template: "{{ .ProjectName }}_v{{ .Version }}_{{ .Os }}_{{ .Arch }}"
 
 checksum:
   name_template: 'checksums.txt'
