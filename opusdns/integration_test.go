@@ -99,17 +99,17 @@ func TestRealAPIDNSZoneLifecycle(t *testing.T) {
 		}
 	}()
 
-	zone, err := client.DNS.CreateZone(ctx, &models.ZoneCreateRequest{Name: zoneName})
+	changes, err := client.DNS.CreateZone(ctx, &models.ZoneCreateRequest{Name: zoneName})
 	if err != nil {
 		fatalRealAPIError(t, "create zone "+zoneName, err)
 	}
 	created = true
-	if zone.Name != "" && !sameDNSName(zone.Name, zoneName) {
-		t.Fatalf("created zone name mismatch: got %q, want %q", zone.Name, zoneName)
+	if !sameDNSName(changes.ZoneName, zoneName) {
+		t.Fatalf("created zone name mismatch: got %q, want %q", changes.ZoneName, zoneName)
 	}
-	t.Logf("POST /v1/dns -> OK: %s", zoneSummary(zone))
+	t.Logf("POST /v1/dns -> OK: changeset=%s changes=%d", changes.ChangesetID, changes.NumChanges)
 
-	zone, err = client.DNS.GetZone(ctx, zoneName+".")
+	zone, err := client.DNS.GetZone(ctx, zoneName+".")
 	if err != nil {
 		fatalRealAPIError(t, "get created zone "+zoneName+" with trailing dot", err)
 	}

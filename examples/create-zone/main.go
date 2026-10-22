@@ -39,15 +39,20 @@ func main() {
 
 	// Create zone with no records
 	fmt.Printf("Creating zone: %s\n", zoneName)
-	zone, err := client.DNS.CreateZone(ctx, &models.ZoneCreateRequest{
+	changes, err := client.DNS.CreateZone(ctx, &models.ZoneCreateRequest{
 		Name: zoneName,
 	})
 	if err != nil {
 		log.Fatalf("Failed to create zone: %v", err)
 	}
+	fmt.Printf("Zone created successfully (%d changes)\n", changes.NumChanges)
 
-	// Print result
-	fmt.Println("Zone created successfully!")
+	// The API answers with the changeset, so read the zone back to show it.
+	zone, err := client.DNS.GetZone(ctx, zoneName)
+	if err != nil {
+		log.Fatalf("Failed to get zone: %v", err)
+	}
+
 	data, err := json.MarshalIndent(zone, "", "  ")
 	if err != nil {
 		log.Fatalf("Failed to marshal zone: %v", err)

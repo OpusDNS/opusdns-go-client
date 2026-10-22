@@ -85,18 +85,18 @@ var zonesCreateCmd = &cobra.Command{
 
 		zoneName := args[0]
 
-		zone, err := getClient().DNS.CreateZone(ctx, &models.ZoneCreateRequest{
+		changes, err := getClient().DNS.CreateZone(ctx, &models.ZoneCreateRequest{
 			Name: zoneName,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to create zone: %w", err)
 		}
 
-		fmt.Printf("✓ Zone '%s' created successfully!\n\n", zone.Name)
+		fmt.Printf("✓ Zone '%s' created successfully (%d changes)!\n\n", zoneName, changes.NumChanges)
 
-		data, err := json.MarshalIndent(zone, "", "  ")
+		data, err := json.MarshalIndent(changes, "", "  ")
 		if err != nil {
-			return fmt.Errorf("failed to format zone: %w", err)
+			return fmt.Errorf("failed to format changes: %w", err)
 		}
 
 		fmt.Println(string(data))
