@@ -73,7 +73,7 @@ func (s *VanityNameserversService) ListSetsPage(ctx context.Context, opts *model
 
 // GetSet retrieves a vanity nameserver set by ID.
 func (s *VanityNameserversService) GetSet(ctx context.Context, setID models.VanityNameserverSetID) (*models.VanityNameserverSet, error) {
-	path := s.client.http.BuildPath("vanity-nameserver-sets", string(setID))
+	path := s.client.http.BuildPath("vanity-nameserver-sets", url.PathEscape(string(setID)))
 
 	resp, err := s.client.http.Get(ctx, path, nil)
 	if err != nil {
@@ -91,6 +91,10 @@ func (s *VanityNameserversService) GetSet(ctx context.Context, setID models.Vani
 // CreateSet creates a vanity nameserver set. Creation is asynchronous: the returned set
 // starts with status "provisioning" until the provisioning chain finalizes it.
 func (s *VanityNameserversService) CreateSet(ctx context.Context, req *models.VanityNameserverSetCreateRequest) (*models.VanityNameserverSet, error) {
+	if req == nil || len(req.Hostnames) == 0 {
+		return nil, &ValidationError{Field: "hostnames", Message: "a vanity nameserver set needs at least one hostname"}
+	}
+
 	path := s.client.http.BuildPath("vanity-nameserver-sets")
 
 	resp, err := s.client.http.Post(ctx, path, req)
@@ -108,7 +112,7 @@ func (s *VanityNameserversService) CreateSet(ctx context.Context, req *models.Va
 
 // DeleteSet deletes a vanity nameserver set. Deletion is asynchronous.
 func (s *VanityNameserversService) DeleteSet(ctx context.Context, setID models.VanityNameserverSetID) error {
-	path := s.client.http.BuildPath("vanity-nameserver-sets", string(setID))
+	path := s.client.http.BuildPath("vanity-nameserver-sets", url.PathEscape(string(setID)))
 
 	resp, err := s.client.http.Delete(ctx, path)
 	if err != nil {
@@ -135,9 +139,11 @@ func (s *VanityNameserversService) CheckSet(ctx context.Context, setID models.Va
 	return &result, nil
 }
 
-// SetDefault marks a vanity nameserver set as the organization's default.
+// SetDefault marks a vanity nameserver set as the organization's default. The
+// response describes the set but carries no status or billing fields; call
+// GetSet for those.
 func (s *VanityNameserversService) SetDefault(ctx context.Context, setID models.VanityNameserverSetID) (*models.VanityNameserverSetDefaultResponse, error) {
-	path := s.client.http.BuildPath("vanity-nameserver-sets", string(setID), "default")
+	path := s.client.http.BuildPath("vanity-nameserver-sets", url.PathEscape(string(setID)), "default")
 
 	resp, err := s.client.http.Patch(ctx, path, nil)
 	if err != nil {
@@ -171,7 +177,7 @@ func (s *VanityNameserversService) ClearDefault(ctx context.Context) (*models.Cl
 
 // RestoreSet restores a suspended vanity nameserver set.
 func (s *VanityNameserversService) RestoreSet(ctx context.Context, setID models.VanityNameserverSetID) (*models.VanityNameserverSet, error) {
-	path := s.client.http.BuildPath("vanity-nameserver-sets", string(setID), "restore")
+	path := s.client.http.BuildPath("vanity-nameserver-sets", url.PathEscape(string(setID)), "restore")
 
 	resp, err := s.client.http.Post(ctx, path, nil)
 	if err != nil {
@@ -186,9 +192,39 @@ func (s *VanityNameserversService) RestoreSet(ctx context.Context, setID models.
 	return &set, nil
 }
 
-// ListZonesReferencingSet lists the DNS zones whose apex is branded by a vanity NS set.
-func (s *VanityNameserversService) ListZonesReferencingSet(ctx context.Context, setID models.VanityNameserverSetID, opts *models.ListVanityNameserverSetsOptions) (*models.ZonesReferencingSetResponse, error) {
-	path := s.client.http.BuildPath("vanity-nameserver-sets", string(setID), "zones")
+// ListZonesReferencingSet lists every DNS zone whose apex is branded by a
+// vanity NS set, following pagination.
+func (s *VanityNameserversService) ListZonesReferencingSet(ctx context.Context, setID models.VanityNameserverSetID, opts *models.ListVanityNameserverSetsOptions) ([]models.Zone, error) {
+	var all []models.Zone
+	page := 1
+
+	for {
+		pageOpts := cloneOptions(opts)
+		pageOpts.Page = page
+		if pageOpts.PageSize == 0 {
+			pageOpts.PageSize = DefaultPageSize
+		}
+
+		resp, err := s.ListZonesReferencingSetPage(ctx, setID, pageOpts)
+		if err != nil {
+			return nil, err
+		}
+
+		all = append(all, resp.Results...)
+
+		if !resp.Pagination.HasNextPage {
+			break
+		}
+		page++
+	}
+
+	return all, nil
+}
+
+// ListZonesReferencingSetPage retrieves a single page of the DNS zones whose
+// apex is branded by a vanity NS set.
+func (s *VanityNameserversService) ListZonesReferencingSetPage(ctx context.Context, setID models.VanityNameserverSetID, opts *models.ListVanityNameserverSetsOptions) (*models.ZonesReferencingSetResponse, error) {
+	path := s.client.http.BuildPath("vanity-nameserver-sets", url.PathEscape(string(setID)), "zones")
 
 	query := url.Values{}
 	if opts != nil {

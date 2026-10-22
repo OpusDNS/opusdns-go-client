@@ -515,7 +515,7 @@ operations:
     method: VanityNameservers.GetSet
   "GET /v1/vanity-nameserver-sets/{set_id}/zones":
     status: implemented
-    method: VanityNameservers.ListZonesReferencingSet
+    method: VanityNameservers.ListZonesReferencingSetPage
   "PATCH /v1/vanity-nameserver-sets/{set_id}":
     status: implemented
     method: VanityNameservers.SetRenewalMode

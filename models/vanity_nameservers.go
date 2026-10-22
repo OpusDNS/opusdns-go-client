@@ -80,7 +80,8 @@ type VanityNameserverSetCreateRequest struct {
 	// SOARName is the SOA RNAME stamped verbatim into the vanity NS zone.
 	SOARName string `json:"soa_rname"`
 
-	// Hostnames are the fully-qualified vanity NS hostnames, ordered by intended position.
+	// Hostnames are the fully-qualified vanity NS hostnames, ordered by intended
+	// position. One to four are required.
 	Hostnames []string `json:"hostnames"`
 }
 
@@ -96,7 +97,27 @@ type VanityNameserverSetListResponse struct {
 // VanityNameserverSetDefaultResponse is the response when setting a set as the org default.
 type VanityNameserverSetDefaultResponse struct {
 	// VanityNameserverSet is the set that is now the organization's default.
-	VanityNameserverSet VanityNameserverSet `json:"vanity_nameserver_set"`
+	VanityNameserverSet VanityNameserverSetDefinition `json:"vanity_nameserver_set"`
+}
+
+// VanityNameserverSetDefinition is what defines a vanity nameserver set: its
+// name, parent domain, SOA RNAME and nameservers (VanityNameserverSetDTO). It
+// carries no status, default flag or billing fields; GetSet returns those.
+type VanityNameserverSetDefinition struct {
+	// SetID is the stable identifier for the vanity NS set.
+	SetID VanityNameserverSetID `json:"set_id"`
+
+	// Name is the human-readable name for the set.
+	Name string `json:"name"`
+
+	// ParentDomainName is the parent domain used as the apex of the vanity NS zone.
+	ParentDomainName string `json:"parent_domain_name"`
+
+	// SOARName is the SOA RNAME used verbatim when creating vanity-branded zones.
+	SOARName string `json:"soa_rname"`
+
+	// Nameservers are the nameservers in the set, ordered by position.
+	Nameservers []VanityNameserver `json:"nameservers,omitempty"`
 }
 
 // ClearVanityNameserverSetDefaultResponse is the response when clearing the org default.

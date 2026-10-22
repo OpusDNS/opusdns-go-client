@@ -200,18 +200,18 @@ var vanityNSZonesCmd = &cobra.Command{
 		ctx, cancel := getContext()
 		defer cancel()
 
-		result, err := getClient().VanityNameservers.ListZonesReferencingSet(ctx, models.VanityNameserverSetID(args[0]), nil)
+		zones, err := getClient().VanityNameservers.ListZonesReferencingSet(ctx, models.VanityNameserverSetID(args[0]), nil)
 		if err != nil {
 			return fmt.Errorf("failed to list zones referencing set: %w", err)
 		}
 
-		if len(result.Results) == 0 {
+		if len(zones) == 0 {
 			fmt.Println("No zones reference this set.")
 			return nil
 		}
 
-		fmt.Printf("Found %d zone(s):\n\n", len(result.Results))
-		for _, zone := range result.Results {
+		fmt.Printf("Found %d zone(s):\n\n", len(zones))
+		for _, zone := range zones {
 			fmt.Printf("  • %s\n", zone.Name)
 		}
 		return nil
