@@ -84,10 +84,10 @@ func (s *ReportsService) ListReportsPage(ctx context.Context, opts *models.ListR
 			query.Set("trigger_type", string(opts.TriggerType))
 		}
 		if opts.CreatedAfter != nil {
-			query.Set("created_after", opts.CreatedAfter.Format(time.RFC3339))
+			query.Set("created_after", opts.CreatedAfter.Format(time.RFC3339Nano))
 		}
 		if opts.CreatedBefore != nil {
-			query.Set("created_before", opts.CreatedBefore.Format(time.RFC3339))
+			query.Set("created_before", opts.CreatedBefore.Format(time.RFC3339Nano))
 		}
 	}
 
@@ -106,7 +106,7 @@ func (s *ReportsService) ListReportsPage(ctx context.Context, opts *models.ListR
 
 // GetReport retrieves a specific report by ID.
 func (s *ReportsService) GetReport(ctx context.Context, reportID models.ReportID) (*models.Report, error) {
-	path := s.client.http.BuildPath("reports", string(reportID))
+	path := s.client.http.BuildPath("reports", url.PathEscape(string(reportID)))
 
 	resp, err := s.client.http.Get(ctx, path, nil)
 	if err != nil {

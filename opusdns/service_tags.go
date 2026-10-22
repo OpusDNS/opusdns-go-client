@@ -82,7 +82,7 @@ func (s *TagsService) ListTagsPage(ctx context.Context, opts *models.ListTagsOpt
 
 // GetTag retrieves a tag by ID.
 func (s *TagsService) GetTag(ctx context.Context, tagID models.TagID) (*models.Tag, error) {
-	path := s.client.http.BuildPath("tags", string(tagID))
+	path := s.client.http.BuildPath("tags", url.PathEscape(string(tagID)))
 
 	resp, err := s.client.http.Get(ctx, path, nil)
 	if err != nil {
@@ -116,7 +116,7 @@ func (s *TagsService) CreateTag(ctx context.Context, req *models.TagCreateReques
 
 // UpdateTag updates a tag.
 func (s *TagsService) UpdateTag(ctx context.Context, tagID models.TagID, req *models.TagUpdateRequest) (*models.Tag, error) {
-	path := s.client.http.BuildPath("tags", string(tagID))
+	path := s.client.http.BuildPath("tags", url.PathEscape(string(tagID)))
 
 	resp, err := s.client.http.Patch(ctx, path, req)
 	if err != nil {
@@ -133,7 +133,7 @@ func (s *TagsService) UpdateTag(ctx context.Context, tagID models.TagID, req *mo
 
 // DeleteTag deletes a tag.
 func (s *TagsService) DeleteTag(ctx context.Context, tagID models.TagID) error {
-	path := s.client.http.BuildPath("tags", string(tagID))
+	path := s.client.http.BuildPath("tags", url.PathEscape(string(tagID)))
 
 	resp, err := s.client.http.Delete(ctx, path)
 	if err != nil {
@@ -145,7 +145,7 @@ func (s *TagsService) DeleteTag(ctx context.Context, tagID models.TagID) error {
 
 // UpdateTagObjects adds or removes objects from a tag.
 func (s *TagsService) UpdateTagObjects(ctx context.Context, tagID models.TagID, req *models.ObjectTagChanges) (*models.ObjectTagChangesResponse, error) {
-	path := s.client.http.BuildPath("tags", string(tagID), "objects")
+	path := s.client.http.BuildPath("tags", url.PathEscape(string(tagID)), "objects")
 
 	resp, err := s.client.http.Post(ctx, path, req)
 	if err != nil {

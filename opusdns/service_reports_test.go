@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/opusdns/opusdns-go-client/models"
 	"github.com/stretchr/testify/assert"
@@ -79,6 +80,9 @@ func TestReportsService_ListReportsPage(t *testing.T) {
 		assert.Equal(t, string(models.ReportTypeDNSZoneSummary), query.Get("report_type"))
 		assert.Equal(t, string(models.ReportStatusCompleted), query.Get("status"))
 		assert.Equal(t, string(models.ReportTriggerScheduled), query.Get("trigger_type"))
+		// Sub-second precision survives, so paging by a returned created_on
+		// neither skips nor repeats reports from the same second.
+		assert.Equal(t, "2026-01-23T08:26:55.123456Z", query.Get("created_before"))
 
 		_ = json.NewEncoder(w).Encode(models.ReportListResponse{
 			Results: []models.Report{
@@ -92,12 +96,14 @@ func TestReportsService_ListReportsPage(t *testing.T) {
 	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
 	require.NoError(t, err)
 
+	createdBefore := time.Date(2026, 1, 23, 8, 26, 55, 123456000, time.UTC)
 	resp, err := client.Reports.ListReportsPage(context.Background(), &models.ListReportsOptions{
-		Page:        2,
-		PageSize:    10,
-		ReportType:  []models.ReportType{models.ReportTypeDNSZoneSummary},
-		Status:      []models.ReportStatus{models.ReportStatusCompleted},
-		TriggerType: models.ReportTriggerScheduled,
+		Page:          2,
+		PageSize:      10,
+		ReportType:    []models.ReportType{models.ReportTypeDNSZoneSummary},
+		Status:        []models.ReportStatus{models.ReportStatusCompleted},
+		TriggerType:   models.ReportTriggerScheduled,
+		CreatedBefore: &createdBefore,
 	})
 	require.NoError(t, err)
 	require.Len(t, resp.Results, 1)
@@ -125,6 +131,20 @@ func TestReportsService_GetReport(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, models.ReportID("report_123"), report.ReportID)
 	assert.Equal(t, models.ReportStatusCompleted, report.Status)
+}
+
+func TestReportsService_GetReport_EscapesID(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/v1/reports/report_1%2F..%2F..%2Fjobs", r.RequestURI)
+		_, _ = w.Write([]byte(`{"report_id":"report_1","report_type":"domain_inventory","status":"pending"}`))
+	}))
+	defer server.Close()
+
+	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+	require.NoError(t, err)
+
+	_, err = client.Reports.GetReport(context.Background(), "report_1/../../jobs")
+	require.NoError(t, err)
 }
 
 func TestReportsService_DownloadReport(t *testing.T) {
