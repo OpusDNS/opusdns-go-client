@@ -15,10 +15,11 @@ type TLDsService struct {
 }
 
 // ListTLDs retrieves the TLDs available to the organization.
-// The API returns a nested structure where each TLD configuration contains
-// an array of TLD info objects. This method flattens that structure and
-// leaves out TLDs whose configuration is not enabled. The endpoint is not
-// paginated; opts.TLDs limits the list to the named TLDs.
+// The API returns one TLD specification per entry, each covering one or more
+// TLDs. This method flattens that structure and leaves out TLDs whose
+// configuration is not enabled. Each TLD carries its entry's specification and
+// the flat fields derived from it. The endpoint is not paginated; opts.TLDs
+// limits the list to the named TLDs.
 func (s *TLDsService) ListTLDs(ctx context.Context, opts *models.ListTLDsOptions) ([]models.TLD, error) {
 	path := s.client.http.BuildPath("tlds", "")
 
@@ -38,23 +39,60 @@ func (s *TLDsService) ListTLDs(ctx context.Context, opts *models.ListTLDsOptions
 	}
 
 	// Extract TLDs from the nested structure
-	// The API returns: { "tlds": [{ "enabled": true, "tlds": [{"name": "com", "type": "gTLD"}] }] }
+	// The API returns: { "tlds": [{ "enabled": true, "tlds": [{"name": "com", "type": "gTLD"}], ...spec }] }
 	var tlds []models.TLD
-	for _, config := range result.TLDConfigurations {
+	for i := range result.TLDConfigurations {
+		config := &result.TLDConfigurations[i]
 		if !config.Enabled {
 			continue
 		}
+		spec := &config.Specification
+		minYears, maxYears := registrationYears(spec.DomainLifecycle.RegistrationPeriods)
 		for _, tldInfo := range config.TLDs {
 			tld := models.TLD{
-				Name:      tldInfo.Name,
-				Type:      tldInfo.Type,
-				Available: config.Enabled,
+				Name:                  tldInfo.Name,
+				Type:                  tldInfo.Type,
+				Available:             config.Enabled,
+				IDNSupported:          spec.IDN.IDNCapable,
+				DNSSECSupported:       spec.DNSConfiguration.DNSSECAllowed,
+				MinRegistrationPeriod: minYears,
+				MaxRegistrationPeriod: maxYears,
+				Specification:         spec,
 			}
 			tlds = append(tlds, tld)
 		}
 	}
 
 	return tlds, nil
+}
+
+// registrationYears returns the shortest and longest of the periods that are
+// whole years, in years. Both are 0 when no period is.
+func registrationYears(periods []models.DomainPeriod) (minYears, maxYears int) {
+	for _, p := range periods {
+		var years int
+		switch p.Unit {
+		case models.PeriodUnitYear:
+			years = p.Value
+		case models.PeriodUnitMonth:
+			if p.Value%12 != 0 {
+				continue
+			}
+			years = p.Value / 12
+		default:
+			continue
+		}
+		if years <= 0 {
+			continue
+		}
+		if minYears == 0 || years < minYears {
+			minYears = years
+		}
+		if years > maxYears {
+			maxYears = years
+		}
+	}
+	return minYears, maxYears
 }
 
 // GetTLD retrieves the specification of a TLD, using the specification the

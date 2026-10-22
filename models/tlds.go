@@ -2,9 +2,13 @@
 package models
 
 // NOTE: The TLD struct in this file is a flattened convenience view that
-// ListTLDs builds from the TLD list; only Name, Type and Available are filled
-// in. The full specification of one TLD is TLDSpecification, which GetTLD
-// returns (see tld_specification.go).
+// ListTLDs builds from the TLD list. It fills Name, Type, Available,
+// IDNSupported, DNSSECSupported, Min/MaxRegistrationPeriod and Specification;
+// the other fields have no source in the API. The full specification of a TLD
+// is TLDSpecification (see tld_specification.go), which GetTLD returns and
+// TLD.Specification carries.
+
+import "encoding/json"
 
 // TLDInfo represents the basic TLD name and type information.
 type TLDInfo struct {
@@ -32,21 +36,31 @@ type TLD struct {
 	Available bool `json:"available"`
 
 	// RegistrationEnabled indicates if new registrations are accepted.
+	//
+	// Deprecated: The API does not send this, so it is always false. Available
+	// tells whether the TLD is enabled for the organization.
 	RegistrationEnabled bool `json:"registration_enabled,omitempty"`
 
 	// TransferEnabled indicates if transfers are accepted.
+	//
+	// Deprecated: The API does not send this, so it is always false.
 	TransferEnabled bool `json:"transfer_enabled,omitempty"`
 
 	// IDNSupported indicates if internationalized domain names are supported.
+	// ListTLDs reads it from Specification.IDN.IDNCapable.
 	IDNSupported bool `json:"idn_supported,omitempty"`
 
-	// DNSSECSupported indicates if DNSSEC is supported.
+	// DNSSECSupported indicates if DNSSEC is supported. ListTLDs reads it from
+	// Specification.DNSConfiguration.DNSSECAllowed.
 	DNSSECSupported bool `json:"dnssec_supported,omitempty"`
 
 	// MinRegistrationPeriod is the minimum registration period in years.
+	// ListTLDs derives it from Specification.DomainLifecycle.RegistrationPeriods;
+	// periods that are not whole years are left out, and it is 0 when none is.
 	MinRegistrationPeriod int `json:"min_registration_period,omitempty"`
 
-	// MaxRegistrationPeriod is the maximum registration period in years.
+	// MaxRegistrationPeriod is the maximum registration period in years,
+	// derived like MinRegistrationPeriod.
 	MaxRegistrationPeriod int `json:"max_registration_period,omitempty"`
 
 	// GracePeriodDays is the number of days in the grace period after expiration.
@@ -72,6 +86,10 @@ type TLD struct {
 
 	// RoleAttributeRequirements contains attribute requirements by contact role.
 	RoleAttributeRequirements []ContactRoleAttributeRequirement `json:"role_attribute_requirements,omitempty"`
+
+	// Specification is the full specification of the TLD as the list endpoint
+	// sends it. TLDs that share a specification share the pointer.
+	Specification *TLDSpecification `json:"-"`
 }
 
 // TLDType represents the type of TLD.
@@ -171,11 +189,26 @@ const (
 	AllocationMethodLottery AllocationMethodType = "lottery"
 )
 
-// TLDConfiguration represents the full TLD configuration from the API.
+// TLDConfiguration is one entry of the TLD list: a TLD specification plus
+// whether it is enabled for the organization.
 type TLDConfiguration struct {
 	Enabled        bool      `json:"enabled"`
 	ParkingEnabled bool      `json:"parking_enabled,omitempty"`
 	TLDs           []TLDInfo `json:"tlds"`
+
+	// Specification is the full TLD specification of this entry. The list
+	// endpoint sends the same fields as GetTLD.
+	Specification TLDSpecification `json:"-"`
+}
+
+// UnmarshalJSON decodes the entry and its full specification from the same
+// object.
+func (c *TLDConfiguration) UnmarshalJSON(data []byte) error {
+	type plain TLDConfiguration
+	if err := json.Unmarshal(data, (*plain)(c)); err != nil {
+		return err
+	}
+	return json.Unmarshal(data, &c.Specification)
 }
 
 // TLDListResponse represents the response when listing TLDs.

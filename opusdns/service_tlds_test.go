@@ -54,6 +54,179 @@ func TestTLDsService_ListTLDs(t *testing.T) {
 	assert.Equal(t, "net", tlds[1].Name)
 }
 
+// tldListBody is a GET /v1/tlds/ response as production sends it for .de and
+// .com (idn_tables trimmed), plus a disabled entry. Every entry is a full TLD
+// specification plus `enabled`.
+const tldListBody = `{"tlds": [
+	{"characters": {"max": 63, "min": 1},
+	 "contacts": {"authinfo_required": false, "authinfo_supported": true, "is_thick": true,
+		"possible_attributes": [
+			{"conditions": null, "contact_roles": ["registrant"], "key": "DE_CONTACT_TYPE", "required": false,
+			 "type": "enum", "values": ["ORG", "PERSON", "REQUEST"]},
+			{"conditions": [{"field": "DE_CONTACT_TYPE", "operator": "equals", "value": "REQUEST"}],
+			 "contact_roles": null, "key": "DE_ABUSE_URI_TEMPLATE", "required": false, "type": "uri_template", "values": null}],
+		"privacy_proxy": true, "registrant_change": "update",
+		"registrant_change_policy": {"confirmation": "none", "confirmation_window": null, "designated_agent_allowed": false,
+			"fee": "none", "prior_registrant_notice": false, "renews_domain": false, "transfer_lock_after_change": "P0D"},
+		"support_check": true, "support_client_contact_id": true, "support_transfer": false,
+		"supported_postal_types": ["int"], "supported_roles": [{"max": 5, "min": 1, "type": "registrant"}],
+		"transfer_supported_roles": null, "update_supported_roles": null},
+	 "dispute_resolutions": [{"name": "Domain Dispute", "reference": "https://www.denic.de/en/service/dispute", "supported": true}],
+	 "dns_configuration": {"allowed_number_of_nameserver": {"max": 13, "min": 0}, "czds_available": false,
+		"dnssec_allowed": true, "dnssec_mandatory": false, "dnssec_mode": "DNSKEY", "dnssec_submit_digest_types": null,
+		"host_objects": false, "host_parent_check_tlds": null, "registry_nameserver_check": true,
+		"registry_root_nameserver_update": 0},
+	 "domain_lifecycle": {"add_grace_period": "P0D", "auto_renew_before_expiration": "P0D",
+		"default_transfer_renewal_period": {"unit": "y", "value": 1}, "delete_before_expiration": "P0D",
+		"delete_policy": ["immediate", "expiration"], "explicit_renew": false, "grace_period": "P0D",
+		"pending_delete": "P0D", "redemption_period": "P30D",
+		"registration_periods": [{"unit": "y", "value": 1}, {"unit": "m", "value": 1}],
+		"registry_auto_renew": true, "renewal_periods": [{"unit": "y", "value": 1}, {"unit": "m", "value": 1}],
+		"restore_triggers_renewal": true, "rgp_operations": {"report": true, "request": true},
+		"sync_after_operations": ["registration", "renewal", "transfer"], "transfer_grace_period": null,
+		"transfer_renewal_periods": [{"unit": "y", "value": 1}, {"unit": "m", "value": 1}]},
+	 "domain_statuses": {"default": ["connect"], "status_mapping": {"connect": ["ok"], "failed": ["inactive"]},
+		"supported_statuses": ["free", "connect", "failed", "invalid", "serverHold", "pendingCreate", "redemptionPeriod"]},
+	 "enabled": true,
+	 "idn": {"idn_capable": true, "idn_tables": ["idn_tables/denic_idn_de.yaml"]},
+	 "launch_phases": {"general_availability": {"start_date": "2025-01-01T00:00:00Z"},
+		"phases": [{"allocation": "fcfs", "end_date": null, "smd_required": true, "start_date": null, "supported": false, "type": "sunrise"}],
+		"trademark_claims": {"end_date": null, "start_date": null, "supported": false, "tmch_required": false}},
+	 "legal_requirements": [],
+	 "local_presence": {"eligible_countries": null, "exemptions": null, "required": false,
+		"requirement": ["physical_address", "business_entity"], "type": ["registrant", "admin", "tech", "billing"]},
+	 "max_domains_per_check": 1, "parking_enabled": true, "partner_management": {"partners_file": null},
+	 "premium_domains": {"affects": ["registration", "renewal"], "source": "EPP", "supported": false},
+	 "rdap": {"rdap_server": "https://rdap.denic.de/"},
+	 "registry_lock": {"prevents": ["update", "transfer", "delete"], "removal_process": "Manual with authentication",
+		"requires_manual_request": true, "supported": true},
+	 "required_communications": null,
+	 "reserved_domains": {"source": null, "supported": false, "url": null},
+	 "tlds": [{"name": "de", "third_level_structure": [], "type": "ccTLD"}],
+	 "transfer_policies": {"authinfo_max_length": 16, "authinfo_min_length": 8, "authinfo_pattern": null,
+		"authinfo_required": true, "authinfo_set_by_registrar": true, "authinfo_time_limited": true,
+		"authinfo_validity_period": "P30D", "contacts_in_transfer_command": false, "info_contact_authinfo": true,
+		"info_domain_authinfo": true, "post_transfer_requirements": null, "transfer_ack": "none",
+		"transfer_email_required": false,
+		"transfer_lock_policy": {"supported_by_registrar": false, "supported_by_registry": false},
+		"transfer_nack": "none", "transfer_renewal_period": "P1Y", "transfer_renews_domain": false, "transfer_time": "P0D"},
+	 "verification_policies": null,
+	 "whois": {"whois_server": "whois.denic.de"}},
+	{"characters": {"max": 63, "min": 1},
+	 "contacts": {"authinfo_required": false, "authinfo_supported": true, "is_thick": false, "possible_attributes": [],
+		"privacy_proxy": true, "registrant_change": "update",
+		"registrant_change_policy": {"confirmation": "registrar", "confirmation_window": "P14D", "designated_agent_allowed": true,
+			"fee": "none", "prior_registrant_notice": true, "renews_domain": false, "transfer_lock_after_change": "P60D"},
+		"support_check": false, "support_client_contact_id": false, "support_transfer": false,
+		"supported_postal_types": ["loc", "int"],
+		"supported_roles": [{"max": 1, "min": 1, "type": "registrant"}, {"max": 0, "min": 0, "type": "billing"}],
+		"transfer_supported_roles": null, "update_supported_roles": null},
+	 "dispute_resolutions": [{"name": "UDRP", "reference": "https://www.icann.org/resources/pages/help/dndr/udrp-en", "supported": true}],
+	 "dns_configuration": {"allowed_number_of_nameserver": {"max": 13, "min": 0}, "czds_available": false,
+		"dnssec_allowed": true, "dnssec_mandatory": false, "dnssec_mode": "DS", "dnssec_submit_digest_types": null,
+		"host_objects": true, "host_parent_check_tlds": ["com", "net"], "registry_nameserver_check": false,
+		"registry_root_nameserver_update": 0},
+	 "domain_lifecycle": {"add_grace_period": "P5D", "auto_renew_before_expiration": "-P7D",
+		"default_transfer_renewal_period": {"unit": "y", "value": 1}, "delete_before_expiration": "-P2D",
+		"delete_policy": ["immediate", "expiration"], "explicit_renew": true, "grace_period": "P45D",
+		"pending_delete": "P5D", "redemption_period": "P30D",
+		"registration_periods": [{"unit": "y", "value": 1}, {"unit": "y", "value": 2}, {"unit": "y", "value": 10}],
+		"registry_auto_renew": true, "renewal_periods": [{"unit": "y", "value": 1}, {"unit": "y", "value": 10}],
+		"restore_triggers_renewal": true, "rgp_operations": {"report": true, "request": true},
+		"sync_after_operations": ["registration", "renewal", "transfer"], "transfer_grace_period": "P5D",
+		"transfer_renewal_periods": [{"unit": "y", "value": 1}]},
+	 "domain_statuses": {"default": ["ok"], "status_mapping": null,
+		"supported_statuses": ["ok", "clientTransferProhibited", "serverHold", "pendingTransfer", "pendingDelete"]},
+	 "enabled": true,
+	 "idn": {"idn_capable": true, "idn_tables": ["idn_tables/com_de_1.2.yaml", "idn_tables/com_latn_2.6.yaml"]},
+	 "launch_phases": {"general_availability": {"start_date": "2025-01-01T00:00:00Z"},
+		"phases": [{"allocation": "fcfs", "end_date": null, "smd_required": false, "start_date": null, "supported": false, "type": "eap"}],
+		"trademark_claims": {"end_date": null, "start_date": null, "supported": false, "tmch_required": false}},
+	 "legal_requirements": [],
+	 "local_presence": {"eligible_countries": null, "exemptions": null, "required": false,
+		"requirement": ["physical_address", "business_entity"], "type": ["registrant", "admin", "tech", "billing"]},
+	 "max_domains_per_check": 20, "parking_enabled": true, "partner_management": {"partners_file": null},
+	 "premium_domains": {"affects": ["registration", "renewal"], "source": "EPP", "supported": false},
+	 "rdap": {"rdap_server": "https://rdap.verisign.com/com/v1/"},
+	 "registry_lock": {"prevents": ["update", "transfer", "delete"], "removal_process": "Manual with authentication",
+		"requires_manual_request": true, "supported": true},
+	 "required_communications": [
+		{"required": true, "timedelta": ["-P120D"], "trigger": ["registration_anniversary"], "type": "registration_data_reminder"},
+		{"required": true, "timedelta": ["-P30D", "-P7D", "P0D", "P7D"], "trigger": ["expiration"], "type": "renewal_reminder"}],
+	 "reserved_domains": {"source": "manual", "supported": true,
+		"url": "https://www.icann.org/en/registry-agreements/com/com-registry-agreement-appendix-6-1-12-2012-en"},
+	 "tlds": [{"name": "com", "third_level_structure": [], "type": "gTLD"}],
+	 "transfer_policies": {"authinfo_max_length": 32, "authinfo_min_length": 8, "authinfo_pattern": null,
+		"authinfo_required": true, "authinfo_set_by_registrar": true, "authinfo_time_limited": false,
+		"authinfo_validity_period": null, "contacts_in_transfer_command": false, "info_contact_authinfo": true,
+		"info_domain_authinfo": true, "post_transfer_requirements": null, "transfer_ack": "both",
+		"transfer_email_required": false,
+		"transfer_lock_policy": {"supported_by_registrar": true, "supported_by_registry": true},
+		"transfer_nack": "both", "transfer_renewal_period": "P1Y", "transfer_renews_domain": true, "transfer_time": "P5D"},
+	 "verification_policies": {"email_verification": {"communication": {"timedelta": ["+0D", "+4D", "+12D"], "type": "email"},
+		"contact_roles": ["registrant"], "enabled": true, "suspension_delay": "15D", "suspension_on_failure": true,
+		"trigger": ["domain_registration", "domain_inbound_transfer"], "validity_period": null, "verification_method": "email"}},
+	 "whois": {"whois_server": "whois.verisign-grs.com"}},
+	{"enabled": false, "idn": {"idn_capable": false},
+	 "tlds": [{"name": "xyz", "third_level_structure": [], "type": "gTLD"}]}
+]}`
+
+func TestTLDsService_ListTLDs_Specification(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(tldListBody))
+	}))
+	defer server.Close()
+
+	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+	require.NoError(t, err)
+
+	tlds, err := client.TLDs.ListTLDs(context.Background(), nil)
+	require.NoError(t, err)
+	require.Len(t, tlds, 2)
+
+	de := tlds[0]
+	assert.Equal(t, "de", de.Name)
+	assert.Equal(t, models.TLDTypeCCTLD, de.Type)
+	assert.True(t, de.Available)
+	assert.True(t, de.IDNSupported)
+	assert.True(t, de.DNSSECSupported)
+	// The one-month period is not a whole year, so it is left out.
+	assert.Equal(t, 1, de.MinRegistrationPeriod)
+	assert.Equal(t, 1, de.MaxRegistrationPeriod)
+	require.NotNil(t, de.Specification)
+	require.NotNil(t, de.Specification.Whois)
+	assert.Equal(t, models.StringPtr("whois.denic.de"), de.Specification.Whois.WhoisServer)
+	assert.Len(t, de.Specification.DomainLifecycle.RegistrationPeriods, 2)
+
+	com := tlds[1]
+	assert.Equal(t, "com", com.Name)
+	assert.Equal(t, models.TLDTypeGTLD, com.Type)
+	assert.Equal(t, 1, com.MinRegistrationPeriod)
+	assert.Equal(t, 10, com.MaxRegistrationPeriod)
+	require.NotNil(t, com.Specification)
+	assert.Equal(t, []string{"com", "net"}, com.Specification.DNSConfiguration.HostParentCheckTLDs)
+}
+
+func TestRegistrationYears(t *testing.T) {
+	tests := []struct {
+		name     string
+		periods  []models.DomainPeriod
+		min, max int
+	}{
+		{"none", nil, 0, 0},
+		{"years", []models.DomainPeriod{{Value: 2, Unit: "y"}, {Value: 1, Unit: "y"}, {Value: 5, Unit: "y"}}, 1, 5},
+		{"whole months", []models.DomainPeriod{{Value: 24, Unit: "m"}, {Value: 12, Unit: "m"}}, 1, 2},
+		{"only partial months", []models.DomainPeriod{{Value: 1, Unit: "m"}, {Value: 30, Unit: "d"}}, 0, 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			minYears, maxYears := registrationYears(tt.periods)
+			assert.Equal(t, tt.min, minYears)
+			assert.Equal(t, tt.max, maxYears)
+		})
+	}
+}
+
 func TestTLDsService_ListTLDs_NoOptions(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Empty(t, r.URL.RawQuery)
