@@ -131,28 +131,26 @@ func tldInfoExample(ctx context.Context, client *opusdns.Client) {
 		return
 	}
 
-	fmt.Printf("Available TLDs in portfolio: %d\n", portfolio.Total)
+	fmt.Printf("Available TLDs in portfolio: %d\n", len(portfolio))
 
-	// Get details for a specific TLD
-	tldDetails, err := client.TLDs.GetTLD(ctx, "com")
+	// Get the specification of a specific TLD
+	spec, err := client.TLDs.GetTLD(ctx, "com")
 	if err != nil {
-		log.Printf("Failed to get TLD details: %v", err)
+		log.Printf("Failed to get TLD specification: %v", err)
 		return
 	}
 
-	fmt.Printf("\nDetails for .%s:\n", tldDetails.Name)
-	fmt.Printf("  Type: %s\n", tldDetails.Type)
-	fmt.Printf("  DNSSEC Supported: %v\n", tldDetails.DNSSECSupported)
-	fmt.Printf("  IDN Supported: %v\n", tldDetails.IDNSupported)
-	fmt.Printf("  Registration Period: %d-%d years\n",
-		tldDetails.MinRegistrationPeriod,
-		tldDetails.MaxRegistrationPeriod,
+	for _, tld := range spec.TLDs {
+		fmt.Printf("\nSpecification for .%s (%s):\n", tld.Name, tld.Type)
+	}
+	fmt.Printf("  DNSSEC allowed: %v\n", spec.DNSConfiguration.DNSSECAllowed)
+	fmt.Printf("  IDN capable: %v\n", spec.IDN.IDNCapable)
+	fmt.Printf("  Label length: %d-%d characters\n", spec.Characters.Min, spec.Characters.Max)
+	fmt.Printf("  Nameservers: %d-%d\n",
+		spec.DNSConfiguration.AllowedNumberOfNameservers.Min,
+		spec.DNSConfiguration.AllowedNumberOfNameservers.Max,
 	)
-
-	if tldDetails.Pricing != nil {
-		fmt.Printf("  Registration Price: %s %s\n",
-			tldDetails.Pricing.RegisterPrice,
-			tldDetails.Pricing.Currency,
-		)
+	for _, period := range spec.DomainLifecycle.RegistrationPeriods {
+		fmt.Printf("  Registration period: %d%s\n", period.Value, period.Unit)
 	}
 }

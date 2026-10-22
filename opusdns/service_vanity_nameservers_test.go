@@ -3,8 +3,10 @@ package opusdns
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
 
 	"github.com/opusdns/opusdns-go-client/models"
@@ -106,6 +108,24 @@ func TestVanityNameserversService_CreateSet(t *testing.T) {
 	assert.Equal(t, models.VanityNameserverSetStatusProvisioning, set.Status)
 }
 
+func TestVanityNameserversService_CreateSet_RequiresHostnames(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Errorf("no request expected, got %s %s", r.Method, r.URL.Path)
+	}))
+	defer server.Close()
+
+	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+	require.NoError(t, err)
+
+	// Without hostnames the request would carry "hostnames": null.
+	_, err = client.VanityNameservers.CreateSet(context.Background(), &models.VanityNameserverSetCreateRequest{
+		Name:             "Primary",
+		ParentDomainName: "example.com",
+		SOARName:         "hostmaster.example.com",
+	})
+	require.ErrorIs(t, err, ErrInvalidInput)
+}
+
 func TestVanityNameserversService_DeleteSet(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "DELETE", r.Method)
@@ -150,9 +170,14 @@ func TestVanityNameserversService_SetDefault(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "PATCH", r.Method)
 		assert.Equal(t, "/v1/vanity-nameserver-sets/vns_1/default", r.URL.Path)
-		_ = json.NewEncoder(w).Encode(models.VanityNameserverSetDefaultResponse{
-			VanityNameserverSet: models.VanityNameserverSet{SetID: "vns_1", IsDefault: true},
-		})
+		// SetVanityNameserverSetDefaultRes wraps a VanityNameserverSetDTO,
+		// which has no status or is_default.
+		_, _ = w.Write([]byte(`{"vanity_nameserver_set": {
+			"set_id": "vns_1", "name": "Primary", "parent_domain_name": "example.com",
+			"soa_rname": "hostmaster.example.com",
+			"nameservers": [{"hostname": "ns1.example.com", "position": 0},
+			                {"hostname": "ns2.example.com", "position": 1}]
+		}}`))
 	}))
 	defer server.Close()
 
@@ -161,7 +186,12 @@ func TestVanityNameserversService_SetDefault(t *testing.T) {
 
 	result, err := client.VanityNameservers.SetDefault(context.Background(), "vns_1")
 	require.NoError(t, err)
-	assert.True(t, result.VanityNameserverSet.IsDefault)
+	set := result.VanityNameserverSet
+	assert.Equal(t, models.VanityNameserverSetID("vns_1"), set.SetID)
+	assert.Equal(t, "Primary", set.Name)
+	assert.Equal(t, "hostmaster.example.com", set.SOARName)
+	require.Len(t, set.Nameservers, 2)
+	assert.Equal(t, "ns2.example.com", set.Nameservers[1].Hostname)
 }
 
 func TestVanityNameserversService_ClearDefault(t *testing.T) {
@@ -197,11 +227,47 @@ func TestVanityNameserversService_RestoreSet(t *testing.T) {
 }
 
 func TestVanityNameserversService_ListZonesReferencingSet(t *testing.T) {
+	var pages []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "GET", r.Method)
+		assert.Equal(t, "/v1/vanity-nameserver-sets/vns_1/zones", r.URL.Path)
+		assert.Equal(t, strconv.Itoa(DefaultPageSize), r.URL.Query().Get("page_size"))
+		page := r.URL.Query().Get("page")
+		pages = append(pages, page)
+
+		// ListZonesReferencingSetRes with DnsZoneDTO entries.
+		hasNext := page == "1"
+		name := "example.com"
+		if !hasNext {
+			name = "example.org"
+		}
+		_, _ = fmt.Fprintf(w, `{"results": [{"name": %q, "dnssec_status": "disabled", "rrsets": [],
+			"vanity_nameserver_set_id": "vns_1", "created_on": null, "updated_on": null}],
+			"pagination": {"total_pages": 2, "current_page": %s, "has_next_page": %t,
+			               "has_previous_page": %t, "total_items": 2, "page_size": %d}}`,
+			name, page, hasNext, !hasNext, DefaultPageSize)
+	}))
+	defer server.Close()
+
+	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+	require.NoError(t, err)
+
+	zones, err := client.VanityNameservers.ListZonesReferencingSet(context.Background(), "vns_1", nil)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"1", "2"}, pages)
+	require.Len(t, zones, 2)
+	assert.Equal(t, "example.com", zones[0].Name)
+	assert.Equal(t, "example.org", zones[1].Name)
+}
+
+func TestVanityNameserversService_ListZonesReferencingSetPage(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/v1/vanity-nameserver-sets/vns_1/zones", r.URL.Path)
+		assert.Equal(t, "3", r.URL.Query().Get("page"))
+		assert.Equal(t, "10", r.URL.Query().Get("page_size"))
 		_ = json.NewEncoder(w).Encode(models.ZonesReferencingSetResponse{
 			Results:    []models.Zone{{Name: "example.com"}},
-			Pagination: models.Pagination{HasNextPage: false},
+			Pagination: models.Pagination{CurrentPage: 3, HasNextPage: true},
 		})
 	}))
 	defer server.Close()
@@ -209,10 +275,27 @@ func TestVanityNameserversService_ListZonesReferencingSet(t *testing.T) {
 	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
 	require.NoError(t, err)
 
-	result, err := client.VanityNameservers.ListZonesReferencingSet(context.Background(), "vns_1", nil)
+	result, err := client.VanityNameservers.ListZonesReferencingSetPage(context.Background(), "vns_1",
+		&models.ListVanityNameserverSetsOptions{Page: 3, PageSize: 10})
 	require.NoError(t, err)
 	require.Len(t, result.Results, 1)
-	assert.Equal(t, "example.com", result.Results[0].Name)
+	assert.True(t, result.Pagination.HasNextPage)
+}
+
+func TestVanityNameserversService_SetIDIsEscaped(t *testing.T) {
+	var gotPath string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.EscapedPath()
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+
+	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+	require.NoError(t, err)
+
+	err = client.VanityNameservers.DeleteSet(context.Background(), "../default")
+	require.NoError(t, err)
+	assert.Equal(t, "/v1/vanity-nameserver-sets/..%2Fdefault", gotPath)
 }
 
 func TestVanityNameserversService_SetRenewalMode(t *testing.T) {

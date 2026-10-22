@@ -36,6 +36,29 @@ type DomainAvailability struct {
 
 	// Status is the availability status.
 	Status DomainAvailabilityStatus `json:"status"`
+
+	// Error says why the check failed. It is set when Status is "error".
+	Error *DomainAvailabilityError `json:"error,omitempty"`
+
+	// Marketplace names the aftermarket offering the domain, for
+	// "market_available" results.
+	Marketplace *Marketplace `json:"marketplace,omitempty"`
+}
+
+// DomainAvailabilityError says why an availability check failed for one
+// domain, for example because its TLD is not supported.
+type DomainAvailabilityError struct {
+	// Type classifies the error.
+	Type string `json:"type"`
+
+	// Message describes the error.
+	Message string `json:"message"`
+}
+
+// Marketplace is an aftermarket that offers a domain.
+type Marketplace struct {
+	// Name is the marketplace name (e.g. "fruits").
+	Name string `json:"name"`
 }
 
 // DomainPrice represents pricing information for a domain.
@@ -97,6 +120,9 @@ type DomainAvailabilityResult struct {
 	// Reason provides additional context (if not available).
 	Reason *string `json:"reason,omitempty"`
 
+	// Error says why the check failed, if it did.
+	Error *DomainAvailabilityError `json:"error,omitempty"`
+
 	// IsPremium indicates if the registry classifies this domain as premium.
 	IsPremium *bool `json:"is_premium,omitempty"`
 
@@ -141,6 +167,13 @@ type DomainSuggestion struct {
 
 	// RenewalPrice contains renewal pricing information if available.
 	RenewalPrice *DomainSearchSuggestionPriceData `json:"renewal_price,omitempty"`
+
+	// Marketplace names where the suggestion comes from.
+	Marketplace *Marketplace `json:"marketplace,omitempty"`
+
+	// ConnectedAccount is the organization's own registry account (AMS) the
+	// domain would be registered on, or nil when OpusDNS registers it.
+	ConnectedAccount *DomainConnectedAccount `json:"connected_account,omitempty"`
 }
 
 // DomainSearchSuggestionPriceData represents pricing information for a domain suggestion.
@@ -170,10 +203,12 @@ type DomainSuggestRequest struct {
 	Premium *bool `json:"premium,omitempty"`
 }
 
-// DomainSuggestResponse represents the response from a domain suggestion request.
+// DomainSuggestResponse represents the response from a domain suggestion
+// request (DomainSearchResponse).
 type DomainSuggestResponse struct {
-	// Suggestions contains the suggested domains.
-	Suggestions []DomainSuggestion `json:"suggestions"`
+	// Suggestions contains the suggested domains. The API sends them as
+	// "results".
+	Suggestions []DomainSuggestion `json:"results"`
 
 	// Meta contains metadata about the request.
 	Meta AvailabilityMeta `json:"meta,omitempty"`

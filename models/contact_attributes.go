@@ -41,7 +41,8 @@ type ContactAttributeSetCreateRequest struct {
 	// Label is a human-readable label explaining the purpose of the set.
 	Label string `json:"label"`
 
-	// Attributes is the key-value map of registry contact attributes.
+	// Attributes is the key-value map of registry contact attributes. It is
+	// required: use an empty map, not nil, for a set without attributes.
 	Attributes map[string]string `json:"attributes"`
 
 	// TLD is the TLD this attribute set applies to (e.g. "de").
@@ -63,6 +64,16 @@ type ContactAttributeSetListResponse struct {
 	Pagination Pagination `json:"pagination"`
 }
 
+// ContactAttributeSetSortField represents fields for sorting contact attribute sets.
+type ContactAttributeSetSortField string
+
+const (
+	ContactAttributeSetSortByLabel     ContactAttributeSetSortField = "label"
+	ContactAttributeSetSortByTLD       ContactAttributeSetSortField = "tld"
+	ContactAttributeSetSortByCreatedOn ContactAttributeSetSortField = "created_on"
+	ContactAttributeSetSortByUpdatedOn ContactAttributeSetSortField = "updated_on"
+)
+
 // ListContactAttributeSetsOptions contains options for listing contact attribute sets.
 type ListContactAttributeSetsOptions struct {
 	// Page is the page number to retrieve (1-indexed).
@@ -70,6 +81,18 @@ type ListContactAttributeSetsOptions struct {
 
 	// PageSize is the number of items per page.
 	PageSize int
+
+	// SortBy is the field to sort by.
+	SortBy ContactAttributeSetSortField
+
+	// SortOrder is the sort direction.
+	SortOrder SortOrder
+
+	// TLD filters by the TLD the sets apply to.
+	TLD string
+
+	// Label filters by label.
+	Label string
 }
 
 // ContactAttributeLinkDetail is an attribute set as it appears inline on a

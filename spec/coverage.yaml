@@ -126,7 +126,7 @@ operations:
     method: Contacts.VerifyContact
   "GET /v1/contacts/{contact_id}":
     status: implemented
-    method: Contacts.GetContact
+    method: [Contacts.GetContactWithOptions, Contacts.GetContact]
   "GET /v1/contacts/{contact_id}/verification":
     status: implemented
     method: Contacts.GetVerificationStatus
@@ -515,7 +515,7 @@ operations:
     method: VanityNameservers.GetSet
   "GET /v1/vanity-nameserver-sets/{set_id}/zones":
     status: implemented
-    method: VanityNameservers.ListZonesReferencingSet
+    method: VanityNameservers.ListZonesReferencingSetPage
   "PATCH /v1/vanity-nameserver-sets/{set_id}":
     status: implemented
     method: VanityNameservers.SetRenewalMode

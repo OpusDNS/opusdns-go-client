@@ -74,10 +74,45 @@ func (u *User) FullName() string {
 	return u.FirstName + " " + u.LastName
 }
 
+// UserWithRole is a user as the organization's user list returns it: the
+// user plus the role assigned to them (UserPublicWithRole).
+type UserWithRole struct {
+	User
+
+	// Role is the user's role: a built-in role name (see AssignableRole, plus
+	// "owner") or the label of a custom role. Nil when no role is assigned.
+	Role *string `json:"role,omitempty"`
+}
+
+// UserProfile is the authenticated user as GetCurrentUser returns it: the
+// user plus their role, resolved permissions and organization (UserProfile).
+type UserProfile struct {
+	User
+
+	// Role is the user's role: a built-in role name (see AssignableRole, plus
+	// "owner") or the label of a custom role. Nil when no role is assigned.
+	Role *string `json:"role,omitempty"`
+
+	// Permissions are the "resource:scope" permissions the role resolves to.
+	Permissions []Permission `json:"permissions,omitempty"`
+
+	// Organization carries details of the user's organization.
+	Organization *UserOrganizationMeta `json:"organization,omitempty"`
+}
+
+// UserOrganizationMeta carries details of a user's organization.
+type UserOrganizationMeta struct {
+	// Currency is the organization's billing currency.
+	Currency *Currency `json:"currency,omitempty"`
+
+	// ParentOrganizationID is the organization's parent, if it has one.
+	ParentOrganizationID *OrganizationID `json:"parent_organization_id,omitempty"`
+}
+
 // UserListResponse represents the paginated response when listing users.
 type UserListResponse struct {
 	// Results contains the list of users for the current page.
-	Results []User `json:"results"`
+	Results []UserWithRole `json:"results"`
 
 	// Pagination contains the pagination metadata.
 	Pagination Pagination `json:"pagination"`

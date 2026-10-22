@@ -17,10 +17,23 @@ func TestUsersService_GetCurrentUser(t *testing.T) {
 		assert.Equal(t, "GET", r.Method)
 		assert.Equal(t, "/v1/users/me", r.URL.Path)
 
-		_ = json.NewEncoder(w).Encode(models.User{
-			UserID: "user_123",
-			Email:  "user@example.com",
-		})
+		// UserProfile
+		_, _ = w.Write([]byte(`{
+			"user_id": "user_123",
+			"organization_id": "organization_123",
+			"username": "sam",
+			"first_name": "Sam",
+			"last_name": "Example",
+			"email": "user@example.com",
+			"phone": null,
+			"locale": "en_US",
+			"created_on": "2026-01-23T08:26:55Z",
+			"updated_on": "2026-01-23T08:26:55Z",
+			"user_attributes": {},
+			"role": "domain_manager",
+			"permissions": ["domains:read", "domains:manage"],
+			"organization": {"currency": "EUR", "parent_organization_id": "organization_456"}
+		}`))
 	}))
 	defer server.Close()
 
@@ -31,6 +44,15 @@ func TestUsersService_GetCurrentUser(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, "user@example.com", user.Email)
+	assert.Equal(t, "Sam Example", user.FullName())
+	require.NotNil(t, user.Role)
+	assert.Equal(t, "domain_manager", *user.Role)
+	assert.Equal(t, []models.Permission{"domains:read", "domains:manage"}, user.Permissions)
+	require.NotNil(t, user.Organization)
+	require.NotNil(t, user.Organization.Currency)
+	assert.Equal(t, models.CurrencyEUR, *user.Organization.Currency)
+	require.NotNil(t, user.Organization.ParentOrganizationID)
+	assert.Equal(t, models.OrganizationID("organization_456"), *user.Organization.ParentOrganizationID)
 }
 
 func TestUsersService_ListUsersOmitsUnsupportedFilters(t *testing.T) {
@@ -42,7 +64,7 @@ func TestUsersService_ListUsersOmitsUnsupportedFilters(t *testing.T) {
 		assert.Empty(t, query.Get("status"))
 
 		_ = json.NewEncoder(w).Encode(models.UserListResponse{
-			Results:    []models.User{},
+			Results:    []models.UserWithRole{},
 			Pagination: models.Pagination{HasNextPage: false},
 		})
 	}))
@@ -270,10 +292,21 @@ func TestUsersService_ListUsersPage(t *testing.T) {
 		assert.Equal(t, "asc", query.Get("sort_order"))
 		assert.Equal(t, "sam", query.Get("search"))
 
-		_ = json.NewEncoder(w).Encode(models.UserListResponse{
-			Results:    []models.User{{UserID: "usr_123", Email: "user@example.com"}},
-			Pagination: models.Pagination{HasNextPage: false},
-		})
+		// Pagination_UserPublicWithRole_
+		_, _ = w.Write([]byte(`{
+			"results": [
+				{"user_id": "usr_123", "organization_id": "organization_123", "username": "sam",
+				 "first_name": "Sam", "last_name": "Example", "email": "user@example.com",
+				 "phone": null, "locale": "en_US", "role": "support_staff",
+				 "created_on": "2026-01-23T08:26:55Z", "updated_on": "2026-01-23T08:26:55Z"},
+				{"user_id": "usr_456", "organization_id": "organization_123", "username": "kim",
+				 "first_name": "Kim", "last_name": "Example", "email": "kim@example.com",
+				 "phone": null, "locale": "en_US", "role": null,
+				 "created_on": "2026-01-23T08:26:55Z", "updated_on": "2026-01-23T08:26:55Z"}
+			],
+			"pagination": {"total_pages": 2, "current_page": 2, "has_next_page": false,
+			               "has_previous_page": true, "total_items": 52, "page_size": 50}
+		}`))
 	}))
 	defer server.Close()
 
@@ -288,6 +321,25 @@ func TestUsersService_ListUsersPage(t *testing.T) {
 		Search:    "sam",
 	})
 	require.NoError(t, err)
-	require.Len(t, resp.Results, 1)
+	require.Len(t, resp.Results, 2)
 	assert.Equal(t, "user@example.com", resp.Results[0].Email)
+	require.NotNil(t, resp.Results[0].Role)
+	assert.Equal(t, "support_staff", *resp.Results[0].Role)
+	assert.Nil(t, resp.Results[1].Role)
+}
+
+func TestUsersService_UserIDIsEscaped(t *testing.T) {
+	var gotPath string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.EscapedPath()
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+
+	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+	require.NoError(t, err)
+
+	err = client.Users.DeleteUser(context.Background(), "../organizations/organization_1")
+	require.NoError(t, err)
+	assert.Equal(t, "/v1/users/..%2Forganizations%2Forganization_1", gotPath)
 }
