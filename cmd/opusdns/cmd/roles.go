@@ -124,6 +124,9 @@ var rolesUpdateCmd = &cobra.Command{
 			permissions, _ := cmd.Flags().GetStringArray("permission")
 			req.Permissions = &permissions
 		}
+		if req.Name == nil && req.Description == nil && req.Permissions == nil {
+			return fmt.Errorf("nothing to update: pass --name, --description or --permission")
+		}
 
 		role, err := getClient().Organizations.UpdateRole(ctx, args[0], req)
 		if err != nil {
@@ -152,16 +155,8 @@ var rolesDeleteCmd = &cobra.Command{
 
 		label := args[0]
 
-		force, _ := cmd.Flags().GetBool("force")
-		if !force {
-			fmt.Printf("Are you sure you want to delete role '%s'? This action cannot be undone.\n", label)
-			fmt.Print("Type 'yes' to confirm: ")
-			var confirm string
-			_, _ = fmt.Scanln(&confirm)
-			if confirm != "yes" {
-				fmt.Println("Aborted.")
-				return nil
-			}
+		if err := confirm(cmd, fmt.Sprintf("Are you sure you want to delete role '%s'? This action cannot be undone.", label)); err != nil {
+			return err
 		}
 
 		if err := getClient().Organizations.DeleteRole(ctx, label); err != nil {

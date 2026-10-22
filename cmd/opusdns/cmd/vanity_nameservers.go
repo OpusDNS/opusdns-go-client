@@ -97,16 +97,8 @@ var vanityNSDeleteCmd = &cobra.Command{
 
 		setID := args[0]
 
-		force, _ := cmd.Flags().GetBool("force")
-		if !force {
-			fmt.Printf("Are you sure you want to delete vanity nameserver set '%s'?\n", setID)
-			fmt.Print("Type 'yes' to confirm: ")
-			var confirm string
-			_, _ = fmt.Scanln(&confirm)
-			if confirm != "yes" {
-				fmt.Println("Aborted.")
-				return nil
-			}
+		if err := confirm(cmd, fmt.Sprintf("Are you sure you want to delete vanity nameserver set '%s'?", setID)); err != nil {
+			return err
 		}
 
 		if err := getClient().VanityNameservers.DeleteSet(ctx, models.VanityNameserverSetID(setID)); err != nil {

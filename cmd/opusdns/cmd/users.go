@@ -43,9 +43,9 @@ var usersRoleGetCmd = &cobra.Command{
 }
 
 var usersRoleSetCmd = &cobra.Command{
-	Use:   "set <user-id> <role>",
+	Use:   "set <user-id> [role]",
 	Short: "Set the role for a user",
-	Long:  `Set the role for a user, replacing any existing role. Pass --clear to remove the role.`,
+	Long:  `Set the role for a user, replacing any existing role. Pass --clear instead of a role to remove the role.`,
 	Args:  cobra.RangeArgs(1, 2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx, cancel := getContext()
@@ -55,6 +55,8 @@ var usersRoleSetCmd = &cobra.Command{
 
 		var role *string
 		switch {
+		case clear && len(args) == 2:
+			return fmt.Errorf("pass either a role or --clear, not both")
 		case clear:
 			role = nil
 		case len(args) == 2:

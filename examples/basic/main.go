@@ -17,10 +17,10 @@ func main() {
 	defer cancel()
 
 	// Create client using environment variables or explicit configuration
-	// The API key can be set via OPUSDNS_API_KEY environment variable
+	// The API key can be set via OPUSDNS_API_KEY environment variable. The
+	// client reads OPUSDNS_DEBUG ("true" or "1") itself.
 	client, err := opusdns.NewClient(
 		opusdns.WithAPIKey(os.Getenv("OPUSDNS_API_KEY")),
-		opusdns.WithDebug(os.Getenv("OPUSDNS_DEBUG") == "true"),
 	)
 	if err != nil {
 		log.Fatalf("Failed to create client: %v", err)
