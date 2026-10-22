@@ -231,7 +231,20 @@ func (s *DNSService) PatchRecords(ctx context.Context, zoneName string, ops []mo
 	zoneName = strings.TrimSuffix(zoneName, ".")
 	path := s.client.http.BuildPath("dns", url.PathEscape(zoneName), "records")
 
-	req := models.RecordPatchRequest{Ops: ops}
+	// The API's record patch schema has no "protected"; Record.Protected is
+	// read-only and is left out of the body.
+	req := models.RecordPatchRequest{Ops: make([]models.RecordPatchOperation, len(ops))}
+	for i, op := range ops {
+		req.Ops[i] = models.RecordPatchOperation{
+			Op: op.Op,
+			Record: models.RecordPatch{
+				Name:  op.Record.Name,
+				Type:  op.Record.Type,
+				TTL:   op.Record.TTL,
+				RData: op.Record.RData,
+			},
+		}
+	}
 
 	resp, err := s.client.http.Patch(ctx, path, req)
 	if err != nil {

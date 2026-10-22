@@ -3,6 +3,7 @@ package opusdns
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -553,6 +554,42 @@ func TestDNSService_PatchRecords(t *testing.T) {
 	})
 
 	require.NoError(t, err)
+}
+
+func TestDNSService_PatchRecordsBodyMatchesSpec(t *testing.T) {
+	// The spec's change_mx_record example for PATCH /v1/dns/{zone_name}/records.
+	// DnsRrsetWithOneRecordPatch has name, rdata, ttl and type only, so a
+	// Record read back with Protected set must not send "protected".
+	const want = `{"ops": [
+		{"op": "upsert", "record": {"name": "@", "rdata": "5 new-mail.example.com.", "ttl": 300, "type": "MX"}},
+		{"op": "remove", "record": {"name": "@", "rdata": "10 old-mail.example.com.", "ttl": 300, "type": "MX"}}
+	]}`
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "PATCH", r.Method)
+		assert.Equal(t, "/v1/dns/example.com/records", r.URL.Path)
+
+		body, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+		assert.JSONEq(t, want, string(body))
+
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+
+	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+	require.NoError(t, err)
+
+	err = client.DNS.PatchRecords(context.Background(), "example.com", []models.RecordOperation{
+		{Op: models.RecordOpUpsert, Record: models.Record{Name: "@", Type: models.RRSetTypeMX, TTL: 300, RData: "5 new-mail.example.com."}},
+		{Op: models.RecordOpRemove, Record: models.Record{Name: "@", Type: models.RRSetTypeMX, TTL: 300, RData: "10 old-mail.example.com.", Protected: true}},
+	})
+	require.NoError(t, err)
+
+	// Record still decodes "protected" where a payload carries it.
+	var record models.Record
+	require.NoError(t, json.Unmarshal([]byte(`{"name": "@", "type": "NS", "ttl": 3600, "rdata": "ns1.opusdns.com.", "protected": true}`), &record))
+	assert.True(t, record.Protected)
 }
 
 func TestDNSService_ListZonesPage(t *testing.T) {
