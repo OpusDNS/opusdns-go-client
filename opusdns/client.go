@@ -1,4 +1,3 @@
-// Package opusdns provides a Go client library for the OpusDNS API.
 package opusdns
 
 // Client is the high-level OpusDNS API client.

@@ -11,8 +11,8 @@ The official Go client library for the [OpusDNS](https://opusdns.com) API - a co
 - **Broad API Coverage**: DNS zones, domains, contacts, email forwarding, domain forwarding, jobs, reports, tags and more ([what is and is not covered](spec/coverage.yaml))
 - **Type-Safe**: Strongly typed models with Go idioms
 - **Automatic Pagination**: Easily iterate through all resources
-- **Retry Logic**: Built-in exponential backoff for transient failures, without resending non-idempotent requests
-- **Rate Limit Handling**: Automatic handling of rate limits (HTTP 429)
+- **Retry Logic**: Built-in exponential backoff for transient failures, without resending requests that may already have taken effect
+- **Rate Limit Handling**: Automatic handling of rate limits (HTTP 429), honouring `Retry-After`
 - **Context Support**: All methods accept `context.Context` for cancellation and timeouts
 - **Configurable**: Flexible configuration via functional options or environment variables
 - **Debug Mode**: Optional request/response logging for troubleshooting
@@ -100,15 +100,27 @@ client, err := opusdns.NewClient()
 | `WithAPIKey(key)` | Set the API key | - |
 | `WithAPIEndpoint(url)` | Set custom API endpoint | `https://api.opusdns.com` |
 | `WithAPIVersion(version)` | Set API version | `v1` |
-| `WithHTTPTimeout(duration)` | HTTP request timeout | `30s` |
-| `WithMaxRetries(n)` | Max retries for transient failures | `3` |
-| `WithRetryWait(min, max)` | Retry backoff bounds | `1s`, `30s` |
-| `WithHTTPClient(client)` | Use custom HTTP client | - |
+| `WithHTTPTimeout(duration)` | Timeout of each HTTP request (for report downloads: until the download starts) | `30s` |
+| `WithMaxRetries(n)` | Max retries for transient failures; `0` disables retries | `3` |
+| `WithRetryWait(min, max)` | Retry backoff bounds; `max` also caps the `Retry-After` the client waits out | `1s`, `30s` |
+| `WithHTTPClient(client)` | Use custom HTTP client (`WithHTTPTimeout` then has no effect) | - |
 | `WithUserAgent(ua)` | Custom User-Agent string | `opusdns-go-client/<version>` |
 | `WithClientToken(token)` | `X-OpusDNS-Client` product token; `""` omits the header | `opusdns-go-client/<version>` |
 | `WithDebug(enabled)` | Enable debug logging | `false` |
-| `WithLogger(logger)` | Custom logger for debug output | stdout |
+| `WithLogger(logger)` | Custom logger for debug output | standard error |
 | `WithTTL(ttl)` | Default TTL for DNS records | `60` |
+
+The endpoint must be an absolute `https://` (or, for local testing, `http://`) URL.
+The default HTTP client honours the `HTTP_PROXY`, `HTTPS_PROXY` and `NO_PROXY`
+environment variables. When the API redirects to another host, the client does not
+send your API key along.
+
+### Debug logging
+
+`WithDebug(true)` (or `OPUSDNS_DEBUG=true`) logs each request and response to standard
+error, or to the logger set with `WithLogger`. Secrets in bodies and query strings, such as
+API keys, client secrets, access tokens, auth codes and passwords, are replaced with
+`[REDACTED]`. Binary bodies, such as report archives, are only described.
 
 ### Client identification
 
@@ -818,14 +830,22 @@ if err != nil {
         fmt.Println("Rate limited - try again later")
     } else if errors.Is(err, opusdns.ErrForbidden) {
         fmt.Println("Insufficient permissions")
+    } else if errors.Is(err, opusdns.ErrTimeout) {
+        fmt.Println("Timed out")
     }
 
     // Get detailed API error information
     if apiErr, ok := opusdns.IsAPIError(err); ok {
         fmt.Printf("Status: %d\n", apiErr.StatusCode)
-        fmt.Printf("Error Code: %s\n", apiErr.ErrorCode)
+        fmt.Printf("Error Code: %s\n", apiErr.ErrorCode)   // e.g. ERROR_USER_EXISTS
         fmt.Printf("Message: %s\n", apiErr.Message)
-        fmt.Printf("Request ID: %s\n", apiErr.RequestID)
+        fmt.Printf("Request ID: %s\n", apiErr.RequestID)   // quote this to OpusDNS support
+        fmt.Printf("Retry after: %v\n", apiErr.RetryAfter) // set when the API sent Retry-After
+
+        // A validation error (HTTP 422) lists the fields that failed
+        for _, fieldErr := range apiErr.Errors {
+            fmt.Printf("%s: %s\n", fieldErr.Field(), fieldErr.Msg) // body.postal_code: ...
+        }
     }
 
     // Check if error is retryable
@@ -844,11 +864,18 @@ if err != nil {
 | `ErrForbidden` | Insufficient permissions (HTTP 403) |
 | `ErrBadRequest` | Invalid request (HTTP 400) |
 | `ErrConflict` | Resource conflict (HTTP 409) |
-| `ErrRateLimited` | Rate limit exceeded (HTTP 429) |
+| `ErrRateLimited` | Rate limit exceeded (HTTP 429) and not retried; see [Retries](#retries) |
 | `ErrServerError` | Server error (HTTP 5xx) |
-| `ErrTimeout` | Request timeout |
-| `ErrZoneNotFound` | No matching zone for FQDN |
-| `ErrInvalidInput` | Input validation failed |
+| `ErrTimeout` | The context's deadline passed or the HTTP timeout fired |
+| `ErrInvalidInput` | Input validation failed, in the client or in the API (HTTP 422) |
+
+When the context is canceled or its deadline passes, the error also matches
+`context.Canceled` or `context.DeadlineExceeded`. `ErrZoneNotFound` is deprecated: no
+method returns it, a missing zone is `ErrNotFound`.
+
+The client checks a request before sending it. A path segment that is empty, `.` or
+`..` (usually an empty or unescaped ID) or a header value with a control character is
+returned as `ErrInvalidInput`, and nothing is sent.
 
 ### Helper Functions
 
@@ -864,16 +891,35 @@ opusdns.IsAPIError(err)           // Extract APIError details
 
 ### Retries
 
+| Failure | GET / HEAD / OPTIONS / PUT | POST / PATCH / DELETE |
+|---|---|---|
+| 429 | retried | retried (the API rejected the request without acting) |
+| 5xx | retried | **not retried**, returned as `APIError` |
+| Network error before the connection opened (dial) | retried | retried (nothing was sent) |
+| Network error after that (reset, timeout, …) | retried | **not retried**, error returned |
+| Invalid request (bad path, unencodable body, bad header), untrusted TLS certificate | not retried | not retried |
+
 The client retries a request that was rate limited (HTTP 429) whatever its
 method. Server errors (HTTP 5xx) and network failures are retried only for
-`GET`, `PUT` and `DELETE`, which are safe to send twice.
+methods that are safe to send twice.
 
-`POST` and `PATCH` are not retried after a server error or a dropped
+`POST`, `PATCH` and `DELETE` are not retried after a server error or a dropped
 connection, because the API may already have acted on them: a resent renewal
-renews twice, a resent registration is charged twice. The error comes back to
-you instead. Before you send such a request again, check the resulting state,
-for example with `GetDomain` or the domain's events. `IsRetryableError` only
-classifies the status code; it does not know whether resending is safe.
+renews twice, a resent registration is charged twice, and a resent delete that
+had worked fails with "not found". The error comes back to you instead. Before
+you send such a request again, check the resulting state, for example with
+`GetDomain` or the domain's events. `IsRetryableError` only classifies the
+status code; it does not know whether resending is safe.
+
+Between attempts the client waits with exponential backoff from `RetryWaitMin`
+up to `RetryWaitMax`, or, when the response carries `Retry-After`, exactly as long
+as it asks. A rate limit holds back only the request that hit it, not the rest of
+the client. When `Retry-After` asks for longer than `RetryWaitMax` (the report
+cooldown asks for up to 5 minutes, for example), the client does not wait: the
+`ErrRateLimited` error comes back at once, with the requested wait in
+`APIError.RetryAfter`. If the context ends while the client waits to retry, the
+error matches both the context's error and the last failure, e.g.
+`ErrRateLimited`. With `WithMaxRetries(0)` the client never retries or waits.
 
 ## Thread Safety
 
