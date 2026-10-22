@@ -657,7 +657,7 @@ operations:
     method: Reports.GetReport
   "GET /v1/reports/{report_id}/download":
     status: implemented
-    method: Reports.DownloadReport
+    method: Reports.DownloadReportToWriter
   "POST /v1/reports":
     status: implemented
     method: Reports.CreateReport
