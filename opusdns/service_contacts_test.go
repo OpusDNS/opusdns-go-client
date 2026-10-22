@@ -383,6 +383,7 @@ func TestContactsService_ListContactsFilters(t *testing.T) {
 		assert.Equal(t, "true", query.Get("in_use"))
 		assert.Equal(t, []string{"VERIFICATION_REQUIRED"}, query["status_tags"])
 		assert.Equal(t, "match_any", query.Get("status_tag_mode"))
+		assert.Equal(t, "false", query.Get("has_tags"))
 
 		_ = json.NewEncoder(w).Encode(models.ContactListResponse{
 			Results:    []models.Contact{},
@@ -395,10 +396,12 @@ func TestContactsService_ListContactsFilters(t *testing.T) {
 	require.NoError(t, err)
 
 	inUse := true
+	hasTags := false
 	_, err = client.Contacts.ListContacts(context.Background(), &models.ListContactsOptions{
 		InUse:         &inUse,
 		StatusTags:    []models.StatusTagType{models.StatusTagTypeVerificationRequired},
 		StatusTagMode: models.TagFilterModeMatchAny,
+		HasTags:       &hasTags,
 	})
 	require.NoError(t, err)
 }

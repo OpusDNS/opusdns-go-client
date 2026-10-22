@@ -299,6 +299,9 @@ type ListContactsOptions struct {
 
 	// StatusTagMode controls whether any, all or none of StatusTags must match.
 	StatusTagMode TagFilterMode
+
+	// HasTags filters by whether the contact has any tags.
+	HasTags *bool
 }
 
 // ContactIncludeField represents optional contact response expansions.

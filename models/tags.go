@@ -55,6 +55,14 @@ const (
 
 	// StatusTagTypeDNSSECPending marks a domain whose DS submission is deferred and retrying.
 	StatusTagTypeDNSSECPending StatusTagType = "DNSSEC_PENDING"
+
+	// StatusTagTypeTransferOnRenewPending marks a domain held at another
+	// registrar whose renewal is transferring it into OpusDNS.
+	StatusTagTypeTransferOnRenewPending StatusTagType = "TRANSFER_ON_RENEW_PENDING"
+
+	// StatusTagTypeRegistrantChangeLocked marks a domain under the transfer
+	// lock that follows a change of registrant.
+	StatusTagTypeRegistrantChangeLocked StatusTagType = "REGISTRANT_CHANGE_LOCKED"
 )
 
 // StatusTagResponse represents a system-managed status tag on a resource.

@@ -25,6 +25,7 @@ const (
 	EventTypeVanityNSRestoration EventType = "VANITY_NS_RESTORATION"
 	EventTypeVanityNSTermination EventType = "VANITY_NS_TERMINATION"
 	EventTypeClone               EventType = "CLONE"
+	EventTypeRegistrantChange    EventType = "REGISTRANT_CHANGE"
 )
 
 // EventSubtype represents a more specific event subtype.
@@ -35,6 +36,7 @@ const (
 	EventSubtypeSuccess      EventSubtype = "SUCCESS"
 	EventSubtypeFailure      EventSubtype = "FAILURE"
 	EventSubtypeCanceled     EventSubtype = "CANCELED"
+	EventSubtypeOverdue      EventSubtype = "OVERDUE"
 )
 
 // EventObjectType represents the type of object an event relates to.
@@ -71,10 +73,11 @@ type EventError struct {
 type VerificationClaimType string
 
 const (
-	VerificationClaimTypeName    VerificationClaimType = "name"
-	VerificationClaimTypeAddress VerificationClaimType = "address"
-	VerificationClaimTypeEmail   VerificationClaimType = "email"
-	VerificationClaimTypePhone   VerificationClaimType = "phone"
+	VerificationClaimTypeName        VerificationClaimType = "name"
+	VerificationClaimTypeAddress     VerificationClaimType = "address"
+	VerificationClaimTypeEmail       VerificationClaimType = "email"
+	VerificationClaimTypePhone       VerificationClaimType = "phone"
+	VerificationClaimTypeLegalEntity VerificationClaimType = "legal_entity"
 )
 
 // VerificationDeadlineType represents the type of a verification deadline.
@@ -83,6 +86,7 @@ type VerificationDeadlineType string
 const (
 	VerificationDeadlineTypeDedelegation VerificationDeadlineType = "dedelegation"
 	VerificationDeadlineTypeDeletion     VerificationDeadlineType = "deletion"
+	VerificationDeadlineTypeVerification VerificationDeadlineType = "verification"
 )
 
 // VerificationDeadline represents a deadline for domain verification.
@@ -107,8 +111,8 @@ type VerificationRegistrantDetails struct {
 }
 
 // EventDetails contains the discriminated union of event detail variants.
-// DetailType selects the variant ("domain_renewal" or "domain_verification");
-// variant-specific fields are populated accordingly.
+// DetailType selects the variant ("domain_renewal", "domain_verification" or
+// "registrant_change"); variant-specific fields are populated accordingly.
 type EventDetails struct {
 	// DetailType is the discriminator selecting the detail variant.
 	DetailType string `json:"detail_type,omitempty"`
@@ -127,6 +131,39 @@ type EventDetails struct {
 
 	// Registrants is set for the "domain_verification" variant.
 	Registrants []VerificationRegistrantDetails `json:"registrants,omitempty"`
+
+	// VerificationID is set for the "domain_verification" variant.
+	VerificationID string `json:"verification_id,omitempty"`
+
+	// Source is set for the "domain_verification" variant.
+	Source *DomainVerificationKind `json:"source,omitempty"`
+
+	// RegistrantChangeID is set for the "registrant_change" variant.
+	RegistrantChangeID string `json:"registrant_change_id,omitempty"`
+
+	// PriorRegistrantID is set for the "registrant_change" variant.
+	PriorRegistrantID string `json:"prior_registrant_id,omitempty"`
+
+	// NewRegistrantID is set for the "registrant_change" variant.
+	NewRegistrantID string `json:"new_registrant_id,omitempty"`
+
+	// Status is set for the "registrant_change" variant.
+	Status *RegistrantChangeStatus `json:"status,omitempty"`
+
+	// ConfirmationMethod is set for the "registrant_change" variant.
+	ConfirmationMethod *RegistrantChangeConfirmationMethod `json:"confirmation_method,omitempty"`
+
+	// ConfirmationDeadline is set for the "registrant_change" variant.
+	ConfirmationDeadline *time.Time `json:"confirmation_deadline,omitempty"`
+
+	// NotificationType is set for the "registrant_change" variant.
+	NotificationType *string `json:"notification_type,omitempty"`
+
+	// TransferLockOptOut is set for the "registrant_change" variant.
+	TransferLockOptOut *bool `json:"transfer_lock_opt_out,omitempty"`
+
+	// TransferLockUntil is set for the "registrant_change" variant.
+	TransferLockUntil *time.Time `json:"transfer_lock_until,omitempty"`
 }
 
 // EventData contains the event-specific data.
@@ -230,6 +267,13 @@ const (
 	ObjectEventTypeTransferCompleted           ObjectEventType = "TRANSFER_COMPLETED"
 	ObjectEventTypeTransferOutStarted          ObjectEventType = "TRANSFER_OUT_STARTED"
 	ObjectEventTypeTransferOutCompleted        ObjectEventType = "TRANSFER_OUT_COMPLETED"
+	ObjectEventTypeTransferCancelled           ObjectEventType = "TRANSFER_CANCELLED"
+	ObjectEventTypeTransferFailed              ObjectEventType = "TRANSFER_FAILED"
+	ObjectEventTypeTransferOutCancelled        ObjectEventType = "TRANSFER_OUT_CANCELLED"
+	ObjectEventTypeTransferOutFailed           ObjectEventType = "TRANSFER_OUT_FAILED"
+	ObjectEventTypeTransferOutRejected         ObjectEventType = "TRANSFER_OUT_REJECTED"
+	ObjectEventTypeSynced                      ObjectEventType = "SYNCED"
+	ObjectEventTypeSyncedAfterImport           ObjectEventType = "SYNCED_AFTER_IMPORT"
 	ObjectEventTypeRenewed                     ObjectEventType = "RENEWED"
 	ObjectEventTypeRestored                    ObjectEventType = "RESTORED"
 	ObjectEventTypeBillingTransactionReserved  ObjectEventType = "BILLING_TRANSACTION_RESERVED"
@@ -255,6 +299,10 @@ type ObjectLog struct {
 	// Details contains the changes made to the object.
 	Details *map[string]interface{} `json:"details,omitempty"`
 
+	// Changes lists the fields the action changed, with their old and new
+	// values. Nil when the API does not record field changes for the action.
+	Changes []ObjectLogChange `json:"changes,omitempty"`
+
 	// PerformedByID is the ID of the actor who performed the action.
 	PerformedByID *string `json:"performed_by_id,omitempty"`
 
@@ -266,6 +314,18 @@ type ObjectLog struct {
 
 	// CreatedOn is when the log entry was created.
 	CreatedOn *time.Time `json:"created_on,omitempty"`
+}
+
+// ObjectLogChange is one field changed by an object log action.
+type ObjectLogChange struct {
+	// Field is the name of the changed field.
+	Field string `json:"field"`
+
+	// OldValue is the value before the change; any JSON type.
+	OldValue interface{} `json:"old_value"`
+
+	// NewValue is the value after the change; any JSON type.
+	NewValue interface{} `json:"new_value"`
 }
 
 // ObjectLogListResponse represents the paginated response when listing object logs.

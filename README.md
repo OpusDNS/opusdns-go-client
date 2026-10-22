@@ -354,15 +354,32 @@ result, err := client.Domains.ResolveOutboundTransfer(ctx, "example.com",
     &models.OutboundTransferRequest{Action: models.OutboundTransferApprove})
 ```
 
-Some registries issue the transfer auth code on request and deliver it out of
-band rather than returning it over the API:
+Request the transfer auth code of a domain. Depending on the registry, the code
+comes back in the response or is emailed to the registrant:
 
 ```go
-result, err := client.Domains.RequestAuthCode(ctx, models.AuthCodeTLDSE, "example.se")
+result, err := client.Domains.RequestDomainAuthCode(ctx, "example.se")
+if result.Delivery == models.AuthCodeDeliveryResponse {
+    fmt.Println("auth code:", *result.AuthCode)
+} else {
+    fmt.Println("sent to:", result.Recipients)
+}
 ```
 
-Other TLD-specific operations follow the same shape: `WithdrawATDomain`,
+`RequestAuthCode`, which takes the TLD, is deprecated together with the per-TLD
+routes it calls. Other TLD-specific operations: `WithdrawATDomain`,
 `TransitDEDomain`, `SubmitNorIDDeclaration` and `ResendNorIDDeclarationEmail`.
+
+### Domain Verifications
+
+List the verification cases (ICANN or registry) of a domain, open and closed:
+
+```go
+cases, err := client.Domains.ListDomainVerifications(ctx, "example.com", nil)
+for _, c := range cases {
+    fmt.Println(c.Source, c.Trigger, c.Status, c.Claims)
+}
+```
 
 ### Trademark Claims Notices
 
@@ -381,9 +398,15 @@ for _, notice := range notices {
 ### Renew a Domain
 
 ```go
-domain, err := client.Domains.RenewDomain(ctx, "example.com", &models.DomainRenewRequest{
+result, err := client.Domains.RenewDomain(ctx, "example.com", &models.DomainRenewRequest{
     Period: 2, // Renew for 2 years
 })
+if result.TransferPending() {
+    // The domain is held at another registrar: the renewal transfers it into
+    // OpusDNS. Follow the transfer through the domain's events.
+} else {
+    fmt.Println("expires on", result.NewExpiryDate)
+}
 ```
 
 ### Update a Domain

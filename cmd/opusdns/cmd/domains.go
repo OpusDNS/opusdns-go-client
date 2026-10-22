@@ -111,6 +111,7 @@ var domainsSummaryCmd = &cobra.Command{
 		printCounts("Domains by TLD", counts.ByTLD, ".")
 		printCounts("Domains by Status", stringKeyed(counts.ByStatus), "")
 		printCounts("Domains by Status Tag", stringKeyed(counts.ByStatusTag), "")
+		printCounts("Domains by Account Type", stringKeyed(counts.ByAccountType), "")
 		printCounts("Domains by Organization", counts.ByOrganization, "")
 
 		return nil
@@ -144,17 +145,24 @@ var domainsRenewCmd = &cobra.Command{
 			}
 		}
 
-		domain, err := getClient().Domains.RenewDomain(ctx, domainName, &models.DomainRenewRequest{
+		result, err := getClient().Domains.RenewDomain(ctx, domainName, &models.DomainRenewRequest{
 			Period: period,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to renew domain: %w", err)
 		}
 
-		fmt.Printf("✓ Domain '%s' renewed successfully!\n\n", domain.Name)
+		if result.TransferPending() {
+			fmt.Printf("✓ Domain '%s' is held at another registrar; a transfer into OpusDNS was requested.\n", result.Name)
+			fmt.Printf("Request ID: %s\n", result.RequestID)
+			fmt.Println("Follow the transfer through the domain's events.")
+			return nil
+		}
 
-		if domain.ExpiresOn != nil {
-			fmt.Printf("New expiration date: %s\n", domain.ExpiresOn.Format("2006-01-02"))
+		fmt.Printf("✓ Domain '%s' renewed successfully!\n\n", result.Name)
+
+		if result.NewExpiryDate != nil {
+			fmt.Printf("New expiration date: %s\n", result.NewExpiryDate.Format("2006-01-02"))
 		}
 
 		return nil

@@ -138,6 +138,24 @@ func (s *DomainsService) ListDomainsPage(ctx context.Context, opts *models.ListD
 		if opts.TransferredBefore != nil {
 			query.Set("transferred_before", opts.TransferredBefore.Format(time.RFC3339))
 		}
+		if opts.HasTags != nil {
+			query.Set("has_tags", strconv.FormatBool(*opts.HasTags))
+		}
+		if opts.Nameserver != "" {
+			query.Set("nameserver", opts.Nameserver)
+		}
+		for _, accountType := range opts.AccountTypes {
+			query.Add("account_type", string(accountType))
+		}
+		if opts.AccountTypeMode != "" {
+			query.Set("account_type_mode", string(opts.AccountTypeMode))
+		}
+		for _, registrar := range opts.Registrars {
+			query.Add("registrar", string(registrar))
+		}
+		for _, credentialID := range opts.RegistrarCredentialIDs {
+			query.Add("registrar_credential_id", string(credentialID))
+		}
 	}
 
 	resp, err := s.client.http.Get(ctx, path, query)
@@ -259,7 +277,11 @@ func (s *DomainsService) CancelTransfer(ctx context.Context, domainRef string) e
 }
 
 // RenewDomain renews a domain registration.
-func (s *DomainsService) RenewDomain(ctx context.Context, domainRef string, req *models.DomainRenewRequest) (*models.Domain, error) {
+//
+// For a domain held at another registrar, the API transfers the domain into
+// OpusDNS instead and answers before the transfer starts; the result's
+// TransferPending reports that case.
+func (s *DomainsService) RenewDomain(ctx context.Context, domainRef string, req *models.DomainRenewRequest) (*models.DomainRenewResult, error) {
 	path := s.client.http.BuildPath("domains", url.PathEscape(domainRef), "renew")
 
 	resp, err := s.client.http.Post(ctx, path, req)
@@ -267,12 +289,88 @@ func (s *DomainsService) RenewDomain(ctx context.Context, domainRef string, req 
 		return nil, err
 	}
 
-	var domain models.Domain
-	if err := s.client.http.DecodeResponse(resp, &domain); err != nil {
+	var result models.DomainRenewResult
+	if err := s.client.http.DecodeResponse(resp, &result); err != nil {
 		return nil, err
 	}
 
-	return &domain, nil
+	return &result, nil
+}
+
+// RequestDomainAuthCode requests the transfer auth code of a domain. Depending
+// on the registry, the code is in the response or is emailed to the registrant;
+// the result's Delivery says which.
+func (s *DomainsService) RequestDomainAuthCode(ctx context.Context, domainRef string) (*models.DomainAuthCodeResponse, error) {
+	path := s.client.http.BuildPath("domains", url.PathEscape(domainRef), "auth-code")
+
+	resp, err := s.client.http.Post(ctx, path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var result models.DomainAuthCodeResponse
+	if err := s.client.http.DecodeResponse(resp, &result); err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
+// ListDomainVerifications retrieves all verification cases of a domain with
+// automatic pagination.
+func (s *DomainsService) ListDomainVerifications(ctx context.Context, domainRef string, opts *models.ListDomainVerificationsOptions) ([]models.DomainVerification, error) {
+	var all []models.DomainVerification
+	page := 1
+
+	for {
+		pageOpts := cloneOptions(opts)
+		pageOpts.Page = page
+		if pageOpts.PageSize == 0 {
+			pageOpts.PageSize = DefaultPageSize
+		}
+
+		resp, err := s.ListDomainVerificationsPage(ctx, domainRef, pageOpts)
+		if err != nil {
+			return nil, err
+		}
+
+		all = append(all, resp.Results...)
+
+		if !resp.Pagination.HasNextPage {
+			break
+		}
+		page++
+	}
+
+	return all, nil
+}
+
+// ListDomainVerificationsPage retrieves a single page of a domain's
+// verification cases.
+func (s *DomainsService) ListDomainVerificationsPage(ctx context.Context, domainRef string, opts *models.ListDomainVerificationsOptions) (*models.DomainVerificationListResponse, error) {
+	path := s.client.http.BuildPath("domains", url.PathEscape(domainRef), "verifications")
+
+	query := url.Values{}
+	if opts != nil {
+		if opts.Page > 0 {
+			query.Set("page", strconv.Itoa(opts.Page))
+		}
+		if opts.PageSize > 0 {
+			query.Set("page_size", strconv.Itoa(opts.PageSize))
+		}
+	}
+
+	resp, err := s.client.http.Get(ctx, path, query)
+	if err != nil {
+		return nil, err
+	}
+
+	var result models.DomainVerificationListResponse
+	if err := s.client.http.DecodeResponse(resp, &result); err != nil {
+		return nil, err
+	}
+
+	return &result, nil
 }
 
 // RestoreDomain restores a deleted domain from redemption.

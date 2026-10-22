@@ -158,7 +158,7 @@ operations:
     status: excluded
     reason: "unauthenticated token flow completed in a browser, not by an API client"
 
-  # --- dns (15) ---
+  # --- dns (20) ---
   "DELETE /v1/dns/{zone_name}":
     status: implemented
     method: DNS.DeleteZone
@@ -171,6 +171,18 @@ operations:
   "GET /v1/dns/email-forwards":
     status: implemented
     method: EmailForwards.ListZonesPage
+  "GET /v1/dns/statistics":
+    status: deferred
+    reason: "query statistics are read-only analytics; not bound until a consumer needs them"
+  "GET /v1/dns/statistics/inactive-zones":
+    status: deferred
+    reason: "query statistics are read-only analytics; not bound until a consumer needs them"
+  "GET /v1/dns/statistics/movers":
+    status: deferred
+    reason: "query statistics are read-only analytics; not bound until a consumer needs them"
+  "GET /v1/dns/statistics/top-zones":
+    status: deferred
+    reason: "query statistics are read-only analytics; not bound until a consumer needs them"
   "GET /v1/dns/summary":
     status: implemented
     method: DNS.GetSummary
@@ -183,6 +195,9 @@ operations:
   "GET /v1/dns/{zone_name}/email-forwards":
     status: implemented
     method: EmailForwards.ListEmailForwardsByZone
+  "GET /v1/dns/{zone_name}/statistics":
+    status: deferred
+    reason: "query statistics are read-only analytics; not bound until a consumer needs them"
   "PATCH /v1/dns/{zone_name}/records":
     status: implemented
     method: DNS.PatchRecords
@@ -205,7 +220,7 @@ operations:
     status: implemented
     method: DNS.PutRRSets
 
-  # --- domain (18) ---
+  # --- domain (21) ---
   "DELETE /v1/domains/{domain_reference}":
     status: implemented
     method: Domains.DeleteDomain
@@ -221,6 +236,9 @@ operations:
   "GET /v1/domains/check":
     status: implemented
     method: Domains.CheckDomains
+  "GET /v1/domains/statistics":
+    status: deferred
+    reason: "query statistics are read-only analytics; not bound until a consumer needs them"
   "GET /v1/domains/summary":
     status: implemented
     method: Domains.GetSummary
@@ -230,6 +248,9 @@ operations:
   "GET /v1/domains/{domain_reference}/dnssec":
     status: implemented
     method: Domains.GetDNSSEC
+  "GET /v1/domains/{domain_reference}/verifications":
+    status: implemented
+    method: Domains.ListDomainVerificationsPage
   "PATCH /v1/domains/{domain_reference}":
     status: implemented
     method: Domains.UpdateDomain
@@ -242,6 +263,9 @@ operations:
   "POST /v1/domains/transfer":
     status: implemented
     method: Domains.TransferDomain
+  "POST /v1/domains/{domain_reference}/auth-code":
+    status: implemented
+    method: Domains.RequestDomainAuthCode
   "POST /v1/domains/{domain_reference}/dnssec/disable":
     status: implemented
     method: Domains.DisableDNSSEC
@@ -262,6 +286,9 @@ operations:
     method: Domains.PutDNSSEC
 
   # --- domain,domain_tld_specific (15) ---
+  # The nine auth_code/request routes are deprecated upstream in favour of
+  # POST /v1/domains/{domain_reference}/auth-code (Domains.RequestDomainAuthCode).
+  # Domains.RequestAuthCode stays bound while the API still serves them.
   "GET /v1/domains/tld-specific/no/applicant-declaration":
     status: excluded
     reason: "unauthenticated token flow completed in a browser, not by an API client"
@@ -588,6 +615,14 @@ operations:
     status: implemented
     method: Organizations.CreateRole
 
+  # --- organization,product_waitlist (2) ---
+  "GET /v1/organizations/product-waitlist":
+    status: excluded
+    reason: "the only waitlist product is ai_concierge, which is intentionally not part of the Go client"
+  "POST /v1/organizations/product-waitlist/{product}/apply":
+    status: excluded
+    reason: "the only waitlist product is ai_concierge, which is intentionally not part of the Go client"
+
   # --- organization,usage (2) ---
   "GET /v1/organizations/{organization_id}/usage/{product}":
     status: implemented
@@ -687,10 +722,19 @@ operations:
     status: implemented
     method: Users.SetUserRole
 
-  # --- whitelabel (8) ---
+  # --- whitelabel (14) ---
+  "DELETE /v1/whitelabel-branding/assets/{asset_id}":
+    status: deferred
+    reason: "asset upload is multipart/form-data, which the transport does not support yet"
   "GET /v1/whitelabel-branding":
     status: implemented
     method: Whitelabel.Get
+  "GET /v1/whitelabel-branding/assets":
+    status: deferred
+    reason: "asset upload is multipart/form-data, which the transport does not support yet"
+  "GET /v1/whitelabel-branding/document":
+    status: deferred
+    reason: "the branding document references uploaded assets; bound together with them"
   "GET /v1/whitelabel-branding/email/templates":
     status: implemented
     method: Whitelabel.ListEmailTemplates
@@ -703,6 +747,12 @@ operations:
     method:
       - Whitelabel.CreateBase
       - Whitelabel.CreatePlus
+  "POST /v1/whitelabel-branding/assets":
+    status: deferred
+    reason: "asset upload is multipart/form-data, which the transport does not support yet"
+  "POST /v1/whitelabel-branding/document":
+    status: deferred
+    reason: "the branding document references uploaded assets; bound together with them"
   "POST /v1/whitelabel-branding/email/preview":
     status: implemented
     method: Whitelabel.PreviewEmail
@@ -715,6 +765,9 @@ operations:
   "POST /v1/whitelabel-branding/tier":
     status: implemented
     method: Whitelabel.UpgradeToPlus
+  "PUT /v1/whitelabel-branding/document":
+    status: deferred
+    reason: "the branding document references uploaded assets; bound together with them"
 
 # Hand-written response structs checked against the schemas they mirror.
 # Every Go type here must also be listed in modelRegistry in

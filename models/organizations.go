@@ -393,6 +393,8 @@ const (
 	BillingProductTypeWhitelabel       BillingTransactionProductType = "whitelabel_branding"
 	BillingProductTypeWhitelabelPlus   BillingTransactionProductType = "whitelabel_branding_plus"
 	BillingProductTypeRASDomain        BillingTransactionProductType = "ras_domain_lifecycle"
+	BillingProductTypeAMSDomain        BillingTransactionProductType = "ams_domain_lifecycle"
+	BillingProductTypeAMSMaintenance   BillingTransactionProductType = "ams_maintenance_fee"
 )
 
 // BillingTransactionAction represents the action in a transaction.
@@ -408,6 +410,7 @@ const (
 	BillingActionServiceFee  BillingTransactionAction = "service_fee"
 	BillingActionUpgradeFee  BillingTransactionAction = "upgrade_fee"
 	BillingActionWalletTopUp BillingTransactionAction = "wallet_top_up"
+	BillingActionImport      BillingTransactionAction = "import"
 )
 
 // BillingTransactionStatus represents the status of a transaction.
