@@ -3,6 +3,8 @@ package opusdns
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -96,6 +98,109 @@ func TestRetryLogic(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, zones, 1)
 	assert.Equal(t, 3, attempts)
+}
+
+// roundTripFunc lets a test stand in for the network.
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+func TestRetryPolicy(t *testing.T) {
+	newClient := func(t *testing.T, opts ...Option) *Client {
+		t.Helper()
+		opts = append([]Option{
+			WithAPIKey("opk_test"),
+			WithMaxRetries(3),
+			WithRetryWait(time.Millisecond, 2*time.Millisecond),
+		}, opts...)
+		client, err := NewClient(opts...)
+		require.NoError(t, err)
+		return client
+	}
+
+	t.Run("server errors", func(t *testing.T) {
+		for _, tc := range []struct {
+			method   string
+			attempts int
+		}{
+			{http.MethodGet, 4},
+			{http.MethodPut, 4},
+			{http.MethodDelete, 4},
+			{http.MethodPost, 1},
+			{http.MethodPatch, 1},
+		} {
+			t.Run(tc.method, func(t *testing.T) {
+				attempts := 0
+				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					attempts++
+					w.WriteHeader(http.StatusServiceUnavailable)
+				}))
+				defer server.Close()
+
+				client := newClient(t, WithAPIEndpoint(server.URL))
+				resp, err := client.http.Do(context.Background(), &Request{Method: tc.method, Path: "/v1/domains/example.com/renew"})
+				if err == nil {
+					err = client.http.DecodeResponse(resp, nil)
+				}
+
+				assert.Equal(t, tc.attempts, attempts)
+				var apiErr *APIError
+				require.ErrorAs(t, err, &apiErr)
+				assert.Equal(t, http.StatusServiceUnavailable, apiErr.StatusCode)
+			})
+		}
+	})
+
+	t.Run("rate limit retries POST", func(t *testing.T) {
+		attempts := 0
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			attempts++
+			if attempts == 1 {
+				w.Header().Set("Retry-After", "0")
+				w.WriteHeader(http.StatusTooManyRequests)
+				return
+			}
+			_, _ = w.Write([]byte(`{}`))
+		}))
+		defer server.Close()
+
+		client := newClient(t, WithAPIEndpoint(server.URL))
+		resp, err := client.http.Post(context.Background(), "/v1/domains", nil)
+
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		assert.Equal(t, 2, attempts)
+	})
+
+	t.Run("network errors", func(t *testing.T) {
+		for _, tc := range []struct {
+			name     string
+			method   string
+			op       string
+			attempts int
+		}{
+			{"GET after the request was sent", http.MethodGet, "read", 4},
+			{"POST after the request was sent", http.MethodPost, "read", 1},
+			{"POST before the connection opened", http.MethodPost, "dial", 4},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				attempts := 0
+				transport := roundTripFunc(func(*http.Request) (*http.Response, error) {
+					attempts++
+					return nil, &net.OpError{Op: tc.op, Net: "tcp", Err: errors.New("connection reset")}
+				})
+
+				client := newClient(t,
+					WithAPIEndpoint("https://api.example.test"),
+					WithHTTPClient(&http.Client{Transport: transport}),
+				)
+				_, err := client.http.Do(context.Background(), &Request{Method: tc.method, Path: "/v1/domains"})
+
+				require.Error(t, err)
+				assert.Equal(t, tc.attempts, attempts)
+			})
+		}
+	})
 }
 
 func TestAPIError(t *testing.T) {

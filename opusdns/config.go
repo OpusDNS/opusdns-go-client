@@ -164,7 +164,9 @@ type Config struct {
 	HTTPTimeout time.Duration
 
 	// MaxRetries is the maximum number of retries for transient failures (429, 5xx).
-	// Set to 0 to disable retries.
+	// POST and PATCH requests are retried only after a 429 or when the
+	// connection could not be opened, never after a 5xx. Set to 0 to disable
+	// retries.
 	// Default: 3
 	MaxRetries int
 

@@ -11,7 +11,7 @@ The official Go client library for the [OpusDNS](https://opusdns.com) API - a co
 - **Broad API Coverage**: DNS zones, domains, contacts, email forwarding, domain forwarding, jobs, reports, tags and more ([what is and is not covered](spec/coverage.yaml))
 - **Type-Safe**: Strongly typed models with Go idioms
 - **Automatic Pagination**: Easily iterate through all resources
-- **Retry Logic**: Built-in exponential backoff for transient failures
+- **Retry Logic**: Built-in exponential backoff for transient failures, without resending non-idempotent requests
 - **Rate Limit Handling**: Automatic handling of rate limits (HTTP 429)
 - **Context Support**: All methods accept `context.Context` for cancellation and timeouts
 - **Configurable**: Flexible configuration via functional options or environment variables
@@ -861,6 +861,19 @@ opusdns.IsConflictError(err)      // Check for 409
 opusdns.IsRetryableError(err)     // Check if retryable (429, 5xx)
 opusdns.IsAPIError(err)           // Extract APIError details
 ```
+
+### Retries
+
+The client retries a request that was rate limited (HTTP 429) whatever its
+method. Server errors (HTTP 5xx) and network failures are retried only for
+`GET`, `PUT` and `DELETE`, which are safe to send twice.
+
+`POST` and `PATCH` are not retried after a server error or a dropped
+connection, because the API may already have acted on them: a resent renewal
+renews twice, a resent registration is charged twice. The error comes back to
+you instead. Before you send such a request again, check the resulting state,
+for example with `GetDomain` or the domain's events. `IsRetryableError` only
+classifies the status code; it does not know whether resending is safe.
 
 ## Thread Safety
 

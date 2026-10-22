@@ -6,10 +6,12 @@ import (
 	"context"
 	cryptorand "crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math"
 	"math/big"
+	"net"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -87,7 +89,17 @@ type Response struct {
 }
 
 // Do executes an HTTP request with retry logic and returns the response.
+//
+// A 429 is retried for every method, since the API turned the request away
+// without acting on it. Server errors and network failures are retried only
+// for idempotent methods (GET, HEAD, OPTIONS, PUT, DELETE). POST and PATCH
+// may already have taken effect when they fail that way, and sending them
+// again could renew, register or charge twice; they are retried only when the
+// connection could not be opened at all. A server error that is not retried
+// is returned as a response, so DecodeResponse turns it into an APIError.
 func (c *HTTPClient) Do(ctx context.Context, req *Request) (*Response, error) {
+	idempotent := isIdempotent(req.Method)
+
 	var lastErr error
 
 	for attempt := 0; attempt <= c.config.MaxRetries; attempt++ {
@@ -126,6 +138,11 @@ func (c *HTTPClient) Do(ctx context.Context, req *Request) (*Response, error) {
 				return nil, ctx.Err()
 			}
 
+			// The request may have reached the API; only resend it if that is harmless.
+			if !idempotent && !isDialError(err) {
+				return nil, err
+			}
+
 			// Retry on network errors
 			c.logf("Request failed (attempt %d): %v", attempt+1, err)
 			continue
@@ -139,7 +156,7 @@ func (c *HTTPClient) Do(ctx context.Context, req *Request) (*Response, error) {
 		}
 
 		// Retry on server errors (5xx)
-		if resp.StatusCode >= 500 {
+		if resp.StatusCode >= 500 && idempotent {
 			lastErr = NewAPIError(&http.Response{StatusCode: resp.StatusCode, Header: resp.Headers}, resp.Body)
 			c.logf("Server error %d (attempt %d)", resp.StatusCode, attempt+1)
 			continue
@@ -150,6 +167,23 @@ func (c *HTTPClient) Do(ctx context.Context, req *Request) (*Response, error) {
 	}
 
 	return nil, fmt.Errorf("opusdns: max retries exceeded: %w", lastErr)
+}
+
+// isIdempotent reports whether sending a request with this method twice has
+// the same effect as sending it once (RFC 9110, section 9.2.2).
+func isIdempotent(method string) bool {
+	switch method {
+	case http.MethodGet, http.MethodHead, http.MethodOptions, http.MethodPut, http.MethodDelete:
+		return true
+	}
+	return false
+}
+
+// isDialError reports whether err happened while opening the connection,
+// before any part of the request was sent.
+func isDialError(err error) bool {
+	var opErr *net.OpError
+	return errors.As(err, &opErr) && opErr.Op == "dial"
 }
 
 // doRequest performs a single HTTP request without retries.
