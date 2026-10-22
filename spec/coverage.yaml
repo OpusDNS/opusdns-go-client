@@ -63,16 +63,16 @@ operations:
   # --- archive (5) ---
   "GET /v1/archive/email-forward-logs/aliases/{email_forward_alias_id}":
     status: implemented
-    method: Events.ListEmailForwardLogsByAlias
+    method: Events.ListEmailForwardLogsByAliasPage
   "GET /v1/archive/email-forward-logs/{email_forward_id}":
     status: implemented
-    method: Events.ListEmailForwardLogs
+    method: Events.ListEmailForwardLogsPage
   "GET /v1/archive/object-logs":
     status: implemented
     method: Events.ListObjectLogs
   "GET /v1/archive/object-logs/{object_id}":
     status: implemented
-    method: Events.GetObjectLog
+    method: Events.ListObjectLogsByObjectPage
   "GET /v1/archive/request-history":
     status: implemented
     method: Events.ListRequestHistory
