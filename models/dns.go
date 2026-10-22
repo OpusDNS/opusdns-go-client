@@ -209,8 +209,35 @@ type Record struct {
 	// RData is the record data.
 	RData string `json:"rdata"`
 
-	// Protected indicates if the record is protected from deletion.
+	// Protected indicates if the record is protected from deletion. It is
+	// read-only: PatchRecords, UpsertRecord and DeleteRecord never send it.
 	Protected bool `json:"protected,omitempty"`
+}
+
+// RecordPatch is a single record as the API takes it in a record patch
+// operation (DnsRrsetWithOneRecordPatch).
+type RecordPatch struct {
+	// Name is the record name relative to the zone.
+	Name string `json:"name"`
+
+	// Type is the DNS record type.
+	Type RRSetType `json:"type"`
+
+	// TTL is the time-to-live in seconds.
+	TTL int `json:"ttl"`
+
+	// RData is the record data.
+	RData string `json:"rdata"`
+}
+
+// RecordPatchOperation is one operation of a record patch request as the API
+// takes it (DnsRecordPatchOp).
+type RecordPatchOperation struct {
+	// Op is the operation type ("upsert" or "remove").
+	Op RecordPatchOp `json:"op"`
+
+	// Record is the record to operate on.
+	Record RecordPatch `json:"record"`
 }
 
 // RecordPatchOp represents an operation for patching records.
@@ -234,9 +261,10 @@ type RecordOperation struct {
 }
 
 // RecordPatchRequest represents a request to patch records in a zone.
+// PatchRecords builds it from RecordOperation values.
 type RecordPatchRequest struct {
 	// Ops is the list of operations to perform.
-	Ops []RecordOperation `json:"ops"`
+	Ops []RecordPatchOperation `json:"ops"`
 }
 
 // RRSetPatch represents an RRset used in patch operations.
