@@ -258,8 +258,9 @@ type ProductCreateResponse struct {
 // BrandingDocument is the reseller's visual and textual branding, applied to
 // the dashboard and to transactional email.
 type BrandingDocument struct {
-	// Version is the branding document revision.
-	Version *string `json:"version,omitempty"`
+	// Version is the branding document schema version. The API supports only
+	// 1, which it also assumes when Version is nil.
+	Version *int `json:"version,omitempty"`
 
 	// Brand carries the reseller's name and logos.
 	Brand *Brand `json:"brand,omitempty"`
