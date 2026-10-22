@@ -13,8 +13,9 @@ type UsersService struct {
 	client *Client
 }
 
-// GetCurrentUser retrieves the currently authenticated user.
-func (s *UsersService) GetCurrentUser(ctx context.Context) (*models.User, error) {
+// GetCurrentUser retrieves the currently authenticated user, with their role,
+// resolved permissions and organization.
+func (s *UsersService) GetCurrentUser(ctx context.Context) (*models.UserProfile, error) {
 	path := s.client.http.BuildPath("users", "me")
 
 	resp, err := s.client.http.Get(ctx, path, nil)
@@ -22,7 +23,7 @@ func (s *UsersService) GetCurrentUser(ctx context.Context) (*models.User, error)
 		return nil, err
 	}
 
-	var user models.User
+	var user models.UserProfile
 	if err := s.client.http.DecodeResponse(resp, &user); err != nil {
 		return nil, err
 	}
@@ -30,9 +31,10 @@ func (s *UsersService) GetCurrentUser(ctx context.Context) (*models.User, error)
 	return &user, nil
 }
 
-// ListUsers retrieves all users with automatic pagination.
-func (s *UsersService) ListUsers(ctx context.Context, opts *models.ListUsersOptions) ([]models.User, error) {
-	var all []models.User
+// ListUsers retrieves all users of the organization, each with their role,
+// following pagination.
+func (s *UsersService) ListUsers(ctx context.Context, opts *models.ListUsersOptions) ([]models.UserWithRole, error) {
+	var all []models.UserWithRole
 	page := 1
 
 	for {
@@ -101,7 +103,7 @@ func (s *UsersService) GetUser(ctx context.Context, userID models.UserID) (*mode
 
 // GetUserWithAttributes retrieves a user and optional user attributes.
 func (s *UsersService) GetUserWithAttributes(ctx context.Context, userID models.UserID, attributes []string) (*models.User, error) {
-	path := s.client.http.BuildPath("users", string(userID))
+	path := s.client.http.BuildPath("users", url.PathEscape(string(userID)))
 
 	query := url.Values{}
 	for _, attribute := range attributes {
@@ -123,7 +125,7 @@ func (s *UsersService) GetUserWithAttributes(ctx context.Context, userID models.
 
 // GetUserPermissions retrieves permissions for a user.
 func (s *UsersService) GetUserPermissions(ctx context.Context, userID models.UserID) (*models.PermissionSet, error) {
-	path := s.client.http.BuildPath("users", string(userID), "permissions")
+	path := s.client.http.BuildPath("users", url.PathEscape(string(userID)), "permissions")
 
 	resp, err := s.client.http.Get(ctx, path, nil)
 	if err != nil {
@@ -140,7 +142,7 @@ func (s *UsersService) GetUserPermissions(ctx context.Context, userID models.Use
 
 // GetUserRole retrieves the role assigned to a user.
 func (s *UsersService) GetUserRole(ctx context.Context, userID models.UserID) (*models.RoleAssignment, error) {
-	path := s.client.http.BuildPath("users", string(userID), "role")
+	path := s.client.http.BuildPath("users", url.PathEscape(string(userID)), "role")
 
 	resp, err := s.client.http.Get(ctx, path, nil)
 	if err != nil {
@@ -159,7 +161,7 @@ func (s *UsersService) GetUserRole(ctx context.Context, userID models.UserID) (*
 // built-in role name or the label of a custom role owned by the user's organization;
 // pass nil to clear the role.
 func (s *UsersService) SetUserRole(ctx context.Context, userID models.UserID, role *string) (*models.RoleAssignment, error) {
-	path := s.client.http.BuildPath("users", string(userID), "role")
+	path := s.client.http.BuildPath("users", url.PathEscape(string(userID)), "role")
 
 	resp, err := s.client.http.Put(ctx, path, &models.RoleAssignmentRequest{Role: role})
 	if err != nil {
@@ -193,7 +195,7 @@ func (s *UsersService) CreateUser(ctx context.Context, req *models.UserCreateReq
 
 // UpdateUser updates a user.
 func (s *UsersService) UpdateUser(ctx context.Context, userID models.UserID, req *models.UserUpdateRequest) (*models.User, error) {
-	path := s.client.http.BuildPath("users", string(userID))
+	path := s.client.http.BuildPath("users", url.PathEscape(string(userID)))
 
 	resp, err := s.client.http.Patch(ctx, path, req)
 	if err != nil {
@@ -210,7 +212,7 @@ func (s *UsersService) UpdateUser(ctx context.Context, userID models.UserID, req
 
 // DeleteUser deletes a user.
 func (s *UsersService) DeleteUser(ctx context.Context, userID models.UserID) error {
-	path := s.client.http.BuildPath("users", string(userID))
+	path := s.client.http.BuildPath("users", url.PathEscape(string(userID)))
 
 	resp, err := s.client.http.Delete(ctx, path)
 	if err != nil {

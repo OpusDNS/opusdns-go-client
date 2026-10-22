@@ -3,6 +3,7 @@ package opusdns
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -115,34 +116,78 @@ func TestOrganizationsService_DeleteOrganization(t *testing.T) {
 
 // --- Migrated from gaps_test.go ---
 
+// orgAttributesBody is a list of OrganizationAttributeResponse as the API
+// sends it: a bare array, not an object.
+const orgAttributesBody = `[
+	{"organization_attribute_id": 1, "key": "plan", "value": "reseller", "protected": true,
+	 "created_on": "2026-01-23T08:26:55Z", "updated_on": "2026-01-23T08:26:55Z"}
+]`
+
 func TestOrganizationsService_GetCurrentAttributes(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "GET", r.Method)
 		assert.Equal(t, "/v1/organizations/attributes", r.URL.Path)
-		_ = json.NewEncoder(w).Encode(models.OrganizationAttributesResponse{})
+		_, _ = w.Write([]byte(orgAttributesBody))
 	}))
 	defer server.Close()
 
 	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
 	require.NoError(t, err)
 
-	_, err = client.Organizations.GetCurrentAttributes(context.Background())
+	resp, err := client.Organizations.GetCurrentAttributes(context.Background())
 	require.NoError(t, err)
+	require.Len(t, resp.Attributes, 1)
+	assert.Equal(t, 1, resp.Attributes[0].OrganizationAttributeID)
+	assert.Equal(t, "plan", resp.Attributes[0].Key)
+	assert.Equal(t, "reseller", resp.Attributes[0].Value)
+	assert.True(t, resp.Attributes[0].Protected)
 }
 
 func TestOrganizationsService_UpdateCurrentAttributes(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "PATCH", r.Method)
 		assert.Equal(t, "/v1/organizations/attributes", r.URL.Path)
-		_ = json.NewEncoder(w).Encode(models.OrganizationAttributesResponse{})
+
+		// The body is a bare array of OrganizationAttributeUpdate.
+		var body []map[string]interface{}
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		require.Len(t, body, 1)
+		assert.Equal(t, "plan", body[0]["key"])
+		assert.Equal(t, "reseller", body[0]["value"])
+
+		_, _ = w.Write([]byte(orgAttributesBody))
 	}))
 	defer server.Close()
 
 	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
 	require.NoError(t, err)
 
-	_, err = client.Organizations.UpdateCurrentAttributes(context.Background(), &models.OrganizationAttributeUpdateRequest{})
+	resp, err := client.Organizations.UpdateCurrentAttributes(context.Background(), &models.OrganizationAttributeUpdateRequest{
+		Attributes: []models.OrganizationAttributeCreate{{Key: "plan", Value: "reseller"}},
+	})
 	require.NoError(t, err)
+	require.Len(t, resp.Attributes, 1)
+	assert.Equal(t, "plan", resp.Attributes[0].Key)
+}
+
+func TestOrganizationsService_UpdateCurrentAttributes_EmptySendsArray(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+		assert.JSONEq(t, `[]`, string(body))
+		_, _ = w.Write([]byte(`[]`))
+	}))
+	defer server.Close()
+
+	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+	require.NoError(t, err)
+
+	resp, err := client.Organizations.UpdateCurrentAttributes(context.Background(), &models.OrganizationAttributeUpdateRequest{})
+	require.NoError(t, err)
+	assert.Empty(t, resp.Attributes)
+
+	_, err = client.Organizations.UpdateCurrentAttributes(context.Background(), nil)
+	require.ErrorIs(t, err, ErrInvalidInput)
 }
 
 // --- Migrated from features_test.go (RBAC roles) ---
@@ -212,6 +257,40 @@ func TestOrganizationsService_CreateRole(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "support_staff", role.Label)
+}
+
+func TestOrganizationsService_CreateRole_RequiresPermissions(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Errorf("no request expected, got %s %s", r.Method, r.URL.Path)
+	}))
+	defer server.Close()
+
+	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+	require.NoError(t, err)
+
+	// Without permissions the request would carry "permissions": null.
+	_, err = client.Organizations.CreateRole(context.Background(), &models.CustomRoleCreateRequest{Name: "Empty"})
+	require.ErrorIs(t, err, ErrInvalidInput)
+
+	_, err = client.Organizations.CreateRole(context.Background(), nil)
+	require.ErrorIs(t, err, ErrInvalidInput)
+}
+
+func TestOrganizationsService_RoleLabelIsEscaped(t *testing.T) {
+	var gotPath string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.EscapedPath()
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+
+	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+	require.NoError(t, err)
+
+	// A label must stay one path segment; it must not reach another resource.
+	err = client.Organizations.DeleteRole(context.Background(), "../ip-restrictions/5")
+	require.NoError(t, err)
+	assert.Equal(t, "/v1/organizations/roles/..%2Fip-restrictions%2F5", gotPath)
 }
 
 func TestOrganizationsService_UpdateRole(t *testing.T) {
@@ -300,11 +379,11 @@ func TestOrganizationsService_UpdateOrganization(t *testing.T) {
 		assert.Equal(t, "PATCH", r.Method)
 		assert.Equal(t, "/v1/organizations/organization_123", r.URL.Path)
 
-		var req models.OrganizationUpdateRequest
-		err := json.NewDecoder(r.Body).Decode(&req)
-		require.NoError(t, err)
-		require.NotNil(t, req.Name)
-		assert.Equal(t, newName, *req.Name)
+		// Only OrganizationUpdate properties go out: tax_rate does, the
+		// deprecated currency does not.
+		var body map[string]interface{}
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		assert.Equal(t, map[string]interface{}{"name": newName, "tax_rate": "0.19"}, body)
 
 		_ = json.NewEncoder(w).Encode(models.Organization{
 			OrganizationID: "organization_123",
@@ -316,8 +395,11 @@ func TestOrganizationsService_UpdateOrganization(t *testing.T) {
 	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
 	require.NoError(t, err)
 
+	eur := models.CurrencyEUR
 	org, err := client.Organizations.UpdateOrganization(context.Background(), models.OrganizationID("organization_123"), &models.OrganizationUpdateRequest{
-		Name: &newName,
+		Name:     &newName,
+		TaxRate:  models.StringPtr("0.19"),
+		Currency: &eur, //nolint:staticcheck // deprecated on purpose: proves it is not sent
 	})
 	require.NoError(t, err)
 	require.NotNil(t, org)
@@ -328,12 +410,13 @@ func TestOrganizationsService_ListIPRestrictions(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "GET", r.Method)
 		assert.Equal(t, "/v1/organizations/ip-restrictions", r.URL.Path)
-		_ = json.NewEncoder(w).Encode(models.IPRestrictionListResponse{
-			Results: []models.IPRestriction{
-				{IPRestrictionID: 1, OrganizationID: "organization_123", IPNetwork: "203.0.113.0/24"},
-			},
-			Pagination: models.Pagination{HasNextPage: false},
-		})
+		// A bare array of IpRestrictionResponse, with no pagination.
+		_, _ = w.Write([]byte(`[
+			{"ip_restriction_id": 1, "organization_id": "organization_01h45ytscbebyvny4gc8cr8ma2",
+			 "ip_network": "203.0.113.0/24", "last_used_on": null, "created_on": "2026-01-23T08:26:55Z"},
+			{"ip_restriction_id": 2, "organization_id": "organization_01h45ytscbebyvny4gc8cr8ma2",
+			 "ip_network": "2001:db8::/32", "last_used_on": "2026-02-01T10:00:00Z", "created_on": "2026-01-24T08:26:55Z"}
+		]`))
 	}))
 	defer server.Close()
 
@@ -342,14 +425,17 @@ func TestOrganizationsService_ListIPRestrictions(t *testing.T) {
 
 	resp, err := client.Organizations.ListIPRestrictions(context.Background())
 	require.NoError(t, err)
-	require.Len(t, resp.Results, 1)
+	require.Len(t, resp.Results, 2)
+	assert.Equal(t, 1, resp.Results[0].IPRestrictionID)
 	assert.Equal(t, "203.0.113.0/24", resp.Results[0].IPNetwork)
+	assert.Nil(t, resp.Results[0].LastUsedOn)
+	require.NotNil(t, resp.Results[1].LastUsedOn)
 }
 
 func TestOrganizationsService_GetIPRestriction(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "GET", r.Method)
-		assert.Equal(t, "/v1/organizations/ip-restrictions/ipr_123", r.URL.Path)
+		assert.Equal(t, "/v1/organizations/ip-restrictions/123", r.URL.Path)
 		_ = json.NewEncoder(w).Encode(models.IPRestriction{
 			IPRestrictionID: 1,
 			OrganizationID:  "organization_123",
@@ -361,7 +447,7 @@ func TestOrganizationsService_GetIPRestriction(t *testing.T) {
 	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
 	require.NoError(t, err)
 
-	restriction, err := client.Organizations.GetIPRestriction(context.Background(), models.TypeID("ipr_123"))
+	restriction, err := client.Organizations.GetIPRestriction(context.Background(), 123)
 	require.NoError(t, err)
 	require.NotNil(t, restriction)
 	assert.Equal(t, "203.0.113.0/24", restriction.IPNetwork)
@@ -402,7 +488,7 @@ func TestOrganizationsService_UpdateIPRestriction(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "PATCH", r.Method)
-		assert.Equal(t, "/v1/organizations/ip-restrictions/ipr_123", r.URL.Path)
+		assert.Equal(t, "/v1/organizations/ip-restrictions/123", r.URL.Path)
 
 		var req models.IPRestrictionUpdateRequest
 		err := json.NewDecoder(r.Body).Decode(&req)
@@ -421,7 +507,7 @@ func TestOrganizationsService_UpdateIPRestriction(t *testing.T) {
 	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
 	require.NoError(t, err)
 
-	restriction, err := client.Organizations.UpdateIPRestriction(context.Background(), models.TypeID("ipr_123"), &models.IPRestrictionUpdateRequest{
+	restriction, err := client.Organizations.UpdateIPRestriction(context.Background(), 123, &models.IPRestrictionUpdateRequest{
 		IPNetwork: &updated,
 	})
 	require.NoError(t, err)
@@ -432,7 +518,7 @@ func TestOrganizationsService_UpdateIPRestriction(t *testing.T) {
 func TestOrganizationsService_DeleteIPRestriction(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "DELETE", r.Method)
-		assert.Equal(t, "/v1/organizations/ip-restrictions/ipr_123", r.URL.Path)
+		assert.Equal(t, "/v1/organizations/ip-restrictions/123", r.URL.Path)
 		w.WriteHeader(http.StatusNoContent)
 	}))
 	defer server.Close()
@@ -440,7 +526,7 @@ func TestOrganizationsService_DeleteIPRestriction(t *testing.T) {
 	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
 	require.NoError(t, err)
 
-	err = client.Organizations.DeleteIPRestriction(context.Background(), models.TypeID("ipr_123"))
+	err = client.Organizations.DeleteIPRestriction(context.Background(), 123)
 	require.NoError(t, err)
 }
 
@@ -448,11 +534,7 @@ func TestOrganizationsService_GetAttributes(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "GET", r.Method)
 		assert.Equal(t, "/v1/organizations/organization_123/attributes", r.URL.Path)
-		_ = json.NewEncoder(w).Encode(models.OrganizationAttributesResponse{
-			Attributes: []models.OrganizationAttribute{
-				{OrganizationAttributeID: 1, Key: "plan", Value: "reseller"},
-			},
-		})
+		_, _ = w.Write([]byte(orgAttributesBody))
 	}))
 	defer server.Close()
 
@@ -470,17 +552,13 @@ func TestOrganizationsService_UpdateAttributes(t *testing.T) {
 		assert.Equal(t, "PATCH", r.Method)
 		assert.Equal(t, "/v1/organizations/organization_123/attributes", r.URL.Path)
 
-		var req models.OrganizationAttributeUpdateRequest
-		err := json.NewDecoder(r.Body).Decode(&req)
-		require.NoError(t, err)
-		require.Len(t, req.Attributes, 1)
-		assert.Equal(t, "plan", req.Attributes[0].Key)
+		// The body is a bare array of OrganizationAttributeUpdate.
+		var body []models.OrganizationAttributeCreate
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		require.Len(t, body, 1)
+		assert.Equal(t, "plan", body[0].Key)
 
-		_ = json.NewEncoder(w).Encode(models.OrganizationAttributesResponse{
-			Attributes: []models.OrganizationAttribute{
-				{OrganizationAttributeID: 1, Key: "plan", Value: "reseller"},
-			},
-		})
+		_, _ = w.Write([]byte(orgAttributesBody))
 	}))
 	defer server.Close()
 
@@ -501,7 +579,13 @@ func TestOrganizationsService_ListTransactions(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "GET", r.Method)
 		assert.Equal(t, "/v1/organizations/organization_123/transactions", r.URL.Path)
-		assert.Equal(t, "domain", r.URL.Query().Get("product_type"))
+		query := r.URL.Query()
+		assert.Equal(t, "domain", query.Get("product_type"))
+		assert.Equal(t, "example.com", query.Get("product_reference"))
+		assert.Equal(t, "2026-01-02T03:04:05.123456789Z", query.Get("created_after"))
+		assert.Equal(t, "2026-02-01T00:00:00Z", query.Get("created_before"))
+		assert.Equal(t, "2026-01-05T00:00:00.5Z", query.Get("completed_after"))
+		assert.Equal(t, "2026-01-31T00:00:00Z", query.Get("completed_before"))
 
 		_ = json.NewEncoder(w).Encode(models.BillingTransactionListResponse{
 			Results: []models.BillingTransaction{
@@ -522,8 +606,17 @@ func TestOrganizationsService_ListTransactions(t *testing.T) {
 	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
 	require.NoError(t, err)
 
+	createdAfter := time.Date(2026, 1, 2, 3, 4, 5, 123456789, time.UTC)
+	createdBefore := time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)
+	completedAfter := time.Date(2026, 1, 5, 0, 0, 0, 500000000, time.UTC)
+	completedBefore := time.Date(2026, 1, 31, 0, 0, 0, 0, time.UTC)
 	resp, err := client.Organizations.ListTransactions(context.Background(), models.OrganizationID("organization_123"), &models.ListTransactionsOptions{
-		ProductType: models.BillingProductTypeDomain,
+		ProductType:      models.BillingProductTypeDomain,
+		ProductReference: "example.com",
+		CreatedAfter:     &createdAfter,
+		CreatedBefore:    &createdBefore,
+		CompletedAfter:   &completedAfter,
+		CompletedBefore:  &completedBefore,
 	})
 	require.NoError(t, err)
 	require.Len(t, resp.Results, 1)
@@ -582,23 +675,50 @@ func TestOrganizationsService_GetPricing(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "GET", r.Method)
 		assert.Equal(t, "/v1/organizations/organization_123/pricing/product-type/domain", r.URL.Path)
-		_ = json.NewEncoder(w).Encode(models.ProductPricing{
-			ProductType: "domain",
-			Actions: map[string]models.PriceInfo{
-				"create": {Price: "10.00", Currency: models.CurrencyUSD},
-			},
-		})
+		assert.Equal(t, "create", r.URL.Query().Get("product_action"))
+		assert.Equal(t, "com", r.URL.Query().Get("product_class"))
+		// GetPricesResponse
+		_, _ = w.Write([]byte(`{"prices": [
+			{"product_type": "domain", "product_action": "create", "product_class": "com",
+			 "price": "10.00", "currency": "USD", "period": {"value": 1, "unit": "y"}},
+			{"product_type": "domain", "product_action": "create", "product_class": "com",
+			 "price": "20.00", "currency": "USD", "period": {"value": 2, "unit": "y"}}
+		]}`))
 	}))
 	defer server.Close()
 
 	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
 	require.NoError(t, err)
 
-	pricing, err := client.Organizations.GetPricing(context.Background(), models.OrganizationID("organization_123"), "domain")
+	pricing, err := client.Organizations.GetPricing(context.Background(), models.OrganizationID("organization_123"), "domain", &models.PricingOptions{
+		ProductAction: models.BillingActionCreate,
+		ProductClass:  "com",
+	})
 	require.NoError(t, err)
-	require.NotNil(t, pricing)
-	assert.Equal(t, "domain", pricing.ProductType)
-	assert.Contains(t, pricing.Actions, "create")
+	require.Len(t, pricing.Prices, 2)
+	price := pricing.Prices[0]
+	assert.Equal(t, "domain", price.ProductType)
+	assert.Equal(t, "10.00", price.Price)
+	assert.Equal(t, models.CurrencyUSD, price.Currency)
+	require.NotNil(t, price.ProductAction)
+	assert.Equal(t, "create", *price.ProductAction)
+	require.NotNil(t, price.Period)
+	assert.Equal(t, models.PricingPeriod{Value: 1, Unit: models.PeriodUnitYear}, *price.Period)
+}
+
+func TestOrganizationsService_GetPricing_NoOptions(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Empty(t, r.URL.RawQuery)
+		_, _ = w.Write([]byte(`{"prices": []}`))
+	}))
+	defer server.Close()
+
+	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+	require.NoError(t, err)
+
+	pricing, err := client.Organizations.GetPricing(context.Background(), models.OrganizationID("organization_123"), "domain", nil)
+	require.NoError(t, err)
+	assert.Empty(t, pricing.Prices)
 }
 
 func TestOrganizationsService_ListOrganizationsPage(t *testing.T) {
@@ -727,12 +847,14 @@ func TestOrganizationsService_GetUsageSeries(t *testing.T) {
 
 func TestOrganizationsService_GetUsageSummary(t *testing.T) {
 	start := time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC)
+	end := time.Date(2026, 8, 31, 0, 0, 0, 0, time.UTC)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/v1/organizations/organization_123/usage/ai_inference/summary", r.URL.Path)
 
 		query := r.URL.Query()
 		assert.Equal(t, "2026-08-01", query.Get("start_date"))
+		assert.Equal(t, "2026-08-31", query.Get("end_date"))
 		// The summary endpoint does not take a granularity.
 		assert.Empty(t, query.Get("granularity"))
 
@@ -753,9 +875,34 @@ func TestOrganizationsService_GetUsageSummary(t *testing.T) {
 	summary, err := client.Organizations.GetUsageSummary(context.Background(), "organization_123",
 		models.UsageProductAIInference, &models.UsageOptions{
 			StartDate:   &start,
+			EndDate:     &end,
 			Granularity: models.UsageGranularityDay,
 		})
 	require.NoError(t, err)
 	require.Len(t, summary.Groups, 1)
 	assert.Equal(t, int64(100), summary.Groups[0].InputTokens)
+}
+
+func TestOrganizationsService_Usage_RequiresDateRange(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Errorf("no request expected, got %s %s", r.Method, r.URL.Path)
+	}))
+	defer server.Close()
+
+	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+	require.NoError(t, err)
+
+	start := time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC)
+	ctx := context.Background()
+
+	// start_date and end_date are required query parameters.
+	_, err = client.Organizations.GetUsageSeries(ctx, "organization_123", models.UsageProductAIInference, nil)
+	require.ErrorIs(t, err, ErrInvalidInput)
+
+	_, err = client.Organizations.GetUsageSummary(ctx, "organization_123", models.UsageProductAIInference, nil)
+	require.ErrorIs(t, err, ErrInvalidInput)
+
+	_, err = client.Organizations.GetUsageSummary(ctx, "organization_123", models.UsageProductAIInference,
+		&models.UsageOptions{StartDate: &start})
+	require.ErrorIs(t, err, ErrInvalidInput)
 }

@@ -83,7 +83,7 @@ func (s *OrganizationsService) ListOrganizationsPage(ctx context.Context, opts *
 
 // GetOrganization retrieves an organization by ID.
 func (s *OrganizationsService) GetOrganization(ctx context.Context, orgID models.OrganizationID) (*models.Organization, error) {
-	path := s.client.http.BuildPath("organizations", string(orgID))
+	path := s.client.http.BuildPath("organizations", url.PathEscape(string(orgID)))
 
 	resp, err := s.client.http.Get(ctx, path, nil)
 	if err != nil {
@@ -117,7 +117,7 @@ func (s *OrganizationsService) CreateOrganization(ctx context.Context, req *mode
 
 // UpdateOrganization updates an organization.
 func (s *OrganizationsService) UpdateOrganization(ctx context.Context, orgID models.OrganizationID, req *models.OrganizationUpdateRequest) (*models.Organization, error) {
-	path := s.client.http.BuildPath("organizations", string(orgID))
+	path := s.client.http.BuildPath("organizations", url.PathEscape(string(orgID)))
 
 	resp, err := s.client.http.Patch(ctx, path, req)
 	if err != nil {
@@ -134,7 +134,7 @@ func (s *OrganizationsService) UpdateOrganization(ctx context.Context, orgID mod
 
 // DeleteOrganization deletes an organization.
 func (s *OrganizationsService) DeleteOrganization(ctx context.Context, orgID models.OrganizationID) error {
-	path := s.client.http.BuildPath("organizations", string(orgID))
+	path := s.client.http.BuildPath("organizations", url.PathEscape(string(orgID)))
 
 	resp, err := s.client.http.Delete(ctx, path)
 	if err != nil {
@@ -144,7 +144,8 @@ func (s *OrganizationsService) DeleteOrganization(ctx context.Context, orgID mod
 	return s.client.http.DecodeResponse(resp, nil)
 }
 
-// ListIPRestrictions retrieves IP restrictions for the organization.
+// ListIPRestrictions retrieves the IP restrictions of the organization. The
+// endpoint is not paginated: every restriction comes back in Results.
 func (s *OrganizationsService) ListIPRestrictions(ctx context.Context) (*models.IPRestrictionListResponse, error) {
 	path := s.client.http.BuildPath("organizations", "ip-restrictions")
 
@@ -153,17 +154,18 @@ func (s *OrganizationsService) ListIPRestrictions(ctx context.Context) (*models.
 		return nil, err
 	}
 
-	var result models.IPRestrictionListResponse
-	if err := s.client.http.DecodeResponse(resp, &result); err != nil {
+	var restrictions []models.IPRestriction
+	if err := s.client.http.DecodeResponse(resp, &restrictions); err != nil {
 		return nil, err
 	}
 
-	return &result, nil
+	return &models.IPRestrictionListResponse{Results: restrictions}, nil
 }
 
-// GetIPRestriction retrieves a specific IP restriction by ID.
-func (s *OrganizationsService) GetIPRestriction(ctx context.Context, restrictionID models.TypeID) (*models.IPRestriction, error) {
-	path := s.client.http.BuildPath("organizations", "ip-restrictions", string(restrictionID))
+// GetIPRestriction retrieves a specific IP restriction by its ID, which is an
+// integer (IPRestriction.IPRestrictionID), not a TypeID.
+func (s *OrganizationsService) GetIPRestriction(ctx context.Context, restrictionID int) (*models.IPRestriction, error) {
+	path := s.client.http.BuildPath("organizations", "ip-restrictions", strconv.Itoa(restrictionID))
 
 	resp, err := s.client.http.Get(ctx, path, nil)
 	if err != nil {
@@ -196,8 +198,8 @@ func (s *OrganizationsService) CreateIPRestriction(ctx context.Context, req *mod
 }
 
 // UpdateIPRestriction updates an IP restriction.
-func (s *OrganizationsService) UpdateIPRestriction(ctx context.Context, restrictionID models.TypeID, req *models.IPRestrictionUpdateRequest) (*models.IPRestriction, error) {
-	path := s.client.http.BuildPath("organizations", "ip-restrictions", string(restrictionID))
+func (s *OrganizationsService) UpdateIPRestriction(ctx context.Context, restrictionID int, req *models.IPRestrictionUpdateRequest) (*models.IPRestriction, error) {
+	path := s.client.http.BuildPath("organizations", "ip-restrictions", strconv.Itoa(restrictionID))
 
 	resp, err := s.client.http.Patch(ctx, path, req)
 	if err != nil {
@@ -213,8 +215,8 @@ func (s *OrganizationsService) UpdateIPRestriction(ctx context.Context, restrict
 }
 
 // DeleteIPRestriction deletes an IP restriction.
-func (s *OrganizationsService) DeleteIPRestriction(ctx context.Context, restrictionID models.TypeID) error {
-	path := s.client.http.BuildPath("organizations", "ip-restrictions", string(restrictionID))
+func (s *OrganizationsService) DeleteIPRestriction(ctx context.Context, restrictionID int) error {
+	path := s.client.http.BuildPath("organizations", "ip-restrictions", strconv.Itoa(restrictionID))
 
 	resp, err := s.client.http.Delete(ctx, path)
 	if err != nil {
@@ -244,7 +246,7 @@ func (s *OrganizationsService) ListRoles(ctx context.Context) ([]models.RoleDefi
 
 // GetRole retrieves a single role (built-in or custom) by its label.
 func (s *OrganizationsService) GetRole(ctx context.Context, label string) (*models.RoleDefinition, error) {
-	path := s.client.http.BuildPath("organizations", "roles", label)
+	path := s.client.http.BuildPath("organizations", "roles", url.PathEscape(label))
 
 	resp, err := s.client.http.Get(ctx, path, nil)
 	if err != nil {
@@ -259,8 +261,13 @@ func (s *OrganizationsService) GetRole(ctx context.Context, label string) (*mode
 	return &role, nil
 }
 
-// CreateRole creates an organization-owned custom role.
+// CreateRole creates an organization-owned custom role. A custom role must
+// grant at least one permission.
 func (s *OrganizationsService) CreateRole(ctx context.Context, req *models.CustomRoleCreateRequest) (*models.RoleDefinition, error) {
+	if req == nil || len(req.Permissions) == 0 {
+		return nil, &ValidationError{Field: "permissions", Message: "a custom role must grant at least one permission"}
+	}
+
 	path := s.client.http.BuildPath("organizations", "roles")
 
 	resp, err := s.client.http.Post(ctx, path, req)
@@ -279,7 +286,7 @@ func (s *OrganizationsService) CreateRole(ctx context.Context, req *models.Custo
 // UpdateRole updates a custom role's name, description and/or permission set.
 // Built-in roles are immutable.
 func (s *OrganizationsService) UpdateRole(ctx context.Context, label string, req *models.CustomRoleUpdateRequest) (*models.RoleDefinition, error) {
-	path := s.client.http.BuildPath("organizations", "roles", label)
+	path := s.client.http.BuildPath("organizations", "roles", url.PathEscape(label))
 
 	resp, err := s.client.http.Patch(ctx, path, req)
 	if err != nil {
@@ -297,7 +304,7 @@ func (s *OrganizationsService) UpdateRole(ctx context.Context, label string, req
 // DeleteRole deletes a custom role. The request is refused while the role is still
 // assigned to any subject, and for built-in roles.
 func (s *OrganizationsService) DeleteRole(ctx context.Context, label string) error {
-	path := s.client.http.BuildPath("organizations", "roles", label)
+	path := s.client.http.BuildPath("organizations", "roles", url.PathEscape(label))
 
 	resp, err := s.client.http.Delete(ctx, path)
 	if err != nil {
@@ -334,68 +341,80 @@ func (s *OrganizationsService) GetCurrentAttributes(ctx context.Context) (*model
 		return nil, err
 	}
 
-	var result models.OrganizationAttributesResponse
-	if err := s.client.http.DecodeResponse(resp, &result); err != nil {
-		return nil, err
-	}
-
-	return &result, nil
+	return s.decodeAttributes(resp)
 }
 
 // UpdateCurrentAttributes updates the authenticated organization's attributes.
 func (s *OrganizationsService) UpdateCurrentAttributes(ctx context.Context, req *models.OrganizationAttributeUpdateRequest) (*models.OrganizationAttributesResponse, error) {
-	path := s.client.http.BuildPath("organizations", "attributes")
-
-	resp, err := s.client.http.Patch(ctx, path, req)
+	body, err := attributeUpdateBody(req)
 	if err != nil {
 		return nil, err
 	}
 
-	var result models.OrganizationAttributesResponse
-	if err := s.client.http.DecodeResponse(resp, &result); err != nil {
+	path := s.client.http.BuildPath("organizations", "attributes")
+
+	resp, err := s.client.http.Patch(ctx, path, body)
+	if err != nil {
 		return nil, err
 	}
 
-	return &result, nil
+	return s.decodeAttributes(resp)
 }
 
 // GetAttributes retrieves organization attributes.
 func (s *OrganizationsService) GetAttributes(ctx context.Context, orgID models.OrganizationID) (*models.OrganizationAttributesResponse, error) {
-	path := s.client.http.BuildPath("organizations", string(orgID), "attributes")
+	path := s.client.http.BuildPath("organizations", url.PathEscape(string(orgID)), "attributes")
 
 	resp, err := s.client.http.Get(ctx, path, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	var result models.OrganizationAttributesResponse
-	if err := s.client.http.DecodeResponse(resp, &result); err != nil {
-		return nil, err
-	}
-
-	return &result, nil
+	return s.decodeAttributes(resp)
 }
 
 // UpdateAttributes updates organization attributes.
 func (s *OrganizationsService) UpdateAttributes(ctx context.Context, orgID models.OrganizationID, req *models.OrganizationAttributeUpdateRequest) (*models.OrganizationAttributesResponse, error) {
-	path := s.client.http.BuildPath("organizations", string(orgID), "attributes")
-
-	resp, err := s.client.http.Patch(ctx, path, req)
+	body, err := attributeUpdateBody(req)
 	if err != nil {
 		return nil, err
 	}
 
-	var result models.OrganizationAttributesResponse
-	if err := s.client.http.DecodeResponse(resp, &result); err != nil {
+	path := s.client.http.BuildPath("organizations", url.PathEscape(string(orgID)), "attributes")
+
+	resp, err := s.client.http.Patch(ctx, path, body)
+	if err != nil {
 		return nil, err
 	}
 
-	return &result, nil
+	return s.decodeAttributes(resp)
 }
 
-// ListTransactions retrieves billing transactions for an organization.
+// attributeUpdateBody returns the attributes of req as the bare array the API
+// takes. A nil slice is sent as an empty array rather than null.
+func attributeUpdateBody(req *models.OrganizationAttributeUpdateRequest) ([]models.OrganizationAttributeCreate, error) {
+	if req == nil {
+		return nil, &ValidationError{Field: "request", Message: "an attribute update request is required"}
+	}
+	if req.Attributes == nil {
+		return []models.OrganizationAttributeCreate{}, nil
+	}
+	return req.Attributes, nil
+}
+
+// decodeAttributes reads the bare attribute array the API answers with.
+func (s *OrganizationsService) decodeAttributes(resp *Response) (*models.OrganizationAttributesResponse, error) {
+	var attributes []models.OrganizationAttribute
+	if err := s.client.http.DecodeResponse(resp, &attributes); err != nil {
+		return nil, err
+	}
+
+	return &models.OrganizationAttributesResponse{Attributes: attributes}, nil
+}
+
+// ListTransactions retrieves one page of billing transactions for an organization.
 func (s *OrganizationsService) ListTransactions(ctx context.Context, orgID models.OrganizationID, opts *models.ListTransactionsOptions) (*models.BillingTransactionListResponse, error) {
-	path := s.client.http.BuildPath("organizations", string(orgID), "transactions")
+	path := s.client.http.BuildPath("organizations", url.PathEscape(string(orgID)), "transactions")
 
 	query := url.Values{}
 	if opts != nil {
@@ -411,6 +430,9 @@ func (s *OrganizationsService) ListTransactions(ctx context.Context, orgID model
 		if opts.SortOrder != "" {
 			query.Set("sort_order", string(opts.SortOrder))
 		}
+		if opts.ProductReference != "" {
+			query.Set("product_reference", opts.ProductReference)
+		}
 		if opts.ProductType != "" {
 			query.Set("product_type", string(opts.ProductType))
 		}
@@ -421,10 +443,16 @@ func (s *OrganizationsService) ListTransactions(ctx context.Context, orgID model
 			query.Set("status", string(opts.Status))
 		}
 		if opts.CreatedAfter != nil {
-			query.Set("created_after", opts.CreatedAfter.Format(time.RFC3339))
+			query.Set("created_after", opts.CreatedAfter.Format(time.RFC3339Nano))
 		}
 		if opts.CreatedBefore != nil {
-			query.Set("created_before", opts.CreatedBefore.Format(time.RFC3339))
+			query.Set("created_before", opts.CreatedBefore.Format(time.RFC3339Nano))
+		}
+		if opts.CompletedAfter != nil {
+			query.Set("completed_after", opts.CompletedAfter.Format(time.RFC3339Nano))
+		}
+		if opts.CompletedBefore != nil {
+			query.Set("completed_before", opts.CompletedBefore.Format(time.RFC3339Nano))
 		}
 	}
 
@@ -443,7 +471,7 @@ func (s *OrganizationsService) ListTransactions(ctx context.Context, orgID model
 
 // GetTransaction retrieves a specific transaction by ID.
 func (s *OrganizationsService) GetTransaction(ctx context.Context, orgID models.OrganizationID, transactionID models.BillingTransactionID) (*models.BillingTransaction, error) {
-	path := s.client.http.BuildPath("organizations", string(orgID), "transactions", string(transactionID))
+	path := s.client.http.BuildPath("organizations", url.PathEscape(string(orgID)), "transactions", url.PathEscape(string(transactionID)))
 
 	resp, err := s.client.http.Get(ctx, path, nil)
 	if err != nil {
@@ -477,7 +505,7 @@ func invoiceQuery(opts *models.ListInvoicesOptions) url.Values {
 
 // ListInvoicesPage retrieves one page of invoices for an organization.
 func (s *OrganizationsService) ListInvoicesPage(ctx context.Context, orgID models.OrganizationID, opts *models.ListInvoicesOptions) (*models.InvoiceListResponse, error) {
-	path := s.client.http.BuildPath("organizations", string(orgID), "billing", "invoices")
+	path := s.client.http.BuildPath("organizations", url.PathEscape(string(orgID)), "billing", "invoices")
 
 	resp, err := s.client.http.Get(ctx, path, invoiceQuery(opts))
 	if err != nil {
@@ -499,11 +527,23 @@ func (s *OrganizationsService) ListInvoices(ctx context.Context, orgID models.Or
 	})
 }
 
-// GetPricing retrieves pricing for a specific product type.
-func (s *OrganizationsService) GetPricing(ctx context.Context, orgID models.OrganizationID, productType string) (*models.ProductPricing, error) {
-	path := s.client.http.BuildPath("organizations", string(orgID), "pricing", "product-type", url.PathEscape(productType))
+// GetPricing retrieves the organization's prices for a product type (for
+// example "domain"). opts may narrow the result to one action or product
+// class and may be nil.
+func (s *OrganizationsService) GetPricing(ctx context.Context, orgID models.OrganizationID, productType string, opts *models.PricingOptions) (*models.ProductPricing, error) {
+	path := s.client.http.BuildPath("organizations", url.PathEscape(string(orgID)), "pricing", "product-type", url.PathEscape(productType))
 
-	resp, err := s.client.http.Get(ctx, path, nil)
+	query := url.Values{}
+	if opts != nil {
+		if opts.ProductAction != "" {
+			query.Set("product_action", string(opts.ProductAction))
+		}
+		if opts.ProductClass != "" {
+			query.Set("product_class", opts.ProductClass)
+		}
+	}
+
+	resp, err := s.client.http.Get(ctx, path, query)
 	if err != nil {
 		return nil, err
 	}
@@ -520,7 +560,7 @@ func (s *OrganizationsService) GetPricing(ctx context.Context, orgID models.Orga
 // organization. Receipts and invoices share a shape and are told apart by
 // their document type.
 func (s *OrganizationsService) ListReceiptsPage(ctx context.Context, orgID models.OrganizationID, opts *models.ListInvoicesOptions) (*models.InvoiceListResponse, error) {
-	path := s.client.http.BuildPath("organizations", string(orgID), "billing", "receipts")
+	path := s.client.http.BuildPath("organizations", url.PathEscape(string(orgID)), "billing", "receipts")
 
 	resp, err := s.client.http.Get(ctx, path, invoiceQuery(opts))
 	if err != nil {
@@ -579,30 +619,36 @@ func (s *OrganizationsService) listBillingDocuments(
 }
 
 // usageQuery turns usage filters into query parameters. Dates are sent as
-// YYYY-MM-DD, which is what the endpoint expects.
-func usageQuery(opts *models.UsageOptions, withGranularity bool) url.Values {
+// YYYY-MM-DD, which is what the endpoint expects. Both dates are required,
+// so a missing one is reported before any request is sent.
+func usageQuery(opts *models.UsageOptions, withGranularity bool) (url.Values, error) {
+	if opts == nil || opts.StartDate == nil {
+		return nil, &ValidationError{Field: "start_date", Message: "a start date is required"}
+	}
+	if opts.EndDate == nil {
+		return nil, &ValidationError{Field: "end_date", Message: "an end date is required"}
+	}
+
 	query := url.Values{}
-	if opts == nil {
-		return query
-	}
-	if opts.StartDate != nil {
-		query.Set("start_date", opts.StartDate.Format("2006-01-02"))
-	}
-	if opts.EndDate != nil {
-		query.Set("end_date", opts.EndDate.Format("2006-01-02"))
-	}
+	query.Set("start_date", opts.StartDate.Format("2006-01-02"))
+	query.Set("end_date", opts.EndDate.Format("2006-01-02"))
 	if withGranularity && opts.Granularity != "" {
 		query.Set("granularity", string(opts.Granularity))
 	}
-	return query
+	return query, nil
 }
 
 // GetUsageSeries retrieves usage of a metered product over time, bucketed by
-// the requested granularity.
+// the requested granularity. opts must set StartDate and EndDate.
 func (s *OrganizationsService) GetUsageSeries(ctx context.Context, orgID models.OrganizationID, product models.UsageProduct, opts *models.UsageOptions) (*models.AIInferenceUsageSeries, error) {
-	path := s.client.http.BuildPath("organizations", string(orgID), "usage", url.PathEscape(string(product)))
+	query, err := usageQuery(opts, true)
+	if err != nil {
+		return nil, err
+	}
 
-	resp, err := s.client.http.Get(ctx, path, usageQuery(opts, true))
+	path := s.client.http.BuildPath("organizations", url.PathEscape(string(orgID)), "usage", url.PathEscape(string(product)))
+
+	resp, err := s.client.http.Get(ctx, path, query)
 	if err != nil {
 		return nil, err
 	}
@@ -616,11 +662,16 @@ func (s *OrganizationsService) GetUsageSeries(ctx context.Context, orgID models.
 }
 
 // GetUsageSummary retrieves usage of a metered product totalled over a date
-// range.
+// range. opts must set StartDate and EndDate.
 func (s *OrganizationsService) GetUsageSummary(ctx context.Context, orgID models.OrganizationID, product models.UsageProduct, opts *models.UsageOptions) (*models.AIInferenceUsageSummary, error) {
-	path := s.client.http.BuildPath("organizations", string(orgID), "usage", url.PathEscape(string(product)), "summary")
+	query, err := usageQuery(opts, false)
+	if err != nil {
+		return nil, err
+	}
 
-	resp, err := s.client.http.Get(ctx, path, usageQuery(opts, false))
+	path := s.client.http.BuildPath("organizations", url.PathEscape(string(orgID)), "usage", url.PathEscape(string(product)), "summary")
+
+	resp, err := s.client.http.Get(ctx, path, query)
 	if err != nil {
 		return nil, err
 	}

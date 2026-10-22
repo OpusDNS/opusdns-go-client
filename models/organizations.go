@@ -140,6 +140,9 @@ type OrganizationAttribute struct {
 	Value interface{} `json:"value,omitempty"`
 
 	// Private indicates if the attribute is private and not visible to users.
+	//
+	// Deprecated: The API does not return private attributes and does not send
+	// this field, so it is always false.
 	Private bool `json:"private,omitempty"`
 
 	// Protected indicates if the attribute is protected and cannot be modified by users.
@@ -259,8 +262,15 @@ type OrganizationUpdateRequest struct {
 	// TaxIDType is the type of tax ID.
 	TaxIDType *string `json:"tax_id_type,omitempty"`
 
+	// TaxRate is the tax rate for the organization, as a decimal string
+	// (e.g. "0.19").
+	TaxRate *string `json:"tax_rate,omitempty"`
+
 	// Currency is the currency used by the organization.
-	Currency *Currency `json:"currency,omitempty"`
+	//
+	// Deprecated: The API does not accept a currency change on update and
+	// silently ignored it, so the client no longer sends this field.
+	Currency *Currency `json:"-"`
 
 	// DefaultLocale is the default locale for the organization.
 	DefaultLocale *string `json:"default_locale,omitempty"`
@@ -282,6 +292,8 @@ type OrganizationAttributeCreate struct {
 }
 
 // OrganizationAttributeUpdateRequest represents a request to update organization attributes.
+// The API takes the attributes as a bare JSON array, so the client sends
+// Attributes in that form rather than this struct.
 type OrganizationAttributeUpdateRequest struct {
 	// Attributes contains the attributes to set.
 	Attributes []OrganizationAttributeCreate `json:"attributes"`
@@ -305,12 +317,16 @@ type IPRestriction struct {
 	CreatedOn time.Time `json:"created_on"`
 }
 
-// IPRestrictionListResponse represents the paginated response when listing IP restrictions.
+// IPRestrictionListResponse holds the IP restrictions of an organization.
+// The API answers with a bare JSON array; the client wraps it in Results.
 type IPRestrictionListResponse struct {
 	// Results contains the list of IP restrictions.
 	Results []IPRestriction `json:"results"`
 
 	// Pagination contains the pagination metadata.
+	//
+	// Deprecated: The endpoint is not paginated and returns every restriction
+	// at once, so Pagination is always zero.
 	Pagination Pagination `json:"pagination"`
 }
 
@@ -332,26 +348,35 @@ type IPRestrictionUpdateRequest struct {
 // Role and RoleListResponse moved to rbac.go and were replaced by RoleDefinition to
 // match the new public RBAC role model (label/built_in/"resource:scope" permissions).
 
-// OrganizationAttributesResponse represents the response when getting organization attributes.
+// OrganizationAttributesResponse holds organization attributes. The API
+// answers with a bare JSON array; the client wraps it in Attributes.
 type OrganizationAttributesResponse struct {
 	// Attributes contains the list of attributes.
 	Attributes []OrganizationAttribute `json:"attributes"`
 }
 
-// ProductPricing represents pricing for a specific product.
+// ProductPricing holds the prices of one product type for an organization
+// (GetPricesResponse).
 type ProductPricing struct {
-	// ProductType is the type of product.
-	ProductType string `json:"product_type"`
+	// Prices has one entry per action, product class and period that has a
+	// price.
+	Prices []PriceInfo `json:"prices"`
+}
 
-	// ProductReference is a reference for the product (e.g., TLD name).
-	ProductReference *string `json:"product_reference,omitempty"`
+// PricingOptions narrows a pricing query. All fields are optional.
+type PricingOptions struct {
+	// ProductAction limits the prices to one action (e.g. create, renew).
+	ProductAction BillingTransactionAction
 
-	// Actions contains pricing by action type.
-	Actions map[string]PriceInfo `json:"actions,omitempty"`
+	// ProductClass limits the prices to one product class.
+	ProductClass string
 }
 
 // PriceInfo represents pricing information.
 type PriceInfo struct {
+	// ProductType is the product type this price applies to.
+	ProductType string `json:"product_type"`
+
 	// Price is the base price.
 	Price string `json:"price"`
 
@@ -514,6 +539,9 @@ type ListTransactionsOptions struct {
 	// SortOrder is the sort direction.
 	SortOrder SortOrder
 
+	// ProductReference filters by product reference (e.g. a domain name).
+	ProductReference string
+
 	// ProductType filters by product type.
 	ProductType BillingTransactionProductType
 
@@ -528,6 +556,12 @@ type ListTransactionsOptions struct {
 
 	// CreatedBefore filters transactions created before this time.
 	CreatedBefore *time.Time
+
+	// CompletedAfter filters transactions completed after this time.
+	CompletedAfter *time.Time
+
+	// CompletedBefore filters transactions completed before this time.
+	CompletedBefore *time.Time
 }
 
 // InvoiceDocumentType distinguishes an invoice from a payment receipt.
@@ -659,11 +693,12 @@ const (
 
 // UsageOptions narrows a usage query to a date range. Dates are sent as
 // YYYY-MM-DD. Granularity applies to the series only, not to the summary.
+// StartDate and EndDate are required by the API.
 type UsageOptions struct {
-	// StartDate is the first day to report on.
+	// StartDate is the first day to report on. Required.
 	StartDate *time.Time
 
-	// EndDate is the last day to report on.
+	// EndDate is the last day to report on. Required.
 	EndDate *time.Time
 
 	// Granularity is the bucket size of the series.
