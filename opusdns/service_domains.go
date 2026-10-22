@@ -374,7 +374,7 @@ func (s *DomainsService) ListDomainVerificationsPage(ctx context.Context, domain
 }
 
 // RestoreDomain restores a deleted domain from redemption.
-func (s *DomainsService) RestoreDomain(ctx context.Context, domainRef string, req *models.DomainRestoreRequest) (*models.Domain, error) {
+func (s *DomainsService) RestoreDomain(ctx context.Context, domainRef string, req *models.DomainRestoreRequest) (*models.DomainRestoreResult, error) {
 	path := s.client.http.BuildPath("domains", url.PathEscape(domainRef), "restore")
 
 	resp, err := s.client.http.Post(ctx, path, req)
@@ -382,12 +382,12 @@ func (s *DomainsService) RestoreDomain(ctx context.Context, domainRef string, re
 		return nil, err
 	}
 
-	var domain models.Domain
-	if err := s.client.http.DecodeResponse(resp, &domain); err != nil {
+	var result models.DomainRestoreResult
+	if err := s.client.http.DecodeResponse(resp, &result); err != nil {
 		return nil, err
 	}
 
-	return &domain, nil
+	return &result, nil
 }
 
 // GetSummary retrieves a summary of domains.

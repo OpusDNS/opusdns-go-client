@@ -141,10 +141,12 @@
 //
 // The client is safe for concurrent use by multiple goroutines.
 //
-// # Rate Limiting
+// # Rate Limiting and Retries
 //
 // The client automatically handles rate limiting (HTTP 429) by retrying with
-// exponential backoff. You can configure the retry behavior:
+// exponential backoff. Server errors and network failures are retried only for
+// idempotent methods (GET, PUT, DELETE); POST and PATCH are not resent once
+// the API may have acted on them. You can configure the retry behavior:
 //
 //	c, err := client.NewClient(
 //	    client.WithAPIKey("opk_..."),
