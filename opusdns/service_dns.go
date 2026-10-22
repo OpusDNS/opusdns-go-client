@@ -80,16 +80,16 @@ func (s *DNSService) ListZonesPage(ctx context.Context, opts *models.ListZonesOp
 			query.Set("dnssec_status", string(opts.DNSSECStatus))
 		}
 		if opts.CreatedAfter != nil {
-			query.Set("created_after", opts.CreatedAfter.Format(time.RFC3339))
+			query.Set("created_after", opts.CreatedAfter.Format(time.RFC3339Nano))
 		}
 		if opts.CreatedBefore != nil {
-			query.Set("created_before", opts.CreatedBefore.Format(time.RFC3339))
+			query.Set("created_before", opts.CreatedBefore.Format(time.RFC3339Nano))
 		}
 		if opts.UpdatedAfter != nil {
-			query.Set("updated_after", opts.UpdatedAfter.Format(time.RFC3339))
+			query.Set("updated_after", opts.UpdatedAfter.Format(time.RFC3339Nano))
 		}
 		if opts.UpdatedBefore != nil {
-			query.Set("updated_before", opts.UpdatedBefore.Format(time.RFC3339))
+			query.Set("updated_before", opts.UpdatedBefore.Format(time.RFC3339Nano))
 		}
 		for _, include := range opts.Include {
 			query.Add("include", string(include))

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/opusdns/opusdns-go-client/models"
 	"github.com/stretchr/testify/assert"
@@ -37,6 +38,21 @@ func TestDNSService_ListZones(t *testing.T) {
 		require.NoError(t, err)
 		assert.Len(t, zones, 2)
 		assert.Equal(t, "example.com", zones[0].Name)
+	})
+
+	t.Run("keeps sub-second precision in time filters", func(t *testing.T) {
+		after := time.Date(2026, 1, 23, 8, 26, 55, 123456000, time.UTC)
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assert.Equal(t, "2026-01-23T08:26:55.123456Z", r.URL.Query().Get("created_after"))
+			_ = json.NewEncoder(w).Encode(models.ZoneListResponse{})
+		}))
+		defer server.Close()
+
+		client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+		require.NoError(t, err)
+
+		_, err = client.DNS.ListZones(context.Background(), &models.ListZonesOptions{CreatedAfter: &after})
+		require.NoError(t, err)
 	})
 
 	t.Run("handles pagination", func(t *testing.T) {

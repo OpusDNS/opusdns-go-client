@@ -232,10 +232,10 @@ func (s *EmailForwardsService) GetMetrics(ctx context.Context, emailForwardID mo
 	query := url.Values{}
 	if opts != nil {
 		if opts.StartTime != nil {
-			query.Set("start_time", opts.StartTime.Format(time.RFC3339))
+			query.Set("start_time", opts.StartTime.Format(time.RFC3339Nano))
 		}
 		if opts.EndTime != nil {
-			query.Set("end_time", opts.EndTime.Format(time.RFC3339))
+			query.Set("end_time", opts.EndTime.Format(time.RFC3339Nano))
 		}
 	}
 
