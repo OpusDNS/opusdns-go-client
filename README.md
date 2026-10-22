@@ -283,7 +283,8 @@ changes, err := client.DNS.DisableDNSSEC(ctx, "example.com")
 ### Check Availability
 
 ```go
-// Check multiple domains
+// Check multiple domains. The API checks at most 50 per request; longer
+// lists are split into several requests and the results merged in order.
 result, err := client.Availability.CheckAvailability(ctx, []string{
     "example.com",
     "example.de",
@@ -293,6 +294,9 @@ result, err := client.Availability.CheckAvailability(ctx, []string{
 for _, avail := range result.Results {
     if avail.Status.IsAvailable() {
         fmt.Printf("%s is available!\n", avail.Domain)
+    }
+    if avail.Error != nil {
+        fmt.Printf("%s could not be checked: %s\n", avail.Domain, avail.Error.Message)
     }
 }
 
@@ -687,7 +691,8 @@ sets, err := client.VanityNameservers.ListSets(ctx, nil)
 report, err := client.VanityNameservers.CheckSet(ctx, set.SetID)
 fmt.Println(report.Summary.State) // ready | propagating | action_required | degraded
 
-// Manage the org default and list zones that use the set.
+// Manage the org default and list every zone that uses the set (all pages;
+// ListZonesReferencingSetPage fetches one).
 _, err = client.VanityNameservers.SetDefault(ctx, set.SetID)
 _, err = client.VanityNameservers.ClearDefault(ctx)
 zones, err := client.VanityNameservers.ListZonesReferencingSet(ctx, set.SetID, nil)
@@ -730,6 +735,25 @@ res, err := client.Contacts.AttestContactVerification(ctx, contactID, &models.Co
 })
 status, err := client.Contacts.GetContactVerifications(ctx, contactID)
 err = client.Contacts.CancelContactVerification(ctx, contactID)
+
+// Start email verification. VerificationTypeEmail mails a link to the
+// contact; VerificationTypeAPI returns the token for you to deliver.
+verification, err := client.Contacts.RequestVerification(ctx, contactID, models.VerificationTypeAPI)
+fmt.Println(*verification.Token)
+```
+
+## TLDs
+
+```go
+// The TLDs in the organization's portfolio.
+portfolio, err := client.TLDs.GetPortfolio(ctx)
+for _, entry := range portfolio {
+    fmt.Println(entry.TLD, entry.Type)
+}
+
+// The full specification of one TLD: lifecycle, DNSSEC, contacts, transfers, ...
+spec, err := client.TLDs.GetTLD(ctx, "de")
+fmt.Println(spec.DNSConfiguration.DNSSECAllowed, spec.DomainLifecycle.RegistrationPeriods)
 ```
 
 ## Host Objects
