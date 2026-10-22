@@ -20,6 +20,9 @@ import (
 // routes the specification lists separately, and it opts out of the route check
 // that pairs a method with a single path.
 //
+// Deprecated: The API deprecated the per-TLD routes. Use
+// DomainsService.RequestDomainAuthCode, which serves every TLD.
+//
 //speccheck:ignore
 func (s *DomainsService) RequestAuthCode(ctx context.Context, tld models.AuthCodeTLD, domainRef string) (*models.RequestAuthCodeResponse, error) {
 	path := s.client.http.BuildPath("domains", "tld-specific", url.PathEscape(string(tld)),

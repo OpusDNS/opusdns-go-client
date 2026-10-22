@@ -109,6 +109,15 @@ type Whitelabel struct {
 	// AuthHostname is the host authentication is served on.
 	AuthHostname string `json:"auth_hostname"`
 
+	// BaseHostname is the managed base dashboard host
+	// (app.<base_label>.<suffix>). On plus it is a backup address served
+	// alongside the custom domain. Nil until first published.
+	BaseHostname *string `json:"base_hostname,omitempty"`
+
+	// BaseAuthHostname is the managed base auth host
+	// (auth.<base_label>.<suffix>). Nil until first published.
+	BaseAuthHostname *string `json:"base_auth_hostname,omitempty"`
+
 	// BaseLabel is the label identifying the configuration.
 	BaseLabel string `json:"base_label"`
 
@@ -310,26 +319,36 @@ type Theme struct {
 // Palette is one colour scheme. Every colour is a CSS hex string such as
 // "#0a7cff" or "#0af".
 type Palette struct {
-	Background          *string `json:"background,omitempty"`
-	Foreground          *string `json:"foreground,omitempty"`
-	Card                *string `json:"card,omitempty"`
-	CardForeground      *string `json:"card_foreground,omitempty"`
-	Primary             *string `json:"primary,omitempty"`
-	PrimaryForeground   *string `json:"primary_foreground,omitempty"`
-	Secondary           *string `json:"secondary,omitempty"`
-	SecondaryForeground *string `json:"secondary_foreground,omitempty"`
-	Accent              *string `json:"accent,omitempty"`
-	AccentForeground    *string `json:"accent_foreground,omitempty"`
-	Muted               *string `json:"muted,omitempty"`
-	MutedForeground     *string `json:"muted_foreground,omitempty"`
-	Sidebar             *string `json:"sidebar,omitempty"`
-	SidebarForeground   *string `json:"sidebar_foreground,omitempty"`
-	Border              *string `json:"border,omitempty"`
-	Input               *string `json:"input,omitempty"`
-	Success             *string `json:"success,omitempty"`
-	Warning             *string `json:"warning,omitempty"`
-	Danger              *string `json:"danger,omitempty"`
-	Info                *string `json:"info,omitempty"`
+	Background              *string `json:"background,omitempty"`
+	Foreground              *string `json:"foreground,omitempty"`
+	Card                    *string `json:"card,omitempty"`
+	CardForeground          *string `json:"card_foreground,omitempty"`
+	Primary                 *string `json:"primary,omitempty"`
+	PrimaryForeground       *string `json:"primary_foreground,omitempty"`
+	Secondary               *string `json:"secondary,omitempty"`
+	SecondaryForeground     *string `json:"secondary_foreground,omitempty"`
+	Accent                  *string `json:"accent,omitempty"`
+	AccentForeground        *string `json:"accent_foreground,omitempty"`
+	Muted                   *string `json:"muted,omitempty"`
+	MutedForeground         *string `json:"muted_foreground,omitempty"`
+	Sidebar                 *string `json:"sidebar,omitempty"`
+	SidebarForeground       *string `json:"sidebar_foreground,omitempty"`
+	SidebarAccent           *string `json:"sidebar_accent,omitempty"`
+	SidebarAccentForeground *string `json:"sidebar_accent_foreground,omitempty"`
+	SidebarBorder           *string `json:"sidebar_border,omitempty"`
+	Body                    *string `json:"body,omitempty"`
+	BodyForeground          *string `json:"body_foreground,omitempty"`
+	Link                    *string `json:"link,omitempty"`
+	Table                   *string `json:"table,omitempty"`
+	TableHeader             *string `json:"table_header,omitempty"`
+	TableRow                *string `json:"table_row,omitempty"`
+	TableRowInteractive     *string `json:"table_row_interactive,omitempty"`
+	Border                  *string `json:"border,omitempty"`
+	Input                   *string `json:"input,omitempty"`
+	Success                 *string `json:"success,omitempty"`
+	Warning                 *string `json:"warning,omitempty"`
+	Danger                  *string `json:"danger,omitempty"`
+	Info                    *string `json:"info,omitempty"`
 
 	// ChartColors is the categorical palette for charts.
 	ChartColors []string `json:"chart_colors,omitempty"`
@@ -385,6 +404,12 @@ type BrandingSupport struct {
 
 	// URL is the support site.
 	URL *string `json:"url,omitempty"`
+
+	// HelpCenterURL links to the help center.
+	HelpCenterURL *string `json:"help_center_url,omitempty"`
+
+	// StatusURL links to the status page.
+	StatusURL *string `json:"status_url,omitempty"`
 }
 
 // BrandingAuth carries the authentication client settings.
@@ -398,6 +423,10 @@ type BrandingAuth struct {
 
 // MailTemplate describes one editable transactional email template.
 type MailTemplate struct {
+	// Category groups the template (organization, billing, user_account,
+	// icann_policy, tld_specific, unknown).
+	Category string `json:"category,omitempty"`
+
 	// Label is the human-readable template name.
 	Label string `json:"label,omitempty"`
 

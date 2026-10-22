@@ -210,6 +210,17 @@ type Domain struct {
 
 	// VerificationRequired carries pending verification claims and deadlines.
 	VerificationRequired *VerificationRequired `json:"verification_required,omitempty"`
+
+	// ConnectedAccount is the registrar credential or registry accreditation
+	// the domain is synced from or managed on. Only present when
+	// connected_account is requested via Include, and nil even then for
+	// natively registered domains.
+	ConnectedAccount *DomainConnectedAccount `json:"connected_account,omitempty"`
+
+	// RegistrantChange is the registrant change in progress, or the completed
+	// one whose transfer lock is still active. Only present when
+	// registrant_change is requested via Include.
+	RegistrantChange *DomainRegistrantChange `json:"registrant_change,omitempty"`
 }
 
 // DomainRenewalPrice is the price to renew a domain for one period.
@@ -231,11 +242,151 @@ type DomainRenewalPrice struct {
 
 // VerificationRequired carries the verification a domain is waiting on.
 type VerificationRequired struct {
+	// Sources are the parties (ICANN, the registry) that require the
+	// verification.
+	Sources []DomainVerificationKind `json:"sources,omitempty"`
+
 	// Claims are the outstanding verification claims.
 	Claims []VerificationClaimType `json:"claims"`
 
 	// Deadlines are the deadlines attached to those claims.
 	Deadlines []VerificationDeadline `json:"deadlines,omitempty"`
+}
+
+// ConnectedAccountType says how a domain is connected to OpusDNS.
+type ConnectedAccountType string
+
+const (
+	// ConnectedAccountTypeDefault is a domain registered natively through OpusDNS.
+	ConnectedAccountTypeDefault ConnectedAccountType = "default"
+
+	// ConnectedAccountTypeAMS is a domain on the organization's own registry
+	// accreditation.
+	ConnectedAccountTypeAMS ConnectedAccountType = "ams"
+
+	// ConnectedAccountTypeRAS is a domain synced from a registrar credential.
+	ConnectedAccountTypeRAS ConnectedAccountType = "ras"
+)
+
+// AccountTypeFilterMode controls how an account type filter matches.
+type AccountTypeFilterMode string
+
+const (
+	// AccountTypeFilterMatchAny matches domains with any of the account types.
+	AccountTypeFilterMatchAny AccountTypeFilterMode = "match_any"
+
+	// AccountTypeFilterMatchNone matches domains with none of the account types.
+	AccountTypeFilterMatchNone AccountTypeFilterMode = "match_none"
+)
+
+// Registrar identifies a registrar a registrar credential connects to.
+type Registrar string
+
+const (
+	RegistrarInternetX           Registrar = "INTERNETX"
+	RegistrarMoniker             Registrar = "MONIKER"
+	RegistrarDomainBestellsystem Registrar = "DOMAIN_BESTELLSYSTEM"
+	RegistrarCentralNic          Registrar = "CENTRALNIC"
+	RegistrarNicManager          Registrar = "NICMANAGER"
+	RegistrarOpusDNS             Registrar = "OPUSDNS"
+	RegistrarEnom                Registrar = "ENOM"
+	RegistrarOpenSRS             Registrar = "OPENSRS"
+	RegistrarNicDirect           Registrar = "NIC_DIRECT"
+	RegistrarOpenprovider        Registrar = "OPENPROVIDER"
+	RegistrarRealtimeRegister    Registrar = "REALTIMEREGISTER"
+)
+
+// DomainConnectedAccount is the account a domain is synced from or managed on.
+// Type selects the variant: "ras" for a registrar credential, "ams" for the
+// organization's own registry accreditation. Only the fields of that variant
+// are set.
+type DomainConnectedAccount struct {
+	// Type is the discriminator, ConnectedAccountTypeRAS or ConnectedAccountTypeAMS.
+	Type ConnectedAccountType `json:"type"`
+
+	// RegistrarCredentialID is set for the "ras" variant.
+	RegistrarCredentialID TypeID `json:"registrar_credential_id,omitempty"`
+
+	// Name is the name of the registrar credential, set for the "ras" variant.
+	Name string `json:"name,omitempty"`
+
+	// Registrar is set for the "ras" variant.
+	Registrar Registrar `json:"registrar,omitempty"`
+
+	// RegistryAccountID is set for the "ams" variant.
+	RegistryAccountID TypeID `json:"registry_account_id,omitempty"`
+
+	// Registry is the registry backend (e.g. "verisign", "denic"), set for
+	// the "ams" variant.
+	Registry string `json:"registry,omitempty"`
+}
+
+// RegistrantChangeStatus is the state of a registrant change.
+type RegistrantChangeStatus string
+
+const (
+	RegistrantChangeStatusPendingConfirmation RegistrantChangeStatus = "pending_confirmation"
+	RegistrantChangeStatusConfirmed           RegistrantChangeStatus = "confirmed"
+	RegistrantChangeStatusExecuting           RegistrantChangeStatus = "executing"
+	RegistrantChangeStatusRegistryPending     RegistrantChangeStatus = "registry_pending"
+	RegistrantChangeStatusCompleted           RegistrantChangeStatus = "completed"
+	RegistrantChangeStatusNotMaterial         RegistrantChangeStatus = "not_material"
+	RegistrantChangeStatusExpired             RegistrantChangeStatus = "expired"
+	RegistrantChangeStatusCanceled            RegistrantChangeStatus = "canceled"
+	RegistrantChangeStatusRejected            RegistrantChangeStatus = "rejected"
+	RegistrantChangeStatusFailed              RegistrantChangeStatus = "failed"
+)
+
+// RegistrantChangeConfirmationMethod says how a registrant change was confirmed.
+type RegistrantChangeConfirmationMethod string
+
+const (
+	RegistrantChangeConfirmationDesignatedAgent RegistrantChangeConfirmationMethod = "designated_agent"
+	RegistrantChangeConfirmationEmail           RegistrantChangeConfirmationMethod = "email"
+	RegistrantChangeConfirmationAPI             RegistrantChangeConfirmationMethod = "api"
+)
+
+// DomainRegistrantChange is a change of a domain's registrant.
+type DomainRegistrantChange struct {
+	// RegistrantChangeID is the ID of the registrant change.
+	RegistrantChangeID TypeID `json:"registrant_change_id"`
+
+	// DomainID is the domain whose registrant changes.
+	DomainID DomainID `json:"domain_id"`
+
+	// Status is the state of the change.
+	Status RegistrantChangeStatus `json:"status"`
+
+	// Material is true when the name, organization or email of the
+	// registrant changes.
+	Material bool `json:"material"`
+
+	// PreviousRegistrant is the registrant contact before the change.
+	PreviousRegistrant ContactID `json:"previous_registrant"`
+
+	// NewRegistrant is the registrant contact after the change.
+	NewRegistrant ContactID `json:"new_registrant"`
+
+	// ConfirmationMethod is how the change was confirmed; nil when no
+	// confirmation applies.
+	ConfirmationMethod *RegistrantChangeConfirmationMethod `json:"confirmation_method,omitempty"`
+
+	// ConfirmationDeadline is when the change expires if not confirmed.
+	ConfirmationDeadline *time.Time `json:"confirmation_deadline,omitempty"`
+
+	// TransferLockOptOut is true when the transfer lock after the change was
+	// opted out of.
+	TransferLockOptOut bool `json:"transfer_lock_opt_out"`
+
+	// TransferLockUntil is until when the domain cannot be transferred away
+	// because of the change; nil when no transfer lock applies.
+	TransferLockUntil *time.Time `json:"transfer_lock_until,omitempty"`
+
+	// FailureReason says why the change failed.
+	FailureReason *string `json:"failure_reason,omitempty"`
+
+	// CreatedOn is when the change was requested.
+	CreatedOn *time.Time `json:"created_on,omitempty"`
 }
 
 // Nameserver represents a nameserver for a domain.
@@ -294,6 +445,9 @@ type DomainSummaryData struct {
 
 	// ByTLD counts domains per TLD.
 	ByTLD map[string]int `json:"by_tld"`
+
+	// ByAccountType counts domains per connected account type.
+	ByAccountType map[ConnectedAccountType]int `json:"by_account_type"`
 
 	// ByOrganization counts domains per organization name.
 	ByOrganization map[string]int `json:"by_organization,omitempty"`
@@ -406,6 +560,75 @@ type DomainRenewRequest struct {
 
 	// CurrentExpiryDate is the current expiration date (for verification).
 	CurrentExpiryDate *time.Time `json:"current_expiry_date,omitempty"`
+}
+
+// DomainRenewStatusTransferPending is the Status of a DomainRenewResult whose
+// renewal became a transfer into OpusDNS.
+const DomainRenewStatusTransferPending = "transfer_pending"
+
+// DomainRenewResult is the outcome of a renewal. The API answers in one of two
+// shapes, and only the fields of that shape are set:
+//
+//   - The domain was renewed: NewExpiryDate and PeriodExtended are set.
+//   - The domain is held at another registrar, so the renewal transfers it
+//     into OpusDNS: Status is DomainRenewStatusTransferPending and RequestID
+//     identifies the request. The transfer's progress is reported as domain
+//     events. Use TransferPending to tell the two apart.
+type DomainRenewResult struct {
+	// Name is the domain name.
+	Name string `json:"name"`
+
+	// NewExpiryDate is the expiration date after the renewal.
+	NewExpiryDate *time.Time `json:"new_expiry_date,omitempty"`
+
+	// PeriodExtended is the period the registration was extended by.
+	PeriodExtended *DomainPeriod `json:"period_extended,omitempty"`
+
+	// Status is DomainRenewStatusTransferPending when the renewal started a
+	// transfer into OpusDNS, empty otherwise.
+	Status string `json:"status,omitempty"`
+
+	// RequestID identifies the transfer request when Status is set.
+	RequestID string `json:"request_id,omitempty"`
+}
+
+// TransferPending reports whether the renewal started a transfer into OpusDNS
+// instead of renewing the domain directly.
+func (r *DomainRenewResult) TransferPending() bool {
+	return r.Status == DomainRenewStatusTransferPending
+}
+
+// AuthCodeDelivery says how the auth code of a domain is delivered.
+type AuthCodeDelivery string
+
+const (
+	// AuthCodeDeliveryResponse means the code is in the API response.
+	AuthCodeDeliveryResponse AuthCodeDelivery = "response"
+
+	// AuthCodeDeliveryRegistrantEmail means the registry emails the code to
+	// the registrant; the API response does not carry it.
+	AuthCodeDeliveryRegistrantEmail AuthCodeDelivery = "registrant_email"
+)
+
+// DomainAuthCodeResponse is the result of requesting a domain's auth code.
+type DomainAuthCodeResponse struct {
+	// Name is the domain name.
+	Name string `json:"name"`
+
+	// Delivery says where the auth code went.
+	Delivery AuthCodeDelivery `json:"delivery"`
+
+	// AuthCode is the auth code; set only when Delivery is
+	// AuthCodeDeliveryResponse.
+	AuthCode *string `json:"auth_code,omitempty"`
+
+	// AuthCodeExpiresOn is when the auth code expires, if the registry
+	// reports it.
+	AuthCodeExpiresOn *time.Time `json:"auth_code_expires_on,omitempty"`
+
+	// Recipients are the addresses the code was sent to when Delivery is
+	// AuthCodeDeliveryRegistrantEmail.
+	Recipients []string `json:"recipients,omitempty"`
 }
 
 // DomainRestoreRequest represents a request to restore a deleted domain.
@@ -559,6 +782,27 @@ type ListDomainsOptions struct {
 
 	// TransferredBefore filters domains transferred in before this date.
 	TransferredBefore *time.Time
+
+	// HasTags filters by whether the domain has any tags.
+	HasTags *bool
+
+	// Nameserver filters by a nameserver hostname the domain delegates to.
+	Nameserver string
+
+	// AccountTypes filters by connected account type. Multiple values are
+	// sent as repeated account_type params.
+	AccountTypes []ConnectedAccountType
+
+	// AccountTypeMode controls whether any or none of AccountTypes must match.
+	AccountTypeMode AccountTypeFilterMode
+
+	// Registrars filters by the registrar of the domain's registrar
+	// credential. Multiple values are sent as repeated registrar params.
+	Registrars []Registrar
+
+	// RegistrarCredentialIDs filters by registrar credential. Multiple values
+	// are sent as repeated registrar_credential_id params.
+	RegistrarCredentialIDs []TypeID
 }
 
 // DomainIncludeField represents optional domain response expansions.
@@ -567,7 +811,113 @@ type DomainIncludeField string
 const (
 	// DomainIncludeTags includes tags assigned to the domain.
 	DomainIncludeTags DomainIncludeField = "tags"
+
+	// DomainIncludeRenewalPrice includes the renewal price. GetDomainWithOptions only.
+	DomainIncludeRenewalPrice DomainIncludeField = "renewal_price"
+
+	// DomainIncludeConnectedAccount includes the connected account.
+	DomainIncludeConnectedAccount DomainIncludeField = "connected_account"
+
+	// DomainIncludeRegistrantChange includes the registrant change in
+	// progress. GetDomainWithOptions only.
+	DomainIncludeRegistrantChange DomainIncludeField = "registrant_change"
 )
+
+// DomainVerificationKind is the party that requires a domain verification.
+type DomainVerificationKind string
+
+const (
+	DomainVerificationKindICANN    DomainVerificationKind = "ICANN"
+	DomainVerificationKindRegistry DomainVerificationKind = "REGISTRY"
+)
+
+// DomainVerificationStatus is the state of a domain verification case.
+type DomainVerificationStatus string
+
+const (
+	DomainVerificationStatusOpen      DomainVerificationStatus = "OPEN"
+	DomainVerificationStatusSubmitted DomainVerificationStatus = "SUBMITTED"
+	DomainVerificationStatusOverdue   DomainVerificationStatus = "OVERDUE"
+	DomainVerificationStatusSatisfied DomainVerificationStatus = "SATISFIED"
+	DomainVerificationStatusFailed    DomainVerificationStatus = "FAILED"
+	DomainVerificationStatusCanceled  DomainVerificationStatus = "CANCELED"
+)
+
+// DomainVerificationTrigger is what opened a domain verification case.
+type DomainVerificationTrigger string
+
+const (
+	DomainVerificationTriggerCreate           DomainVerificationTrigger = "CREATE"
+	DomainVerificationTriggerRegistrantChange DomainVerificationTrigger = "REGISTRANT_CHANGE"
+	DomainVerificationTriggerTransfer         DomainVerificationTrigger = "TRANSFER"
+	DomainVerificationTriggerRegistryRequest  DomainVerificationTrigger = "REGISTRY_REQUEST"
+	DomainVerificationTriggerBackfill         DomainVerificationTrigger = "BACKFILL"
+)
+
+// DomainVerificationCloseReason is why a domain verification case was closed.
+type DomainVerificationCloseReason string
+
+const (
+	DomainVerificationCloseEvidenceVerified DomainVerificationCloseReason = "EVIDENCE_VERIFIED"
+	DomainVerificationCloseRegistryCleared  DomainVerificationCloseReason = "REGISTRY_CLEARED"
+	DomainVerificationCloseRegistryRejected DomainVerificationCloseReason = "REGISTRY_REJECTED"
+	DomainVerificationCloseSuperseded       DomainVerificationCloseReason = "SUPERSEDED"
+	DomainVerificationCloseDomainDeleted    DomainVerificationCloseReason = "DOMAIN_DELETED"
+	DomainVerificationCloseTransferredOut   DomainVerificationCloseReason = "TRANSFERRED_OUT"
+	DomainVerificationCloseTransferAborted  DomainVerificationCloseReason = "TRANSFER_ABORTED"
+)
+
+// DomainVerification is one verification case of a domain.
+type DomainVerification struct {
+	// VerificationID is the ID of the verification case.
+	VerificationID TypeID `json:"verification_id"`
+
+	// Source is the party that requires the verification.
+	Source DomainVerificationKind `json:"source"`
+
+	// Trigger is what opened the case.
+	Trigger DomainVerificationTrigger `json:"trigger"`
+
+	// Status is the state of the case.
+	Status DomainVerificationStatus `json:"status"`
+
+	// Claims are the claims that must be verified.
+	Claims []VerificationClaimType `json:"claims"`
+
+	// Deadlines are the deadlines attached to the case.
+	Deadlines []VerificationDeadline `json:"deadlines"`
+
+	// ContactID is the contact being verified.
+	ContactID ContactID `json:"contact_id"`
+
+	// OpenedOn is when the case was opened.
+	OpenedOn *time.Time `json:"opened_on,omitempty"`
+
+	// ClosedOn is when the case was closed; nil while it is open.
+	ClosedOn *time.Time `json:"closed_on,omitempty"`
+
+	// CloseReason is why the case was closed; nil while it is open.
+	CloseReason *DomainVerificationCloseReason `json:"close_reason,omitempty"`
+}
+
+// DomainVerificationListResponse is a page of domain verification cases.
+type DomainVerificationListResponse struct {
+	// Results contains the verification cases of the current page.
+	Results []DomainVerification `json:"results"`
+
+	// Pagination contains the pagination metadata.
+	Pagination Pagination `json:"pagination"`
+}
+
+// ListDomainVerificationsOptions contains options for listing the
+// verification cases of a domain.
+type ListDomainVerificationsOptions struct {
+	// Page is the page number to retrieve (1-indexed).
+	Page int
+
+	// PageSize is the number of cases per page.
+	PageSize int
+}
 
 // GetDomainOptions contains options for retrieving a domain.
 type GetDomainOptions struct {

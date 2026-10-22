@@ -52,7 +52,11 @@ func main() {
 		log.Fatalf("Failed to renew domain: %v", err)
 	}
 
-	fmt.Println("Domain renewed successfully!")
+	if renewed.TransferPending() {
+		fmt.Println("Domain is held at another registrar; a transfer into OpusDNS was requested.")
+	} else {
+		fmt.Println("Domain renewed successfully!")
+	}
 	data, _ := json.MarshalIndent(renewed, "", "  ")
 	fmt.Println(string(data))
 }

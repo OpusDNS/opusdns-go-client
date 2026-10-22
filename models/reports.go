@@ -23,6 +23,9 @@ const (
 	// ReportTypeSuborgBillingTransactionsMonthly reports monthly billing
 	// transactions for independently billed sub-organizations.
 	ReportTypeSuborgBillingTransactionsMonthly ReportType = "suborg_billing_transactions_monthly"
+
+	// ReportTypeAGPDeletions reports domains deleted within the add grace period.
+	ReportTypeAGPDeletions ReportType = "agp_deletions"
 )
 
 // ReportStatus represents the status of a report.
@@ -33,6 +36,7 @@ const (
 	ReportStatusGenerating ReportStatus = "generating"
 	ReportStatusCompleted  ReportStatus = "completed"
 	ReportStatusFailed     ReportStatus = "failed"
+	ReportStatusEmpty      ReportStatus = "empty"
 )
 
 // ReportTriggerType represents how the report was triggered.

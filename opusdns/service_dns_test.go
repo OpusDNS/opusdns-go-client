@@ -508,6 +508,7 @@ func TestDNSService_ListZonesPage(t *testing.T) {
 func TestDNSService_ListZonesVanitySetFilter(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "vns_123", r.URL.Query().Get("vanity_nameserver_set_id"))
+		assert.Equal(t, "true", r.URL.Query().Get("has_tags"))
 
 		_ = json.NewEncoder(w).Encode(models.ZoneListResponse{
 			Results:    []models.Zone{},
@@ -520,8 +521,10 @@ func TestDNSService_ListZonesVanitySetFilter(t *testing.T) {
 	require.NoError(t, err)
 
 	setID := models.VanityNameserverSetID("vns_123")
+	hasTags := true
 	_, err = client.DNS.ListZones(context.Background(), &models.ListZonesOptions{
 		VanityNameserverSetID: &setID,
+		HasTags:               &hasTags,
 	})
 	require.NoError(t, err)
 }

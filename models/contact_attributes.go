@@ -163,7 +163,28 @@ const (
 	ContactVerificationProofPostalVerTransactionLog ContactVerificationProof = "POSTAL_VER_TRANSACTION_LOG"
 	ContactVerificationProofEmailVerTransactionLog  ContactVerificationProof = "EMAIL_VER_TRANSACTION_LOG"
 	ContactVerificationProofAddressDatabase         ContactVerificationProof = "ADDRESS_DATABASE"
+	ContactVerificationProofPhoneVerTransactionLog  ContactVerificationProof = "PHONE_VER_TRANSACTION_LOG"
 )
+
+// LevelOfAssurance is the eIDAS level of assurance of an electronic
+// identification.
+type LevelOfAssurance string
+
+const (
+	LevelOfAssuranceLow         LevelOfAssurance = "LOW"
+	LevelOfAssuranceSubstantial LevelOfAssurance = "SUBSTANTIAL"
+	LevelOfAssuranceHigh        LevelOfAssurance = "HIGH"
+)
+
+// ContactVerificationEID describes the electronic identification (eID) a
+// verification was made with.
+type ContactVerificationEID struct {
+	// Scheme is the eID scheme.
+	Scheme string `json:"eid_scheme"`
+
+	// LevelOfAssurance is the level of assurance of the identification.
+	LevelOfAssurance LevelOfAssurance `json:"level_of_assurance"`
+}
 
 // ContactAttestVerificationRequest is a single contact-verification attestation.
 type ContactAttestVerificationRequest struct {
@@ -178,6 +199,9 @@ type ContactAttestVerificationRequest struct {
 
 	// AttestationReference is an optional reference for the attestation.
 	AttestationReference string `json:"attestation_reference"`
+
+	// EID describes the electronic identification used, if any.
+	EID *ContactVerificationEID `json:"eid,omitempty"`
 }
 
 // ContactAttestRequest is the request body for attesting contact verifications.
@@ -208,6 +232,9 @@ type ContactVerificationStatus struct {
 
 	// ExpiresOn is when the verification expires, if applicable.
 	ExpiresOn *time.Time `json:"expires_on,omitempty"`
+
+	// EID describes the electronic identification used, if any.
+	EID *ContactVerificationEID `json:"eid,omitempty"`
 }
 
 // ContactAttestResponse is the response with the per-claim verification state.

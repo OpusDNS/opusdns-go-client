@@ -422,6 +422,9 @@ type ListZonesOptions struct {
 
 	// VanityNameserverSetID filters zones using a given vanity nameserver set.
 	VanityNameserverSetID *VanityNameserverSetID
+
+	// HasTags filters by whether the zone has any tags.
+	HasTags *bool
 }
 
 // ZoneIncludeField represents optional zone response expansions.

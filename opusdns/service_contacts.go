@@ -96,6 +96,9 @@ func (s *ContactsService) ListContactsPage(ctx context.Context, opts *models.Lis
 		if opts.StatusTagMode != "" {
 			query.Set("status_tag_mode", string(opts.StatusTagMode))
 		}
+		if opts.HasTags != nil {
+			query.Set("has_tags", strconv.FormatBool(*opts.HasTags))
+		}
 		for _, include := range opts.Include {
 			query.Add("include", string(include))
 		}

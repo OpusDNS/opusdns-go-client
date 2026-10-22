@@ -124,6 +124,12 @@ func TestDomainsService_ListDomains(t *testing.T) {
 			assert.Equal(t, "false", query.Get("read_only"))
 			assert.Equal(t, now.Format(time.RFC3339), query.Get("transferred_after"))
 			assert.Equal(t, now.Format(time.RFC3339), query.Get("transferred_before"))
+			assert.Equal(t, "true", query.Get("has_tags"))
+			assert.Equal(t, "ns1.example.net", query.Get("nameserver"))
+			assert.Equal(t, []string{"ams", "ras"}, query["account_type"])
+			assert.Equal(t, "match_none", query.Get("account_type_mode"))
+			assert.Equal(t, []string{"INTERNETX"}, query["registrar"])
+			assert.Equal(t, []string{"registrar_credential_1"}, query["registrar_credential_id"])
 
 			_ = json.NewEncoder(w).Encode(models.DomainListResponse{
 				Results:    []models.Domain{},
@@ -155,6 +161,15 @@ func TestDomainsService_ListDomains(t *testing.T) {
 			ReadOnly:          &falseValue,
 			TransferredAfter:  &now,
 			TransferredBefore: &now,
+			HasTags:           &trueValue,
+			Nameserver:        "ns1.example.net",
+			AccountTypes: []models.ConnectedAccountType{
+				models.ConnectedAccountTypeAMS,
+				models.ConnectedAccountTypeRAS,
+			},
+			AccountTypeMode:        models.AccountTypeFilterMatchNone,
+			Registrars:             []models.Registrar{models.RegistrarInternetX},
+			RegistrarCredentialIDs: []models.TypeID{"registrar_credential_1"},
 		})
 
 		require.NoError(t, err)
@@ -232,12 +247,27 @@ func TestDomainsService_GetDomainWithOptions(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "GET", r.Method)
 		assert.Equal(t, "/v1/domains/example.com", r.URL.Path)
-		assert.Equal(t, []string{"tags"}, r.URL.Query()["include"])
+		assert.Equal(t, []string{"tags", "connected_account", "registrant_change"}, r.URL.Query()["include"])
 
-		_ = json.NewEncoder(w).Encode(models.Domain{
-			DomainID: "domain_123",
-			Name:     "example.com",
-		})
+		_, _ = w.Write([]byte(`{
+			"domain_id": "domain_123",
+			"name": "example.com",
+			"connected_account": {"type": "ras", "registrar_credential_id": "registrar_credential_1", "name": "My InterNetX", "registrar": "INTERNETX"},
+			"registrant_change": {
+				"registrant_change_id": "registrant_change_1",
+				"domain_id": "domain_123",
+				"status": "completed",
+				"material": true,
+				"previous_registrant": "contact_1",
+				"new_registrant": "contact_2",
+				"confirmation_method": "email",
+				"transfer_lock_opt_out": false,
+				"transfer_lock_until": "2026-12-01T00:00:00Z",
+				"confirmation_deadline": null,
+				"failure_reason": null,
+				"created_on": "2026-10-01T00:00:00Z"
+			}
+		}`))
 	}))
 	defer server.Close()
 
@@ -245,11 +275,27 @@ func TestDomainsService_GetDomainWithOptions(t *testing.T) {
 	require.NoError(t, err)
 
 	domain, err := client.Domains.GetDomainWithOptions(context.Background(), "example.com", &models.GetDomainOptions{
-		Include: []models.DomainIncludeField{models.DomainIncludeTags},
+		Include: []models.DomainIncludeField{
+			models.DomainIncludeTags,
+			models.DomainIncludeConnectedAccount,
+			models.DomainIncludeRegistrantChange,
+		},
 	})
 
 	require.NoError(t, err)
 	assert.Equal(t, "example.com", domain.Name)
+
+	require.NotNil(t, domain.ConnectedAccount)
+	assert.Equal(t, models.ConnectedAccountTypeRAS, domain.ConnectedAccount.Type)
+	assert.Equal(t, models.RegistrarInternetX, domain.ConnectedAccount.Registrar)
+	assert.Equal(t, "My InterNetX", domain.ConnectedAccount.Name)
+
+	require.NotNil(t, domain.RegistrantChange)
+	assert.Equal(t, models.RegistrantChangeStatusCompleted, domain.RegistrantChange.Status)
+	assert.Equal(t, models.ContactID("contact_2"), domain.RegistrantChange.NewRegistrant)
+	require.NotNil(t, domain.RegistrantChange.ConfirmationMethod)
+	assert.Equal(t, models.RegistrantChangeConfirmationEmail, *domain.RegistrantChange.ConfirmationMethod)
+	require.NotNil(t, domain.RegistrantChange.TransferLockUntil)
 }
 
 func TestDomainsService_CreateDomain(t *testing.T) {
@@ -356,31 +402,134 @@ func TestDomainsService_TransferDomain(t *testing.T) {
 }
 
 func TestDomainsService_RenewDomain(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "POST", r.Method)
-		assert.Equal(t, "/v1/domains/example.com/renew", r.URL.Path)
+	t.Run("renewed", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assert.Equal(t, "POST", r.Method)
+			assert.Equal(t, "/v1/domains/example.com/renew", r.URL.Path)
 
-		var req models.DomainRenewRequest
-		err := json.NewDecoder(r.Body).Decode(&req)
+			var req models.DomainRenewRequest
+			err := json.NewDecoder(r.Body).Decode(&req)
+			require.NoError(t, err)
+			assert.Equal(t, 1, req.Period)
+
+			_, _ = w.Write([]byte(`{"name":"example.com","new_expiry_date":"2028-05-01T00:00:00Z","period_extended":{"value":1,"unit":"y"}}`))
+		}))
+		defer server.Close()
+
+		client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
 		require.NoError(t, err)
-		assert.Equal(t, 1, req.Period)
 
-		_ = json.NewEncoder(w).Encode(models.Domain{
-			DomainID: "domain_123",
-			Name:     "example.com",
+		result, err := client.Domains.RenewDomain(context.Background(), "example.com", &models.DomainRenewRequest{
+			Period: 1,
 		})
+
+		require.NoError(t, err)
+		assert.Equal(t, "example.com", result.Name)
+		assert.False(t, result.TransferPending())
+		require.NotNil(t, result.NewExpiryDate)
+		assert.Equal(t, time.Date(2028, 5, 1, 0, 0, 0, 0, time.UTC), result.NewExpiryDate.UTC())
+		require.NotNil(t, result.PeriodExtended)
+		assert.Equal(t, models.DomainPeriod{Value: 1, Unit: models.PeriodUnitYear}, *result.PeriodExtended)
+	})
+
+	t.Run("transfer pending", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusAccepted)
+			_, _ = w.Write([]byte(`{"name":"example.com","request_id":"req_123","status":"transfer_pending"}`))
+		}))
+		defer server.Close()
+
+		client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+		require.NoError(t, err)
+
+		result, err := client.Domains.RenewDomain(context.Background(), "example.com", &models.DomainRenewRequest{
+			Period: 1,
+		})
+
+		require.NoError(t, err)
+		assert.True(t, result.TransferPending())
+		assert.Equal(t, "req_123", result.RequestID)
+		assert.Nil(t, result.NewExpiryDate)
+	})
+}
+
+func TestDomainsService_RequestDomainAuthCode(t *testing.T) {
+	t.Run("in the response", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assert.Equal(t, "POST", r.Method)
+			assert.Equal(t, "/v1/domains/example.com/auth-code", r.URL.Path)
+
+			_, _ = w.Write([]byte(`{"name":"example.com","delivery":"response","auth_code":"s3cret","auth_code_expires_on":"2026-11-01T00:00:00Z"}`))
+		}))
+		defer server.Close()
+
+		client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+		require.NoError(t, err)
+
+		result, err := client.Domains.RequestDomainAuthCode(context.Background(), "example.com")
+
+		require.NoError(t, err)
+		assert.Equal(t, models.AuthCodeDeliveryResponse, result.Delivery)
+		require.NotNil(t, result.AuthCode)
+		assert.Equal(t, "s3cret", *result.AuthCode)
+		require.NotNil(t, result.AuthCodeExpiresOn)
+	})
+
+	t.Run("emailed to the registrant", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assert.Equal(t, "/v1/domains/example.se/auth-code", r.URL.Path)
+
+			_, _ = w.Write([]byte(`{"name":"example.se","delivery":"registrant_email","auth_code":null,"recipients":["owner@example.se"]}`))
+		}))
+		defer server.Close()
+
+		client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+		require.NoError(t, err)
+
+		result, err := client.Domains.RequestDomainAuthCode(context.Background(), "example.se")
+
+		require.NoError(t, err)
+		assert.Equal(t, models.AuthCodeDeliveryRegistrantEmail, result.Delivery)
+		assert.Nil(t, result.AuthCode)
+		assert.Equal(t, []string{"owner@example.se"}, result.Recipients)
+	})
+}
+
+func TestDomainsService_ListDomainVerifications(t *testing.T) {
+	var pages []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "GET", r.Method)
+		assert.Equal(t, "/v1/domains/example.com/verifications", r.URL.Path)
+		pages = append(pages, r.URL.Query().Get("page"))
+
+		if r.URL.Query().Get("page") == "1" {
+			_, _ = w.Write([]byte(`{"results":[{"verification_id":"domain_verification_1","source":"ICANN","trigger":"CREATE","status":"SATISFIED","claims":["email"],"deadlines":[],"contact_id":"contact_1","opened_on":"2026-01-01T00:00:00Z","closed_on":"2026-01-02T00:00:00Z","close_reason":"EVIDENCE_VERIFIED"}],"pagination":{"has_next_page":true}}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"results":[{"verification_id":"domain_verification_2","source":"REGISTRY","trigger":"REGISTRY_REQUEST","status":"OPEN","claims":["legal_entity"],"deadlines":[{"type":"verification","date":"2026-12-01T00:00:00Z"}],"contact_id":"contact_1","opened_on":"2026-10-01T00:00:00Z","closed_on":null,"close_reason":null}],"pagination":{"has_next_page":false}}`))
 	}))
 	defer server.Close()
 
 	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
 	require.NoError(t, err)
 
-	domain, err := client.Domains.RenewDomain(context.Background(), "example.com", &models.DomainRenewRequest{
-		Period: 1,
-	})
+	cases, err := client.Domains.ListDomainVerifications(context.Background(), "example.com", nil)
 
 	require.NoError(t, err)
-	assert.Equal(t, "example.com", domain.Name)
+	assert.Equal(t, []string{"1", "2"}, pages)
+	require.Len(t, cases, 2)
+
+	assert.Equal(t, models.DomainVerificationKindICANN, cases[0].Source)
+	assert.Equal(t, models.DomainVerificationStatusSatisfied, cases[0].Status)
+	require.NotNil(t, cases[0].CloseReason)
+	assert.Equal(t, models.DomainVerificationCloseEvidenceVerified, *cases[0].CloseReason)
+
+	assert.Equal(t, models.DomainVerificationTriggerRegistryRequest, cases[1].Trigger)
+	assert.Equal(t, []models.VerificationClaimType{models.VerificationClaimTypeLegalEntity}, cases[1].Claims)
+	require.Len(t, cases[1].Deadlines, 1)
+	assert.Equal(t, models.VerificationDeadlineTypeVerification, cases[1].Deadlines[0].Type)
+	assert.Nil(t, cases[1].ClosedOn)
+	assert.Nil(t, cases[1].CloseReason)
 }
 
 func TestDomainsService_RestoreDomain(t *testing.T) {
@@ -419,10 +568,14 @@ func TestDomainsService_GetSummary(t *testing.T) {
 		_ = json.NewEncoder(w).Encode(models.DomainSummary{
 			OrganizationID: "organization_123",
 			Domains: models.DomainSummaryData{
-				TotalCount:   42,
-				ByStatus:     map[models.DomainStatus]int{models.DomainStatusOK: 40},
-				ByStatusTag:  map[models.StatusTagType]int{models.StatusTagTypeDNSSECPending: 2},
-				ByTLD:        map[string]int{"com": 42},
+				TotalCount:  42,
+				ByStatus:    map[models.DomainStatus]int{models.DomainStatusOK: 40},
+				ByStatusTag: map[models.StatusTagType]int{models.StatusTagTypeDNSSECPending: 2},
+				ByTLD:       map[string]int{"com": 42},
+				ByAccountType: map[models.ConnectedAccountType]int{
+					models.ConnectedAccountTypeDefault: 40,
+					models.ConnectedAccountTypeRAS:     2,
+				},
 				ExpiringSoon: &models.DomainsExpiringSoon{Next30Days: 3, Next60Days: 5, Next90Days: 9},
 			},
 		})
@@ -439,6 +592,7 @@ func TestDomainsService_GetSummary(t *testing.T) {
 	assert.Equal(t, 42, summary.Domains.TotalCount)
 	assert.Equal(t, 40, summary.Domains.ByStatus[models.DomainStatusOK])
 	assert.Equal(t, 2, summary.Domains.ByStatusTag[models.StatusTagTypeDNSSECPending])
+	assert.Equal(t, 2, summary.Domains.ByAccountType[models.ConnectedAccountTypeRAS])
 	require.NotNil(t, summary.Domains.ExpiringSoon)
 	assert.Equal(t, 3, summary.Domains.ExpiringSoon.Next30Days)
 }
