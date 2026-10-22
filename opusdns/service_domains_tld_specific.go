@@ -42,11 +42,16 @@ func (s *DomainsService) RequestAuthCode(ctx context.Context, tld models.AuthCod
 }
 
 // WithdrawATDomain withdraws an .at domain, handing it back to the registry
-// rather than deleting it.
-func (s *DomainsService) WithdrawATDomain(ctx context.Context, domainRef string) (*models.DomainWithdrawResponse, error) {
+// rather than deleting it. The request is required: it tells the registry
+// whether the domain's name service has already been stopped.
+func (s *DomainsService) WithdrawATDomain(ctx context.Context, domainRef string, req *models.DomainWithdrawRequest) (*models.DomainWithdrawResponse, error) {
+	if req == nil {
+		return nil, &ValidationError{Field: "request", Message: "a withdraw request is required"}
+	}
+
 	path := s.client.http.BuildPath("domains", "tld-specific", "at", url.PathEscape(domainRef), "withdraw")
 
-	resp, err := s.client.http.Post(ctx, path, nil)
+	resp, err := s.client.http.Post(ctx, path, req)
 	if err != nil {
 		return nil, err
 	}
@@ -60,11 +65,16 @@ func (s *DomainsService) WithdrawATDomain(ctx context.Context, domainRef string)
 }
 
 // TransitDEDomain puts a .de domain into transit, handing responsibility for it
-// back to DENIC.
-func (s *DomainsService) TransitDEDomain(ctx context.Context, domainRef string) (*models.DomainTransitResponse, error) {
+// back to DENIC. The request is required: it says whether to disconnect the
+// domain from its current nameservers.
+func (s *DomainsService) TransitDEDomain(ctx context.Context, domainRef string, req *models.DomainTransitRequest) (*models.DomainTransitResponse, error) {
+	if req == nil {
+		return nil, &ValidationError{Field: "request", Message: "a transit request is required"}
+	}
+
 	path := s.client.http.BuildPath("domains", "tld-specific", "de", url.PathEscape(domainRef), "transit")
 
-	resp, err := s.client.http.Post(ctx, path, nil)
+	resp, err := s.client.http.Post(ctx, path, req)
 	if err != nil {
 		return nil, err
 	}

@@ -1,8 +1,8 @@
 // Command restore-domain restores a deleted domain while it is still in the
-// redemption grace period, renewing it for a number of years (default 1).
+// redemption grace period. An optional reason is passed on with the restore.
 //
 //	export OPUSDNS_API_KEY="opk_your_api_key"
-//	go run main.go example.com 1
+//	go run main.go example.com "deleted by mistake"
 package main
 
 import (
@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strconv"
 	"time"
 
 	"github.com/opusdns/opusdns-go-client/models"
@@ -24,17 +23,13 @@ func main() {
 		log.Fatal("OPUSDNS_API_KEY environment variable is required")
 	}
 	if len(os.Args) < 2 {
-		log.Fatal("Usage: restore-domain <domain> [years]\nExample: restore-domain example.com 1")
+		log.Fatal("Usage: restore-domain <domain> [reason]\nExample: restore-domain example.com \"deleted by mistake\"")
 	}
 	domain := os.Args[1]
 
-	years := 1
+	req := &models.DomainRestoreRequest{}
 	if len(os.Args) > 2 {
-		n, err := strconv.Atoi(os.Args[2])
-		if err != nil || n < 1 {
-			log.Fatalf("Invalid years %q: must be a positive integer", os.Args[2])
-		}
-		years = n
+		req.Reason = models.StringPtr(os.Args[2])
 	}
 
 	client, err := opusdns.NewClient(opusdns.WithAPIKey(apiKey))
@@ -46,9 +41,7 @@ func main() {
 	defer cancel()
 
 	fmt.Printf("Restoring domain: %s\n", domain)
-	restored, err := client.Domains.RestoreDomain(ctx, domain, &models.DomainRestoreRequest{
-		Period: years,
-	})
+	restored, err := client.Domains.RestoreDomain(ctx, domain, req)
 	if err != nil {
 		log.Fatalf("Failed to restore domain: %v", err)
 	}

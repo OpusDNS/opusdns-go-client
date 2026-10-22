@@ -3,6 +3,8 @@ package opusdns
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -68,37 +70,85 @@ func TestDomainsService_RequestAuthCodeFailure(t *testing.T) {
 }
 
 func TestDomainsService_WithdrawATDomain(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "POST", r.Method)
-		assert.Equal(t, "/v1/domains/tld-specific/at/example.at/withdraw", r.URL.Path)
+	// zone_delete is a required boolean in the spec's DomainWithdrawRequest,
+	// so false must be sent, not omitted.
+	for _, zoneDelete := range []bool{true, false} {
+		t.Run(fmt.Sprintf("zone_delete=%t", zoneDelete), func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				assert.Equal(t, "POST", r.Method)
+				assert.Equal(t, "/v1/domains/tld-specific/at/example.at/withdraw", r.URL.Path)
 
-		_ = json.NewEncoder(w).Encode(models.DomainWithdrawResponse{Name: "example.at", Success: true})
-	}))
-	defer server.Close()
+				body, err := io.ReadAll(r.Body)
+				require.NoError(t, err)
+				assert.JSONEq(t, fmt.Sprintf(`{"zone_delete":%t}`, zoneDelete), string(body))
 
-	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
-	require.NoError(t, err)
+				_, _ = w.Write([]byte(`{"name":"example.at","success":true,"detail":null}`))
+			}))
+			defer server.Close()
 
-	result, err := client.Domains.WithdrawATDomain(context.Background(), "example.at")
-	require.NoError(t, err)
-	assert.True(t, result.Success)
+			client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+			require.NoError(t, err)
+
+			result, err := client.Domains.WithdrawATDomain(context.Background(), "example.at",
+				&models.DomainWithdrawRequest{ZoneDelete: zoneDelete})
+			require.NoError(t, err)
+			assert.True(t, result.Success)
+		})
+	}
+
+	t.Run("nil request", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			t.Errorf("unexpected request %s %s", r.Method, r.URL.Path)
+		}))
+		defer server.Close()
+
+		client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+		require.NoError(t, err)
+
+		_, err = client.Domains.WithdrawATDomain(context.Background(), "example.at", nil)
+		assert.ErrorIs(t, err, ErrInvalidInput)
+	})
 }
 
 func TestDomainsService_TransitDEDomain(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "POST", r.Method)
-		assert.Equal(t, "/v1/domains/tld-specific/de/example.de/transit", r.URL.Path)
+	// disconnect is a required boolean in the spec's DomainTransitRequest, so
+	// false must be sent, not omitted.
+	for _, disconnect := range []bool{true, false} {
+		t.Run(fmt.Sprintf("disconnect=%t", disconnect), func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				assert.Equal(t, "POST", r.Method)
+				assert.Equal(t, "/v1/domains/tld-specific/de/example.de/transit", r.URL.Path)
 
-		_ = json.NewEncoder(w).Encode(models.DomainTransitResponse{Name: "example.de", Success: true})
-	}))
-	defer server.Close()
+				body, err := io.ReadAll(r.Body)
+				require.NoError(t, err)
+				assert.JSONEq(t, fmt.Sprintf(`{"disconnect":%t}`, disconnect), string(body))
 
-	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
-	require.NoError(t, err)
+				_, _ = w.Write([]byte(`{"name":"example.de","success":true}`))
+			}))
+			defer server.Close()
 
-	result, err := client.Domains.TransitDEDomain(context.Background(), "example.de")
-	require.NoError(t, err)
-	assert.True(t, result.Success)
+			client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+			require.NoError(t, err)
+
+			result, err := client.Domains.TransitDEDomain(context.Background(), "example.de",
+				&models.DomainTransitRequest{Disconnect: disconnect})
+			require.NoError(t, err)
+			assert.True(t, result.Success)
+		})
+	}
+
+	t.Run("nil request", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			t.Errorf("unexpected request %s %s", r.Method, r.URL.Path)
+		}))
+		defer server.Close()
+
+		client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+		require.NoError(t, err)
+
+		_, err = client.Domains.TransitDEDomain(context.Background(), "example.de", nil)
+		assert.ErrorIs(t, err, ErrInvalidInput)
+	})
 }
 
 func TestDomainsService_SubmitNorIDDeclaration(t *testing.T) {

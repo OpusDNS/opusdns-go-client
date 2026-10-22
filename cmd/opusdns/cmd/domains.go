@@ -129,8 +129,8 @@ var domainsRenewCmd = &cobra.Command{
 		domainName := args[0]
 		period, _ := cmd.Flags().GetInt("period")
 
-		if period <= 0 {
-			period = 1
+		if period < 1 {
+			return fmt.Errorf("invalid --period %d: must be at least 1", period)
 		}
 
 		force, _ := cmd.Flags().GetBool("force")
@@ -145,8 +145,19 @@ var domainsRenewCmd = &cobra.Command{
 			}
 		}
 
+		// The API only renews when it is told the current expiry date, so a
+		// renewal is not applied twice.
+		domain, err := getClient().Domains.GetDomain(ctx, domainName)
+		if err != nil {
+			return fmt.Errorf("failed to get domain: %w", err)
+		}
+		if domain.ExpiresOn == nil {
+			return fmt.Errorf("domain '%s' has no expiry date to renew from", domainName)
+		}
+
 		result, err := getClient().Domains.RenewDomain(ctx, domainName, &models.DomainRenewRequest{
-			Period: period,
+			Period:            models.DomainPeriod{Value: period, Unit: models.PeriodUnitYear},
+			CurrentExpiryDate: domain.ExpiresOn,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to renew domain: %w", err)

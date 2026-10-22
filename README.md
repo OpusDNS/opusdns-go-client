@@ -334,6 +334,19 @@ domain, err := client.Domains.CreateDomain(ctx, &models.DomainCreateRequest{
 })
 ```
 
+Some registrations need more than that:
+
+- **Premium domains**: set `ExpectedPrice` to the price from the availability
+  check, as a decimal string with two decimal places (`models.StringPtr("1250.00")`).
+  The API rejects the registration when the price differs. Renew, transfer and
+  restore take `ExpectedPrice` too.
+- **Trademark claims**: set `ClaimsNoticeAcceptanceHash` from the claims notice
+  the registrant accepted (see [Trademark Claims Notices](#trademark-claims-notices)).
+- **TLD attributes**: some TLDs require an attribute, for example
+  `Attributes: map[models.DomainAttributeKey]string{models.DomainAttributeNicITComplianceConfirmation: "true"}`
+  for `.it`. `DomainAttributeAutoRenewPeriod` (`monthly` or `yearly`) works for
+  every TLD, on create, transfer and update.
+
 ### Transfer a Domain
 
 ```go
@@ -397,9 +410,16 @@ for _, notice := range notices {
 
 ### Renew a Domain
 
+The API renews only when it is told the domain's current expiry date, so a
+renewal that is sent twice is not applied twice. Pass `ExpiresOn` as returned by
+`GetDomain`:
+
 ```go
+domain, err := client.Domains.GetDomain(ctx, "example.com")
+
 result, err := client.Domains.RenewDomain(ctx, "example.com", &models.DomainRenewRequest{
-    Period: 2, // Renew for 2 years
+    Period:            models.DomainPeriod{Value: 2, Unit: models.PeriodUnitYear},
+    CurrentExpiryDate: domain.ExpiresOn,
 })
 if result.TransferPending() {
     // The domain is held at another registrar: the renewal transfers it into
@@ -434,9 +454,10 @@ domain, err := client.Domains.UpdateDomain(ctx, "example.com", &models.DomainUpd
 // Delete moves the domain into the redemption / pending-delete window
 err := client.Domains.DeleteDomain(ctx, "example.com")
 
-// Restore is valid while the domain is still in the redemption grace period
+// Restore is valid while the domain is still in the redemption grace period.
+// The request is optional; pass nil to restore without a reason.
 result, err := client.Domains.RestoreDomain(ctx, "example.com", &models.DomainRestoreRequest{
-    Period: 1,
+    Reason: models.StringPtr("deleted by mistake"),
 })
 fmt.Println("restored at", result.RestoredAt)
 ```
