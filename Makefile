@@ -6,7 +6,7 @@ SPEC_REF ?= main
 # Alternative spec source, for debugging only. Skips commit pinning.
 SPEC_URL ?=
 
-SPEC_TESTS := 'TestSpecCoverage|TestSpecModels'
+SPEC_TESTS := 'TestSpecCoverage|TestSpecOperations|TestSpecModels|TestShapeCheckerCatchesDrift'
 
 .PHONY: help build test lint tidy vuln spec-outdated spec-sync spec-check spec-stubs spec-update
 
