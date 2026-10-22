@@ -126,7 +126,7 @@ operations:
     method: Contacts.VerifyContact
   "GET /v1/contacts/{contact_id}":
     status: implemented
-    method: Contacts.GetContact
+    method: [Contacts.GetContactWithOptions, Contacts.GetContact]
   "GET /v1/contacts/{contact_id}/verification":
     status: implemented
     method: Contacts.GetVerificationStatus

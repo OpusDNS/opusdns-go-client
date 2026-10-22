@@ -312,12 +312,19 @@ const (
 	ContactIncludeTags ContactIncludeField = "tags"
 )
 
+// GetContactOptions asks for additional data when retrieving one contact.
+type GetContactOptions struct {
+	// Include requests additional response data, such as the contact's tags.
+	Include []ContactIncludeField
+}
+
 // ContactAttributeDefinition defines a TLD-specific contact attribute.
 type ContactAttributeDefinition struct {
 	// Key is the unique identifier for the attribute.
 	Key RegistryHandleAttributeType `json:"key"`
 
-	// Type is the data type of the attribute.
+	// Type is the data type of the attribute (enum, string, boolean,
+	// datetime, integer, country_code or uri_template).
 	Type string `json:"type"`
 
 	// Values contains allowed values for enum types.
@@ -326,8 +333,42 @@ type ContactAttributeDefinition struct {
 	// Required indicates if this attribute is required.
 	Required bool `json:"required,omitempty"`
 
+	// ContactRoles lists the contact roles the attribute applies to. Empty
+	// means every role.
+	ContactRoles []DomainContactType `json:"contact_roles,omitempty"`
+
+	// Conditions must all hold for the attribute to apply.
+	Conditions []AttributeCondition `json:"conditions,omitempty"`
+
 	// Description provides a human-readable description.
+	//
+	// Deprecated: The API does not send a description, so it is always empty.
 	Description string `json:"description,omitempty"`
+}
+
+// ConditionOperator compares an attribute with the value of an
+// AttributeCondition.
+type ConditionOperator string
+
+const (
+	ConditionOperatorEquals    ConditionOperator = "equals"
+	ConditionOperatorNotEquals ConditionOperator = "not_equals"
+	ConditionOperatorIn        ConditionOperator = "in"
+	ConditionOperatorNotIn     ConditionOperator = "not_in"
+)
+
+// AttributeCondition makes an attribute apply only when another attribute
+// has, or does not have, a given value.
+type AttributeCondition struct {
+	// Field is the attribute the condition looks at.
+	Field RegistryHandleAttributeType `json:"field"`
+
+	// Operator is how Field is compared with Value.
+	Operator ConditionOperator `json:"operator"`
+
+	// Value is a string for equals/not_equals and a []interface{} of strings
+	// for in/not_in.
+	Value interface{} `json:"value"`
 }
 
 // ContactRoleAttributeRequirement defines attribute requirements for a contact role.

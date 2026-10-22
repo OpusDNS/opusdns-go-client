@@ -207,20 +207,29 @@ var contactsVerifyCmd = &cobra.Command{
 var contactsVerifyRequestCmd = &cobra.Command{
 	Use:   "request <contact-id>",
 	Short: "Request email verification for a contact",
-	Args:  cobra.ExactArgs(1),
+	Long: `Request verification of a contact's email address.
+
+With --type email (the default) the contact receives a verification link by
+email. With --type api the verification token is printed instead, for you to
+deliver to the contact yourself.`,
+	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx, cancel := getContext()
 		defer cancel()
 
 		contactID := models.ContactID(args[0])
+		verificationType, _ := cmd.Flags().GetString("type")
 
-		verification, err := getClient().Contacts.RequestVerification(ctx, contactID)
+		verification, err := getClient().Contacts.RequestVerification(ctx, contactID, models.VerificationType(verificationType))
 		if err != nil {
 			return fmt.Errorf("failed to request verification: %w", err)
 		}
 
 		fmt.Printf("✓ Verification requested for contact '%s'\n\n", contactID)
 		fmt.Printf("Status: %s\n", verification.Status)
+		if verification.Token != nil {
+			fmt.Printf("Token:  %s\n", *verification.Token)
+		}
 
 		return nil
 	},
@@ -317,6 +326,7 @@ func init() {
 	// Verify subcommands
 	contactsCmd.AddCommand(contactsVerifyCmd)
 	contactsVerifyCmd.AddCommand(contactsVerifyRequestCmd)
+	contactsVerifyRequestCmd.Flags().String("type", string(models.VerificationTypeEmail), "How the token reaches the contact: email or api")
 	contactsVerifyCmd.AddCommand(contactsVerifyStatusCmd)
 	contactsVerifyCmd.AddCommand(contactsVerifyTokenCmd)
 }

@@ -2,6 +2,7 @@ package opusdns
 
 import (
 	"context"
+	"net/http"
 	"net/url"
 	"strconv"
 	"time"
@@ -85,10 +86,10 @@ func (s *ContactsService) ListContactsPage(ctx context.Context, opts *models.Lis
 			query.Set("in_use", strconv.FormatBool(*opts.InUse))
 		}
 		if opts.CreatedAfter != nil {
-			query.Set("created_after", opts.CreatedAfter.Format(time.RFC3339))
+			query.Set("created_after", opts.CreatedAfter.Format(time.RFC3339Nano))
 		}
 		if opts.CreatedBefore != nil {
-			query.Set("created_before", opts.CreatedBefore.Format(time.RFC3339))
+			query.Set("created_before", opts.CreatedBefore.Format(time.RFC3339Nano))
 		}
 		for _, statusTag := range opts.StatusTags {
 			query.Add("status_tags", string(statusTag))
@@ -119,9 +120,22 @@ func (s *ContactsService) ListContactsPage(ctx context.Context, opts *models.Lis
 
 // GetContact retrieves a specific contact by ID.
 func (s *ContactsService) GetContact(ctx context.Context, contactID models.ContactID) (*models.Contact, error) {
-	path := s.client.http.BuildPath("contacts", string(contactID))
+	return s.GetContactWithOptions(ctx, contactID, nil)
+}
 
-	resp, err := s.client.http.Get(ctx, path, nil)
+// GetContactWithOptions retrieves a specific contact by ID, optionally asking
+// for additional response data such as its tags.
+func (s *ContactsService) GetContactWithOptions(ctx context.Context, contactID models.ContactID, opts *models.GetContactOptions) (*models.Contact, error) {
+	path := s.client.http.BuildPath("contacts", url.PathEscape(string(contactID)))
+
+	query := url.Values{}
+	if opts != nil {
+		for _, include := range opts.Include {
+			query.Add("include", string(include))
+		}
+	}
+
+	resp, err := s.client.http.Get(ctx, path, query)
 	if err != nil {
 		return nil, err
 	}
@@ -153,7 +167,7 @@ func (s *ContactsService) CreateContact(ctx context.Context, req *models.Contact
 
 // DeleteContact deletes a contact.
 func (s *ContactsService) DeleteContact(ctx context.Context, contactID models.ContactID) error {
-	path := s.client.http.BuildPath("contacts", string(contactID))
+	path := s.client.http.BuildPath("contacts", url.PathEscape(string(contactID)))
 
 	resp, err := s.client.http.Delete(ctx, path)
 	if err != nil {
@@ -163,11 +177,26 @@ func (s *ContactsService) DeleteContact(ctx context.Context, contactID models.Co
 	return s.client.http.DecodeResponse(resp, nil)
 }
 
-// RequestVerification initiates email verification for a contact.
-func (s *ContactsService) RequestVerification(ctx context.Context, contactID models.ContactID) (*models.ContactVerification, error) {
-	path := s.client.http.BuildPath("contacts", string(contactID), "verification")
+// RequestVerification starts the verification of a contact's email address.
+// verificationType selects how the verification token reaches the contact:
+// models.VerificationTypeEmail mails a link to the contact, while
+// models.VerificationTypeAPI returns the token in the response (Token) for
+// the caller to deliver itself.
+func (s *ContactsService) RequestVerification(ctx context.Context, contactID models.ContactID, verificationType models.VerificationType) (*models.ContactVerification, error) {
+	if verificationType == "" {
+		return nil, &ValidationError{Field: "type", Message: "a verification type is required (api or email)"}
+	}
 
-	resp, err := s.client.http.Post(ctx, path, nil)
+	path := s.client.http.BuildPath("contacts", url.PathEscape(string(contactID)), "verification")
+
+	query := url.Values{}
+	query.Set("type", string(verificationType))
+
+	resp, err := s.client.http.Do(ctx, &Request{
+		Method: http.MethodPost,
+		Path:   path,
+		Query:  query,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -182,7 +211,7 @@ func (s *ContactsService) RequestVerification(ctx context.Context, contactID mod
 
 // GetVerificationStatus retrieves the verification status for a contact.
 func (s *ContactsService) GetVerificationStatus(ctx context.Context, contactID models.ContactID) (*models.ContactVerification, error) {
-	path := s.client.http.BuildPath("contacts", string(contactID), "verification")
+	path := s.client.http.BuildPath("contacts", url.PathEscape(string(contactID)), "verification")
 
 	resp, err := s.client.http.Get(ctx, path, nil)
 	if err != nil {
@@ -259,6 +288,18 @@ func (s *ContactsService) ListContactAttributeSetsPage(ctx context.Context, opts
 		if opts.PageSize > 0 {
 			query.Set("page_size", strconv.Itoa(opts.PageSize))
 		}
+		if opts.SortBy != "" {
+			query.Set("sort_by", string(opts.SortBy))
+		}
+		if opts.SortOrder != "" {
+			query.Set("sort_order", string(opts.SortOrder))
+		}
+		if opts.TLD != "" {
+			query.Set("tld", opts.TLD)
+		}
+		if opts.Label != "" {
+			query.Set("label", opts.Label)
+		}
 	}
 
 	resp, err := s.client.http.Get(ctx, path, query)
@@ -276,7 +317,7 @@ func (s *ContactsService) ListContactAttributeSetsPage(ctx context.Context, opts
 
 // GetContactAttributeSet retrieves a contact attribute set by ID.
 func (s *ContactsService) GetContactAttributeSet(ctx context.Context, setID models.ContactAttributeSetID) (*models.ContactAttributeSet, error) {
-	path := s.client.http.BuildPath("contacts", "attribute-sets", string(setID))
+	path := s.client.http.BuildPath("contacts", "attribute-sets", url.PathEscape(string(setID)))
 
 	resp, err := s.client.http.Get(ctx, path, nil)
 	if err != nil {
@@ -291,8 +332,13 @@ func (s *ContactsService) GetContactAttributeSet(ctx context.Context, setID mode
 	return &set, nil
 }
 
-// CreateContactAttributeSet creates a contact attribute set.
+// CreateContactAttributeSet creates a contact attribute set. Attributes is
+// required; pass an empty map for a set without attributes.
 func (s *ContactsService) CreateContactAttributeSet(ctx context.Context, req *models.ContactAttributeSetCreateRequest) (*models.ContactAttributeSet, error) {
+	if req == nil || req.Attributes == nil {
+		return nil, &ValidationError{Field: "attributes", Message: "attributes are required; use an empty map for none"}
+	}
+
 	path := s.client.http.BuildPath("contacts", "attribute-sets")
 
 	resp, err := s.client.http.Post(ctx, path, req)
@@ -310,7 +356,7 @@ func (s *ContactsService) CreateContactAttributeSet(ctx context.Context, req *mo
 
 // UpdateContactAttributeSet updates a contact attribute set.
 func (s *ContactsService) UpdateContactAttributeSet(ctx context.Context, setID models.ContactAttributeSetID, req *models.ContactAttributeSetUpdateRequest) (*models.ContactAttributeSet, error) {
-	path := s.client.http.BuildPath("contacts", "attribute-sets", string(setID))
+	path := s.client.http.BuildPath("contacts", "attribute-sets", url.PathEscape(string(setID)))
 
 	resp, err := s.client.http.Patch(ctx, path, req)
 	if err != nil {
@@ -327,7 +373,7 @@ func (s *ContactsService) UpdateContactAttributeSet(ctx context.Context, setID m
 
 // DeleteContactAttributeSet deletes a contact attribute set.
 func (s *ContactsService) DeleteContactAttributeSet(ctx context.Context, setID models.ContactAttributeSetID) error {
-	path := s.client.http.BuildPath("contacts", "attribute-sets", string(setID))
+	path := s.client.http.BuildPath("contacts", "attribute-sets", url.PathEscape(string(setID)))
 
 	resp, err := s.client.http.Delete(ctx, path)
 	if err != nil {
@@ -339,7 +385,7 @@ func (s *ContactsService) DeleteContactAttributeSet(ctx context.Context, setID m
 
 // LinkContactAttributeSet links a contact to a contact attribute set.
 func (s *ContactsService) LinkContactAttributeSet(ctx context.Context, contactID models.ContactID, setID models.ContactAttributeSetID) (*models.ContactAttributeLink, error) {
-	path := s.client.http.BuildPath("contacts", string(contactID), "link", string(setID))
+	path := s.client.http.BuildPath("contacts", url.PathEscape(string(contactID)), "link", url.PathEscape(string(setID)))
 
 	resp, err := s.client.http.Patch(ctx, path, nil)
 	if err != nil {
@@ -357,7 +403,7 @@ func (s *ContactsService) LinkContactAttributeSet(ctx context.Context, contactID
 // AttestContactVerification submits one or more contact-verification attestations and
 // returns the per-claim verification state.
 func (s *ContactsService) AttestContactVerification(ctx context.Context, contactID models.ContactID, req *models.ContactAttestRequest) (*models.ContactAttestResponse, error) {
-	path := s.client.http.BuildPath("contacts", string(contactID), "verifications", "attest")
+	path := s.client.http.BuildPath("contacts", url.PathEscape(string(contactID)), "verifications", "attest")
 
 	resp, err := s.client.http.Post(ctx, path, req)
 	if err != nil {
@@ -374,7 +420,7 @@ func (s *ContactsService) AttestContactVerification(ctx context.Context, contact
 
 // GetContactVerifications retrieves the current verification state for a contact.
 func (s *ContactsService) GetContactVerifications(ctx context.Context, contactID models.ContactID) (*models.ContactAttestResponse, error) {
-	path := s.client.http.BuildPath("contacts", string(contactID), "verifications")
+	path := s.client.http.BuildPath("contacts", url.PathEscape(string(contactID)), "verifications")
 
 	resp, err := s.client.http.Get(ctx, path, nil)
 	if err != nil {
@@ -391,7 +437,7 @@ func (s *ContactsService) GetContactVerifications(ctx context.Context, contactID
 
 // CancelContactVerification deletes a contact's verification.
 func (s *ContactsService) CancelContactVerification(ctx context.Context, contactID models.ContactID) error {
-	path := s.client.http.BuildPath("contacts", string(contactID), "verification")
+	path := s.client.http.BuildPath("contacts", url.PathEscape(string(contactID)), "verification")
 
 	resp, err := s.client.http.Delete(ctx, path)
 	if err != nil {

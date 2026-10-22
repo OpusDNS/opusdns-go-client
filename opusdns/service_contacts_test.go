@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/opusdns/opusdns-go-client/models"
 	"github.com/stretchr/testify/assert"
@@ -275,8 +276,13 @@ func TestContactsService_ListContactAttributeSetsPage(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "GET", r.Method)
 		assert.Equal(t, "/v1/contacts/attribute-sets", r.URL.Path)
-		assert.Equal(t, "2", r.URL.Query().Get("page"))
-		assert.Equal(t, "10", r.URL.Query().Get("page_size"))
+		query := r.URL.Query()
+		assert.Equal(t, "2", query.Get("page"))
+		assert.Equal(t, "10", query.Get("page_size"))
+		assert.Equal(t, "label", query.Get("sort_by"))
+		assert.Equal(t, "asc", query.Get("sort_order"))
+		assert.Equal(t, "de", query.Get("tld"))
+		assert.Equal(t, "DENIC", query.Get("label"))
 		_ = json.NewEncoder(w).Encode(models.ContactAttributeSetListResponse{
 			Results:    []models.ContactAttributeSet{{ContactAttributeSetID: "cas_1", TLD: "de"}},
 			Pagination: models.Pagination{CurrentPage: 2, HasNextPage: false},
@@ -288,8 +294,12 @@ func TestContactsService_ListContactAttributeSetsPage(t *testing.T) {
 	require.NoError(t, err)
 
 	resp, err := client.Contacts.ListContactAttributeSetsPage(context.Background(), &models.ListContactAttributeSetsOptions{
-		Page:     2,
-		PageSize: 10,
+		Page:      2,
+		PageSize:  10,
+		SortBy:    models.ContactAttributeSetSortByLabel,
+		SortOrder: models.SortAsc,
+		TLD:       "de",
+		Label:     "DENIC",
 	})
 
 	require.NoError(t, err)
@@ -319,6 +329,42 @@ func TestContactsService_GetContact(t *testing.T) {
 	assert.Equal(t, "Jane", contact.FirstName)
 }
 
+func TestContactsService_GetContactWithOptions(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "GET", r.Method)
+		assert.Equal(t, "/v1/contacts/contact_123", r.URL.Path)
+		assert.Equal(t, []string{"tags"}, r.URL.Query()["include"])
+		_ = json.NewEncoder(w).Encode(models.Contact{ContactID: "contact_123"})
+	}))
+	defer server.Close()
+
+	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+	require.NoError(t, err)
+
+	contact, err := client.Contacts.GetContactWithOptions(context.Background(), "contact_123", &models.GetContactOptions{
+		Include: []models.ContactIncludeField{models.ContactIncludeTags},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, models.ContactID("contact_123"), contact.ContactID)
+}
+
+func TestContactsService_ContactIDIsEscaped(t *testing.T) {
+	var gotPath string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.EscapedPath()
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+
+	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+	require.NoError(t, err)
+
+	// The ID stays one path segment, so it cannot reach another resource.
+	err = client.Contacts.DeleteContact(context.Background(), "../domains/example.com")
+	require.NoError(t, err)
+	assert.Equal(t, "/v1/contacts/..%2Fdomains%2Fexample.com", gotPath)
+}
+
 func TestContactsService_DeleteContact(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "DELETE", r.Method)
@@ -339,21 +385,65 @@ func TestContactsService_RequestVerification(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "POST", r.Method)
 		assert.Equal(t, "/v1/contacts/contact_123/verification", r.URL.Path)
-		_ = json.NewEncoder(w).Encode(models.ContactVerification{
-			ContactID: "contact_123",
-			Status:    "pending",
-		})
+		// type is a required query parameter.
+		assert.Equal(t, "api", r.URL.Query().Get("type"))
+
+		w.WriteHeader(http.StatusCreated)
+		// ContactVerificationApiResponse
+		_, _ = w.Write([]byte(`{
+			"contact_verification_id": "contact_verification_01h45ytscbebyvny4gc8cr8ma2",
+			"contact_id": "contact_123",
+			"type": "api",
+			"status": "pending",
+			"token": "tok_123",
+			"verified_on": null,
+			"canceled_on": null,
+			"created_on": "2026-01-23T08:26:55Z",
+			"updated_on": "2026-01-23T08:26:55Z"
+		}`))
 	}))
 	defer server.Close()
 
 	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
 	require.NoError(t, err)
 
-	verification, err := client.Contacts.RequestVerification(context.Background(), "contact_123")
+	verification, err := client.Contacts.RequestVerification(context.Background(), "contact_123", models.VerificationTypeAPI)
 
 	require.NoError(t, err)
 	assert.Equal(t, models.ContactID("contact_123"), verification.ContactID)
+	assert.Equal(t, models.VerificationTypeAPI, verification.Type)
 	assert.Equal(t, models.EmailVerificationPending, verification.Status)
+	require.NotNil(t, verification.Token)
+	assert.Equal(t, "tok_123", *verification.Token)
+}
+
+func TestContactsService_RequestVerification_RequiresType(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Errorf("no request expected, got %s %s", r.Method, r.URL.Path)
+	}))
+	defer server.Close()
+
+	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+	require.NoError(t, err)
+
+	_, err = client.Contacts.RequestVerification(context.Background(), "contact_123", "")
+	require.ErrorIs(t, err, ErrInvalidInput)
+}
+
+func TestContactsService_CreateContactAttributeSet_RequiresAttributes(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Errorf("no request expected, got %s %s", r.Method, r.URL.Path)
+	}))
+	defer server.Close()
+
+	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+	require.NoError(t, err)
+
+	// A nil map would go out as "attributes": null.
+	_, err = client.Contacts.CreateContactAttributeSet(context.Background(), &models.ContactAttributeSetCreateRequest{
+		Label: "DENIC", TLD: "de",
+	})
+	require.ErrorIs(t, err, ErrInvalidInput)
 }
 
 func TestContactsService_GetVerificationStatus(t *testing.T) {
@@ -384,6 +474,10 @@ func TestContactsService_ListContactsFilters(t *testing.T) {
 		assert.Equal(t, []string{"VERIFICATION_REQUIRED"}, query["status_tags"])
 		assert.Equal(t, "match_any", query.Get("status_tag_mode"))
 		assert.Equal(t, "false", query.Get("has_tags"))
+		// Sub-second precision survives, so paging by a returned timestamp
+		// neither skips nor repeats contacts created within one second.
+		assert.Equal(t, "2026-01-23T08:26:55.123456Z", query.Get("created_after"))
+		assert.Equal(t, "2026-01-24T00:00:00Z", query.Get("created_before"))
 
 		_ = json.NewEncoder(w).Encode(models.ContactListResponse{
 			Results:    []models.Contact{},
@@ -397,11 +491,15 @@ func TestContactsService_ListContactsFilters(t *testing.T) {
 
 	inUse := true
 	hasTags := false
+	createdAfter := time.Date(2026, 1, 23, 8, 26, 55, 123456000, time.UTC)
+	createdBefore := time.Date(2026, 1, 24, 0, 0, 0, 0, time.UTC)
 	_, err = client.Contacts.ListContacts(context.Background(), &models.ListContactsOptions{
 		InUse:         &inUse,
 		StatusTags:    []models.StatusTagType{models.StatusTagTypeVerificationRequired},
 		StatusTagMode: models.TagFilterModeMatchAny,
 		HasTags:       &hasTags,
+		CreatedAfter:  &createdAfter,
+		CreatedBefore: &createdBefore,
 	})
 	require.NoError(t, err)
 }
