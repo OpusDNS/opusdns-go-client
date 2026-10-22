@@ -38,6 +38,14 @@ tells you what that costs in code.
 the working tree stays clean. The version stamp deliberately records no
 timestamp of its own, only upstream identity.
 
+The npm version in `spec/version.yaml` is the `@opusdns/api` release that ships
+the vendored spec, also for an older `SPEC_REF`. `api-spec` commits a new spec
+first and bumps `package.json` in a second commit, so the script takes the
+first version bump at or after the last spec change, not `package.json` at the
+ref itself. It fails when that spec has no npm release yet. These lookups go
+to the GitHub API, which allows 60 unauthenticated requests an hour; set
+`GITHUB_TOKEN` if you hit the limit.
+
 ## The two checks
 
 Both live in `opusdns/spec_coverage_test.go` and run as part of `go test ./...`,
@@ -153,4 +161,5 @@ Promoting a `deferred` entry later is just changing the status and adding
 - [ ] The release notes name the spec the release was built against, from
       `spec/version.yaml` (npm version and `info.version`).
 - [ ] Removed struct fields or renamed methods are called out as breaking.
-- [ ] Tag `vX.Y.Z`; the release workflow runs GoReleaser from the tag.
+- [ ] Tag `vX.Y.Z`; the release workflow checks that `go.mod` is tidy, runs
+      `go vet` and `go test`, and only then runs GoReleaser from the tag.
