@@ -627,14 +627,25 @@ func TestOrganizationsService_GetTransaction(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "GET", r.Method)
 		assert.Equal(t, "/v1/organizations/organization_123/transactions/txn_1", r.URL.Path)
-		_ = json.NewEncoder(w).Encode(models.BillingTransaction{
-			BillingTransactionID: "txn_1",
-			ProductType:          models.BillingProductTypeDomain,
-			Action:               models.BillingActionCreate,
-			Status:               models.BillingStatusSucceeded,
-			Amount:               "10.00",
-			Currency:             models.CurrencyUSD,
-		})
+		// BillingTransactionResponse: no original_price, original_currency or
+		// exchange_rate.
+		_, _ = w.Write([]byte(`{
+			"billing_transaction_id": "txn_1",
+			"product_type": "domain",
+			"product_reference": "example.com",
+			"action": "create",
+			"volume": "1.00",
+			"unit": "y",
+			"status": "succeeded",
+			"amount": "11.90",
+			"currency": "EUR",
+			"price": "10.00",
+			"tax_rate": "0.19",
+			"tax_amount": "1.90",
+			"created_on": "2026-01-23T08:26:55Z",
+			"updated_on": "2026-01-23T08:26:56Z",
+			"completed_on": "2026-01-23T08:26:56Z"
+		}`))
 	}))
 	defer server.Close()
 
@@ -645,6 +656,13 @@ func TestOrganizationsService_GetTransaction(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, transaction)
 	assert.Equal(t, models.BillingTransactionID("txn_1"), transaction.BillingTransactionID)
+	assert.Equal(t, "1.00", transaction.Volume)
+	require.NotNil(t, transaction.Unit)
+	assert.Equal(t, "y", *transaction.Unit)
+	assert.Equal(t, "10.00", transaction.Price)
+	assert.Equal(t, "1.90", transaction.TaxAmount)
+	assert.Equal(t, models.CurrencyEUR, transaction.Currency)
+	require.NotNil(t, transaction.CompletedOn)
 }
 
 func TestOrganizationsService_ListInvoices(t *testing.T) {

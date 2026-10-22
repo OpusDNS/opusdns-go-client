@@ -45,7 +45,7 @@ func TestRealAPIReadOnlySmoke(t *testing.T) {
 		len(zones.Results),
 		zones.Pagination.CurrentPage,
 		zones.Pagination.TotalPages,
-		paginationTotalItems(zones.Pagination),
+		zones.Pagination.TotalItems,
 		zones.Pagination.HasNextPage,
 	)
 
@@ -249,13 +249,6 @@ func validateIntegrationZoneName(t *testing.T, zoneName string) {
 	if strings.ContainsAny(zoneName, " \t\r\n/") {
 		t.Fatalf("%s contains invalid characters: %q", envIntegrationZone, zoneName)
 	}
-}
-
-func paginationTotalItems(p models.Pagination) int {
-	if p.TotalItems != 0 {
-		return p.TotalItems
-	}
-	return p.TotalCount
 }
 
 func zoneSummary(zone *models.Zone) string {

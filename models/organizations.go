@@ -487,13 +487,21 @@ type BillingTransaction struct {
 	Currency Currency `json:"currency"`
 
 	// OriginalPrice is the original amount in the supplier's base currency (before exchange).
-	OriginalPrice *string `json:"original_price,omitempty"`
+	//
+	// Deprecated: BillingTransactionResponse does not carry the exchange
+	// details; the API keeps them internally. The client no longer decodes
+	// this field, so it is always nil.
+	OriginalPrice *string `json:"-"`
 
 	// OriginalCurrency is the currency the original price was in (before exchange).
-	OriginalCurrency *Currency `json:"original_currency,omitempty"`
+	//
+	// Deprecated: Not part of BillingTransactionResponse; always nil.
+	OriginalCurrency *Currency `json:"-"`
 
 	// ExchangeRate is the exchange rate applied to convert from OriginalCurrency to Currency.
-	ExchangeRate *string `json:"exchange_rate,omitempty"`
+	//
+	// Deprecated: Not part of BillingTransactionResponse; always nil.
+	ExchangeRate *string `json:"-"`
 
 	// CreatedOn is when the transaction was created.
 	CreatedOn *time.Time `json:"created_on,omitempty"`

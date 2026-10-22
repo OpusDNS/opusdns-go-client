@@ -84,7 +84,7 @@ func listZonesExample(ctx context.Context, client *opusdns.Client) {
 	fmt.Printf("  Page %d of %d (total: %d zones)\n",
 		resp.Pagination.CurrentPage,
 		resp.Pagination.TotalPages,
-		resp.Pagination.TotalCount,
+		resp.Pagination.TotalItems,
 	)
 }
 
