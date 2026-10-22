@@ -468,6 +468,54 @@ type DomainsExpiringSoon struct {
 	Next90Days int `json:"next_90_days"`
 }
 
+// DomainAttributeKey names an attribute in the Attributes of a domain create,
+// transfer or update request. Attribute values are strings; boolean keys take
+// "true".
+type DomainAttributeKey string
+
+// The attribute keys a customer may set. The API rejects the keys it writes
+// itself, such as verification_required.
+const (
+	// DomainAttributeAutoRenewPeriod selects the period of the next renewal:
+	// AutoRenewPeriodMonthly or AutoRenewPeriodYearly. All TLDs, on create,
+	// transfer and update.
+	DomainAttributeAutoRenewPeriod DomainAttributeKey = "auto_renew_period"
+
+	// DomainAttributeMusicRegistrantAttestation is required to register a
+	// .music domain.
+	DomainAttributeMusicRegistrantAttestation DomainAttributeKey = "music_registrant_attestation"
+
+	// DomainAttributeNicITComplianceConfirmation is required to register or
+	// transfer a .it domain.
+	DomainAttributeNicITComplianceConfirmation DomainAttributeKey = "nic_it_compliance_confirmation"
+
+	// DomainAttributeTravelIndustryAcknowledgement is required to register a
+	// .travel domain.
+	DomainAttributeTravelIndustryAcknowledgement DomainAttributeKey = "travel_industry_acknowledgement"
+
+	// DomainAttributeInternetEERegistrantAgreement is required to register a
+	// .ee domain.
+	DomainAttributeInternetEERegistrantAgreement DomainAttributeKey = "internet_ee_registrant_agreement"
+
+	// DomainAttributePunktumDKTermsAcceptance is required to register a .dk
+	// domain and to change its registrant.
+	DomainAttributePunktumDKTermsAcceptance DomainAttributeKey = "punktum_dk_terms_acceptance"
+
+	// DomainAttributeDEGeneralRequestContact is the ID of a contact whose .de
+	// attribute set has DE_CONTACT_TYPE REQUEST. .de only.
+	DomainAttributeDEGeneralRequestContact DomainAttributeKey = "de_general_request_contact"
+
+	// DomainAttributeDEAbuseContact is the ID of a contact whose .de attribute
+	// set has DE_CONTACT_TYPE REQUEST. .de only.
+	DomainAttributeDEAbuseContact DomainAttributeKey = "de_abuse_contact"
+)
+
+// Values of DomainAttributeAutoRenewPeriod.
+const (
+	AutoRenewPeriodMonthly = "monthly"
+	AutoRenewPeriodYearly  = "yearly"
+)
+
 // DomainCreateRequest represents a request to register a new domain.
 type DomainCreateRequest struct {
 	// Name is the domain name to register.
@@ -490,6 +538,22 @@ type DomainCreateRequest struct {
 
 	// CreateZone creates a zone for the domain on OpusDNS nameserver infrastructure.
 	CreateZone bool `json:"create_zone,omitempty"`
+
+	// ClaimsNoticeAcceptanceHash confirms that the registrant accepted the
+	// trademark claims notice of the domain. Required while the TLD is in its
+	// claims period and the name matches a trademark; take it from
+	// ClaimsNotice.ClaimsNoticeAcceptanceHash (DomainsService.GetClaimsNotices).
+	ClaimsNoticeAcceptanceHash *string `json:"claims_notice_acceptance_hash,omitempty"`
+
+	// ExpectedPrice confirms the price of a premium domain, as a decimal string
+	// with two decimal places (e.g. "1250.00"). The API rejects the
+	// registration when the price differs.
+	ExpectedPrice *string `json:"expected_price,omitempty"`
+
+	// Attributes are additional attributes of the domain. Some TLDs require
+	// one at registration, for example DomainAttributeNicITComplianceConfirmation
+	// for .it.
+	Attributes map[DomainAttributeKey]string `json:"attributes,omitempty"`
 }
 
 // ContactHandle represents a contact reference with optional attributes.
@@ -530,6 +594,16 @@ type DomainUpdateRequest struct {
 	// StatusChanges provides add/remove semantics for client statuses.
 	// Mutually exclusive with Statuses.
 	StatusChanges *StatusChanges `json:"status_changes,omitempty"`
+
+	// AuthCode sets a new auth code for the domain.
+	AuthCode *string `json:"auth_code,omitempty"`
+
+	// Attributes sets attributes of the domain, for example
+	// DomainAttributeAutoRenewPeriod, or DomainAttributePunktumDKTermsAcceptance
+	// to confirm a .dk registrant change. An empty value removes the stored
+	// attribute. Attributes the registrant accepted at registration cannot be
+	// changed.
+	Attributes map[DomainAttributeKey]string `json:"attributes,omitempty"`
 }
 
 // DomainTransferRequest represents a request to transfer a domain.
@@ -537,8 +611,9 @@ type DomainTransferRequest struct {
 	// Name is the domain name to transfer.
 	Name string `json:"name"`
 
-	// AuthCode is the authorization code for the transfer.
-	AuthCode string `json:"auth_code"`
+	// AuthCode is the authorization code for the transfer. Leave it empty for
+	// registries that do not use one; it is then not sent.
+	AuthCode string `json:"auth_code,omitempty"`
 
 	// Contacts maps contact types to contact handles.
 	Contacts map[DomainContactType][]ContactHandle `json:"contacts,omitempty"`
@@ -549,17 +624,35 @@ type DomainTransferRequest struct {
 	// Nameservers is the list of nameservers to use after transfer.
 	Nameservers []Nameserver `json:"nameservers,omitempty"`
 
-	// Period is the renewal period in years (if applicable).
-	Period int `json:"period,omitempty"`
+	// Period is the registration period to add when the transfer completes.
+	// Nil applies the registry's default.
+	Period *DomainPeriod `json:"period,omitempty"`
+
+	// CreateZone creates a zone for the domain on OpusDNS nameserver infrastructure.
+	CreateZone bool `json:"create_zone,omitempty"`
+
+	// ExpectedPrice confirms the price of a premium domain, as a decimal string
+	// with two decimal places (e.g. "1250.00").
+	ExpectedPrice *string `json:"expected_price,omitempty"`
+
+	// Attributes are additional attributes of the domain, for example
+	// DomainAttributeNicITComplianceConfirmation for a .it transfer.
+	Attributes map[DomainAttributeKey]string `json:"attributes,omitempty"`
 }
 
 // DomainRenewRequest represents a request to renew a domain.
 type DomainRenewRequest struct {
-	// Period is the renewal period in years.
-	Period int `json:"period"`
+	// Period is how long to extend the registration.
+	Period DomainPeriod `json:"period"`
 
-	// CurrentExpiryDate is the current expiration date (for verification).
-	CurrentExpiryDate *time.Time `json:"current_expiry_date,omitempty"`
+	// CurrentExpiryDate is the domain's current expiration date, exactly as
+	// the API reports it in Domain.ExpiresOn. Required: the API rejects the
+	// renewal when it does not match, so a renewal is not applied twice.
+	CurrentExpiryDate *time.Time `json:"current_expiry_date"`
+
+	// ExpectedPrice confirms the price of a premium domain, as a decimal string
+	// with two decimal places (e.g. "1250.00").
+	ExpectedPrice *string `json:"expected_price,omitempty"`
 }
 
 // DomainRenewStatusTransferPending is the Status of a DomainRenewResult whose
@@ -631,10 +724,24 @@ type DomainAuthCodeResponse struct {
 	Recipients []string `json:"recipients,omitempty"`
 }
 
-// DomainRestoreRequest represents a request to restore a deleted domain.
+// DomainRestoreRequest represents a request to restore a deleted domain. All
+// fields are optional.
 type DomainRestoreRequest struct {
-	// Period is the renewal period in years after restoration.
-	Period int `json:"period,omitempty"`
+	// Period is not part of the restore request.
+	//
+	// Deprecated: The API has no restore period and ignored this field. It is
+	// no longer sent.
+	Period int `json:"-"`
+
+	// Reason is the reason for restoring the domain.
+	Reason *string `json:"reason,omitempty"`
+
+	// AdditionalInfo is additional information for the restore.
+	AdditionalInfo *string `json:"additional_info,omitempty"`
+
+	// ExpectedPrice confirms the price of a premium domain, as a decimal string
+	// with two decimal places (e.g. "1250.00").
+	ExpectedPrice *string `json:"expected_price,omitempty"`
 }
 
 // DomainRestoreResult is the outcome of restoring a domain from redemption.

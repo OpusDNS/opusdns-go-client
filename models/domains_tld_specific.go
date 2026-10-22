@@ -35,6 +35,13 @@ type RequestAuthCodeResponse struct {
 	Detail *string `json:"detail,omitempty"`
 }
 
+// DomainWithdrawRequest withdraws an .at domain.
+type DomainWithdrawRequest struct {
+	// ZoneDelete tells the registry whether the name service for the domain
+	// has already been stopped.
+	ZoneDelete bool `json:"zone_delete"`
+}
+
 // DomainWithdrawResponse is the outcome of withdrawing an .at domain.
 type DomainWithdrawResponse struct {
 	// Name is the domain that was withdrawn.
@@ -45,6 +52,13 @@ type DomainWithdrawResponse struct {
 
 	// Detail explains the outcome when Success is false.
 	Detail *string `json:"detail,omitempty"`
+}
+
+// DomainTransitRequest puts a .de domain into transit.
+type DomainTransitRequest struct {
+	// Disconnect disconnects the domain from its current nameservers and
+	// delegates it to the DENIC nameservers.
+	Disconnect bool `json:"disconnect"`
 }
 
 // DomainTransitResponse is the outcome of transiting a .de domain.

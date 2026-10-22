@@ -3,6 +3,7 @@ package opusdns
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -114,16 +115,16 @@ func TestDomainsService_ListDomains(t *testing.T) {
 			assert.Equal(t, []string{"tag_123", "tag_456"}, query["tag_ids"])
 			assert.Equal(t, "match_all", query.Get("tag_mode"))
 			assert.Equal(t, "true", query.Get("is_premium"))
-			assert.Equal(t, now.Format(time.RFC3339), query.Get("updated_after"))
+			assert.Equal(t, now.Format(time.RFC3339Nano), query.Get("updated_after"))
 			assert.Equal(t, "true", query.Get("expires_in_30_days"))
-			assert.Equal(t, now.Format(time.RFC3339), query.Get("registered_after"))
+			assert.Equal(t, now.Format(time.RFC3339Nano), query.Get("registered_after"))
 			assert.Equal(t, []string{"ok", "clientTransferProhibited"}, query["registry_statuses"])
 			assert.Equal(t, []string{"tags"}, query["include"])
 			assert.Equal(t, []string{"EXTERNAL", "DNSSEC_PENDING"}, query["status_tags"])
 			assert.Equal(t, "match_none", query.Get("status_tag_mode"))
 			assert.Equal(t, "false", query.Get("read_only"))
-			assert.Equal(t, now.Format(time.RFC3339), query.Get("transferred_after"))
-			assert.Equal(t, now.Format(time.RFC3339), query.Get("transferred_before"))
+			assert.Equal(t, now.Format(time.RFC3339Nano), query.Get("transferred_after"))
+			assert.Equal(t, now.Format(time.RFC3339Nano), query.Get("transferred_before"))
 			assert.Equal(t, "true", query.Get("has_tags"))
 			assert.Equal(t, "ns1.example.net", query.Get("nameserver"))
 			assert.Equal(t, []string{"ams", "ras"}, query["account_type"])
@@ -303,15 +304,21 @@ func TestDomainsService_CreateDomain(t *testing.T) {
 		assert.Equal(t, "POST", r.Method)
 		assert.Equal(t, "/v1/domains", r.URL.Path)
 
-		var req models.DomainCreateRequest
-		err := json.NewDecoder(r.Body).Decode(&req)
+		// The body must have the shape of the spec's DomainCreate.
+		body, err := io.ReadAll(r.Body)
 		require.NoError(t, err)
-		assert.Equal(t, "example.com", req.Name)
+		assert.JSONEq(t, `{
+			"name": "example.it",
+			"contacts": {"registrant": [{"contact_id": "contact_01h45ytscbebyvny4gc8cr8ma2"}]},
+			"renewal_mode": "renew",
+			"period": {"value": 1, "unit": "y"},
+			"claims_notice_acceptance_hash": "a1b2c3",
+			"expected_price": "1250.00",
+			"attributes": {"nic_it_compliance_confirmation": "true", "auto_renew_period": "monthly"}
+		}`, string(body))
 
-		_ = json.NewEncoder(w).Encode(models.Domain{
-			DomainID: "domain_123",
-			Name:     req.Name,
-		})
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"domain_id":"domain_01h45ytscbebyvny4gc8cr8ma2","name":"example.it","sld":"example","tld":"it","roid":"D1-IT","renewal_mode":"renew","registry_statuses":["ok"]}`))
 	}))
 	defer server.Close()
 
@@ -319,40 +326,56 @@ func TestDomainsService_CreateDomain(t *testing.T) {
 	require.NoError(t, err)
 
 	domain, err := client.Domains.CreateDomain(context.Background(), &models.DomainCreateRequest{
-		Name:        "example.com",
+		Name:        "example.it",
 		RenewalMode: models.RenewalModeRenew,
+		Period:      models.DomainPeriod{Value: 1, Unit: models.PeriodUnitYear},
+		Contacts: map[models.DomainContactType][]models.ContactHandle{
+			models.DomainContactTypeRegistrant: {{ContactID: "contact_01h45ytscbebyvny4gc8cr8ma2"}},
+		},
+		ClaimsNoticeAcceptanceHash: models.StringPtr("a1b2c3"),
+		ExpectedPrice:              models.StringPtr("1250.00"),
+		Attributes: map[models.DomainAttributeKey]string{
+			models.DomainAttributeNicITComplianceConfirmation: "true",
+			models.DomainAttributeAutoRenewPeriod:             models.AutoRenewPeriodMonthly,
+		},
 	})
 
 	require.NoError(t, err)
-	assert.Equal(t, "example.com", domain.Name)
+	assert.Equal(t, "example.it", domain.Name)
 }
 
 func TestDomainsService_UpdateDomain(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "PATCH", r.Method)
-		assert.Equal(t, "/v1/domains/example.com", r.URL.Path)
+		assert.Equal(t, "/v1/domains/example.dk", r.URL.Path)
 
-		var req models.DomainUpdateRequest
-		err := json.NewDecoder(r.Body).Decode(&req)
+		// The body must have the shape of the spec's DomainUpdate.
+		body, err := io.ReadAll(r.Body)
 		require.NoError(t, err)
-		assert.Equal(t, []models.DomainClientStatus{models.DomainClientStatusUpdateProhibited}, req.Statuses)
+		assert.JSONEq(t, `{
+			"statuses": ["clientUpdateProhibited"],
+			"auth_code": "n3w-c0de",
+			"attributes": {"punktum_dk_terms_acceptance": "true", "auto_renew_period": "yearly"}
+		}`, string(body))
 
-		_ = json.NewEncoder(w).Encode(models.Domain{
-			DomainID: "domain_123",
-			Name:     "example.com",
-		})
+		_, _ = w.Write([]byte(`{"domain_id":"domain_01h45ytscbebyvny4gc8cr8ma2","name":"example.dk","sld":"example","tld":"dk","roid":"D1-DK"}`))
 	}))
 	defer server.Close()
 
 	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
 	require.NoError(t, err)
 
-	domain, err := client.Domains.UpdateDomain(context.Background(), "example.com", &models.DomainUpdateRequest{
+	domain, err := client.Domains.UpdateDomain(context.Background(), "example.dk", &models.DomainUpdateRequest{
 		Statuses: []models.DomainClientStatus{models.DomainClientStatusUpdateProhibited},
+		AuthCode: models.StringPtr("n3w-c0de"),
+		Attributes: map[models.DomainAttributeKey]string{
+			models.DomainAttributePunktumDKTermsAcceptance: "true",
+			models.DomainAttributeAutoRenewPeriod:          models.AutoRenewPeriodYearly,
+		},
 	})
 
 	require.NoError(t, err)
-	assert.Equal(t, "example.com", domain.Name)
+	assert.Equal(t, "example.dk", domain.Name)
 }
 
 func TestDomainsService_DeleteDomain(t *testing.T) {
@@ -371,48 +394,93 @@ func TestDomainsService_DeleteDomain(t *testing.T) {
 }
 
 func TestDomainsService_TransferDomain(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "POST", r.Method)
-		assert.Equal(t, "/v1/domains/transfer", r.URL.Path)
+	t.Run("full request", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assert.Equal(t, "POST", r.Method)
+			assert.Equal(t, "/v1/domains/transfer", r.URL.Path)
 
-		var req models.DomainTransferRequest
-		err := json.NewDecoder(r.Body).Decode(&req)
+			// The body must have the shape of the spec's DomainTransferIn:
+			// period is a DomainPeriod object, not a number.
+			body, err := io.ReadAll(r.Body)
+			require.NoError(t, err)
+			assert.JSONEq(t, `{
+				"name": "example.it",
+				"auth_code": "auth123",
+				"renewal_mode": "renew",
+				"period": {"value": 1, "unit": "y"},
+				"create_zone": true,
+				"expected_price": "12.50",
+				"attributes": {"nic_it_compliance_confirmation": "true"}
+			}`, string(body))
+
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte(`{"domain_id":"domain_01h45ytscbebyvny4gc8cr8ma2","name":"example.it","sld":"example","tld":"it","roid":"D1-IT"}`))
+		}))
+		defer server.Close()
+
+		client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
 		require.NoError(t, err)
-		assert.Equal(t, "example.com", req.Name)
-		assert.Equal(t, "auth123", req.AuthCode)
 
-		_ = json.NewEncoder(w).Encode(models.Domain{
-			DomainID: "domain_123",
-			Name:     req.Name,
+		domain, err := client.Domains.TransferDomain(context.Background(), &models.DomainTransferRequest{
+			Name:          "example.it",
+			AuthCode:      "auth123",
+			RenewalMode:   models.RenewalModeRenew,
+			Period:        &models.DomainPeriod{Value: 1, Unit: models.PeriodUnitYear},
+			CreateZone:    true,
+			ExpectedPrice: models.StringPtr("12.50"),
+			Attributes: map[models.DomainAttributeKey]string{
+				models.DomainAttributeNicITComplianceConfirmation: "true",
+			},
 		})
-	}))
-	defer server.Close()
 
-	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
-	require.NoError(t, err)
-
-	domain, err := client.Domains.TransferDomain(context.Background(), &models.DomainTransferRequest{
-		Name:        "example.com",
-		AuthCode:    "auth123",
-		RenewalMode: models.RenewalModeRenew,
+		require.NoError(t, err)
+		assert.Equal(t, "example.it", domain.Name)
 	})
 
-	require.NoError(t, err)
-	assert.Equal(t, "example.com", domain.Name)
+	t.Run("no auth code is not sent as an empty string", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// The spec allows null for auth_code but requires at least 6
+			// characters when it is a string.
+			body, err := io.ReadAll(r.Body)
+			require.NoError(t, err)
+			assert.JSONEq(t, `{"name": "example.com", "renewal_mode": "renew"}`, string(body))
+
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte(`{"domain_id":"domain_01h45ytscbebyvny4gc8cr8ma2","name":"example.com"}`))
+		}))
+		defer server.Close()
+
+		client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+		require.NoError(t, err)
+
+		_, err = client.Domains.TransferDomain(context.Background(), &models.DomainTransferRequest{
+			Name:        "example.com",
+			RenewalMode: models.RenewalModeRenew,
+		})
+		require.NoError(t, err)
+	})
 }
 
 func TestDomainsService_RenewDomain(t *testing.T) {
+	expiresOn := time.Date(2027, 5, 1, 10, 15, 30, 123456000, time.UTC)
+
 	t.Run("renewed", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			assert.Equal(t, "POST", r.Method)
 			assert.Equal(t, "/v1/domains/example.com/renew", r.URL.Path)
 
-			var req models.DomainRenewRequest
-			err := json.NewDecoder(r.Body).Decode(&req)
+			// The body must have the shape of the spec's DomainRenewRequest:
+			// period is a DomainPeriod object and current_expiry_date is
+			// required.
+			body, err := io.ReadAll(r.Body)
 			require.NoError(t, err)
-			assert.Equal(t, 1, req.Period)
+			assert.JSONEq(t, `{
+				"period": {"value": 2, "unit": "y"},
+				"current_expiry_date": "2027-05-01T10:15:30.123456Z",
+				"expected_price": "99.00"
+			}`, string(body))
 
-			_, _ = w.Write([]byte(`{"name":"example.com","new_expiry_date":"2028-05-01T00:00:00Z","period_extended":{"value":1,"unit":"y"}}`))
+			_, _ = w.Write([]byte(`{"name":"example.com","new_expiry_date":"2029-05-01T10:15:30Z","period_extended":{"value":2,"unit":"y"}}`))
 		}))
 		defer server.Close()
 
@@ -420,16 +488,18 @@ func TestDomainsService_RenewDomain(t *testing.T) {
 		require.NoError(t, err)
 
 		result, err := client.Domains.RenewDomain(context.Background(), "example.com", &models.DomainRenewRequest{
-			Period: 1,
+			Period:            models.DomainPeriod{Value: 2, Unit: models.PeriodUnitYear},
+			CurrentExpiryDate: &expiresOn,
+			ExpectedPrice:     models.StringPtr("99.00"),
 		})
 
 		require.NoError(t, err)
 		assert.Equal(t, "example.com", result.Name)
 		assert.False(t, result.TransferPending())
 		require.NotNil(t, result.NewExpiryDate)
-		assert.Equal(t, time.Date(2028, 5, 1, 0, 0, 0, 0, time.UTC), result.NewExpiryDate.UTC())
+		assert.Equal(t, time.Date(2029, 5, 1, 10, 15, 30, 0, time.UTC), result.NewExpiryDate.UTC())
 		require.NotNil(t, result.PeriodExtended)
-		assert.Equal(t, models.DomainPeriod{Value: 1, Unit: models.PeriodUnitYear}, *result.PeriodExtended)
+		assert.Equal(t, models.DomainPeriod{Value: 2, Unit: models.PeriodUnitYear}, *result.PeriodExtended)
 	})
 
 	t.Run("transfer pending", func(t *testing.T) {
@@ -443,13 +513,35 @@ func TestDomainsService_RenewDomain(t *testing.T) {
 		require.NoError(t, err)
 
 		result, err := client.Domains.RenewDomain(context.Background(), "example.com", &models.DomainRenewRequest{
-			Period: 1,
+			Period:            models.DomainPeriod{Value: 1, Unit: models.PeriodUnitYear},
+			CurrentExpiryDate: &expiresOn,
 		})
 
 		require.NoError(t, err)
 		assert.True(t, result.TransferPending())
 		assert.Equal(t, "req_123", result.RequestID)
 		assert.Nil(t, result.NewExpiryDate)
+	})
+
+	t.Run("incomplete requests are rejected before sending", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			t.Errorf("unexpected request %s %s", r.Method, r.URL.Path)
+		}))
+		defer server.Close()
+
+		client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+		require.NoError(t, err)
+
+		for name, req := range map[string]*models.DomainRenewRequest{
+			"nil request":       nil,
+			"no period":         {CurrentExpiryDate: &expiresOn},
+			"no current expiry": {Period: models.DomainPeriod{Value: 1, Unit: models.PeriodUnitYear}},
+			"zero period value": {Period: models.DomainPeriod{Unit: models.PeriodUnitYear}, CurrentExpiryDate: &expiresOn},
+			"negative period":   {Period: models.DomainPeriod{Value: -1, Unit: models.PeriodUnitYear}, CurrentExpiryDate: &expiresOn},
+		} {
+			_, err := client.Domains.RenewDomain(context.Background(), "example.com", req)
+			assert.ErrorIs(t, err, ErrInvalidInput, name)
+		}
 	})
 }
 
@@ -533,31 +625,61 @@ func TestDomainsService_ListDomainVerifications(t *testing.T) {
 }
 
 func TestDomainsService_RestoreDomain(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "POST", r.Method)
-		assert.Equal(t, "/v1/domains/example.com/restore", r.URL.Path)
+	tests := []struct {
+		name     string
+		req      *models.DomainRestoreRequest
+		wantBody string
+	}{
+		{
+			name: "full request",
+			req: &models.DomainRestoreRequest{
+				Reason:         models.StringPtr("deleted by mistake"),
+				AdditionalInfo: models.StringPtr("ticket 4711"),
+				ExpectedPrice:  models.StringPtr("45.00"),
+			},
+			wantBody: `{"reason":"deleted by mistake","additional_info":"ticket 4711","expected_price":"45.00"}`,
+		},
+		{
+			// The deprecated Period is not part of the spec's
+			// DomainRestoreRequest and must not be sent.
+			name:     "deprecated period is not sent",
+			req:      &models.DomainRestoreRequest{Period: 1}, //nolint:staticcheck // checks that the deprecated field is not sent
+			wantBody: `{}`,
+		},
+		{
+			// The API requires a body, so nil is sent as an empty object.
+			name:     "nil request",
+			req:      nil,
+			wantBody: `{}`,
+		},
+	}
 
-		var req models.DomainRestoreRequest
-		err := json.NewDecoder(r.Body).Decode(&req)
-		require.NoError(t, err)
-		assert.Equal(t, 1, req.Period)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				assert.Equal(t, "POST", r.Method)
+				assert.Equal(t, "/v1/domains/example.com/restore", r.URL.Path)
 
-		_, _ = w.Write([]byte(`{"domain_id":"domain_123","name":"example.com","restored_at":"2026-10-22T09:30:00Z"}`))
-	}))
-	defer server.Close()
+				body, err := io.ReadAll(r.Body)
+				require.NoError(t, err)
+				assert.JSONEq(t, tt.wantBody, string(body))
 
-	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
-	require.NoError(t, err)
+				_, _ = w.Write([]byte(`{"domain_id":"domain_123","name":"example.com","restored_at":"2026-10-22T09:30:00Z"}`))
+			}))
+			defer server.Close()
 
-	result, err := client.Domains.RestoreDomain(context.Background(), "example.com", &models.DomainRestoreRequest{
-		Period: 1,
-	})
+			client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+			require.NoError(t, err)
 
-	require.NoError(t, err)
-	assert.Equal(t, models.DomainID("domain_123"), result.DomainID)
-	assert.Equal(t, "example.com", result.Name)
-	require.NotNil(t, result.RestoredAt)
-	assert.Equal(t, time.Date(2026, 10, 22, 9, 30, 0, 0, time.UTC), result.RestoredAt.UTC())
+			result, err := client.Domains.RestoreDomain(context.Background(), "example.com", tt.req)
+
+			require.NoError(t, err)
+			assert.Equal(t, models.DomainID("domain_123"), result.DomainID)
+			assert.Equal(t, "example.com", result.Name)
+			require.NotNil(t, result.RestoredAt)
+			assert.Equal(t, time.Date(2026, 10, 22, 9, 30, 0, 0, time.UTC), result.RestoredAt.UTC())
+		})
+	}
 }
 
 func TestDomainsService_GetSummary(t *testing.T) {

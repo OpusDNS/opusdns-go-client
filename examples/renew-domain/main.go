@@ -44,9 +44,20 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	fmt.Printf("Renewing %s for %d year(s)\n", domain, years)
+	// The API renews only when it is told the domain's current expiry date,
+	// so read it first.
+	current, err := client.Domains.GetDomain(ctx, domain)
+	if err != nil {
+		log.Fatalf("Failed to get domain: %v", err)
+	}
+	if current.ExpiresOn == nil {
+		log.Fatalf("Domain %s has no expiry date to renew from", domain)
+	}
+
+	fmt.Printf("Renewing %s (expires %s) for %d year(s)\n", domain, current.ExpiresOn.Format("2006-01-02"), years)
 	renewed, err := client.Domains.RenewDomain(ctx, domain, &models.DomainRenewRequest{
-		Period: years,
+		Period:            models.DomainPeriod{Value: years, Unit: models.PeriodUnitYear},
+		CurrentExpiryDate: current.ExpiresOn,
 	})
 	if err != nil {
 		log.Fatalf("Failed to renew domain: %v", err)

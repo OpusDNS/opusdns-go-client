@@ -85,22 +85,22 @@ func (s *DomainsService) ListDomainsPage(ctx context.Context, opts *models.ListD
 			query.Set("is_premium", strconv.FormatBool(*opts.IsPremium))
 		}
 		if opts.CreatedAfter != nil {
-			query.Set("created_after", opts.CreatedAfter.Format(time.RFC3339))
+			query.Set("created_after", opts.CreatedAfter.Format(time.RFC3339Nano))
 		}
 		if opts.CreatedBefore != nil {
-			query.Set("created_before", opts.CreatedBefore.Format(time.RFC3339))
+			query.Set("created_before", opts.CreatedBefore.Format(time.RFC3339Nano))
 		}
 		if opts.UpdatedAfter != nil {
-			query.Set("updated_after", opts.UpdatedAfter.Format(time.RFC3339))
+			query.Set("updated_after", opts.UpdatedAfter.Format(time.RFC3339Nano))
 		}
 		if opts.UpdatedBefore != nil {
-			query.Set("updated_before", opts.UpdatedBefore.Format(time.RFC3339))
+			query.Set("updated_before", opts.UpdatedBefore.Format(time.RFC3339Nano))
 		}
 		if opts.ExpiresAfter != nil {
-			query.Set("expires_after", opts.ExpiresAfter.Format(time.RFC3339))
+			query.Set("expires_after", opts.ExpiresAfter.Format(time.RFC3339Nano))
 		}
 		if opts.ExpiresBefore != nil {
-			query.Set("expires_before", opts.ExpiresBefore.Format(time.RFC3339))
+			query.Set("expires_before", opts.ExpiresBefore.Format(time.RFC3339Nano))
 		}
 		if opts.ExpiresIn30Days != nil {
 			query.Set("expires_in_30_days", strconv.FormatBool(*opts.ExpiresIn30Days))
@@ -112,10 +112,10 @@ func (s *DomainsService) ListDomainsPage(ctx context.Context, opts *models.ListD
 			query.Set("expires_in_90_days", strconv.FormatBool(*opts.ExpiresIn90Days))
 		}
 		if opts.RegisteredAfter != nil {
-			query.Set("registered_after", opts.RegisteredAfter.Format(time.RFC3339))
+			query.Set("registered_after", opts.RegisteredAfter.Format(time.RFC3339Nano))
 		}
 		if opts.RegisteredBefore != nil {
-			query.Set("registered_before", opts.RegisteredBefore.Format(time.RFC3339))
+			query.Set("registered_before", opts.RegisteredBefore.Format(time.RFC3339Nano))
 		}
 		for _, status := range opts.RegistryStatuses {
 			query.Add("registry_statuses", status)
@@ -133,10 +133,10 @@ func (s *DomainsService) ListDomainsPage(ctx context.Context, opts *models.ListD
 			query.Set("read_only", strconv.FormatBool(*opts.ReadOnly))
 		}
 		if opts.TransferredAfter != nil {
-			query.Set("transferred_after", opts.TransferredAfter.Format(time.RFC3339))
+			query.Set("transferred_after", opts.TransferredAfter.Format(time.RFC3339Nano))
 		}
 		if opts.TransferredBefore != nil {
-			query.Set("transferred_before", opts.TransferredBefore.Format(time.RFC3339))
+			query.Set("transferred_before", opts.TransferredBefore.Format(time.RFC3339Nano))
 		}
 		if opts.HasTags != nil {
 			query.Set("has_tags", strconv.FormatBool(*opts.HasTags))
@@ -281,7 +281,20 @@ func (s *DomainsService) CancelTransfer(ctx context.Context, domainRef string) e
 // For a domain held at another registrar, the API transfers the domain into
 // OpusDNS instead and answers before the transfer starts; the result's
 // TransferPending reports that case.
+//
+// req.CurrentExpiryDate must be the domain's current Domain.ExpiresOn; the API
+// rejects the renewal when it does not match.
 func (s *DomainsService) RenewDomain(ctx context.Context, domainRef string, req *models.DomainRenewRequest) (*models.DomainRenewResult, error) {
+	if req == nil {
+		return nil, &ValidationError{Field: "request", Message: "a renew request is required"}
+	}
+	if req.Period.Value < 1 {
+		return nil, &ValidationError{Field: "period", Message: "a renewal period of at least 1 is required", Value: req.Period.Value}
+	}
+	if req.CurrentExpiryDate == nil {
+		return nil, &ValidationError{Field: "current_expiry_date", Message: "the domain's current expiry date is required"}
+	}
+
 	path := s.client.http.BuildPath("domains", url.PathEscape(domainRef), "renew")
 
 	resp, err := s.client.http.Post(ctx, path, req)
@@ -373,8 +386,13 @@ func (s *DomainsService) ListDomainVerificationsPage(ctx context.Context, domain
 	return &result, nil
 }
 
-// RestoreDomain restores a deleted domain from redemption.
+// RestoreDomain restores a deleted domain from redemption. req may be nil.
 func (s *DomainsService) RestoreDomain(ctx context.Context, domainRef string, req *models.DomainRestoreRequest) (*models.DomainRestoreResult, error) {
+	if req == nil {
+		// The API requires a body, even though all of its fields are optional.
+		req = &models.DomainRestoreRequest{}
+	}
+
 	path := s.client.http.BuildPath("domains", url.PathEscape(domainRef), "restore")
 
 	resp, err := s.client.http.Post(ctx, path, req)
