@@ -3,6 +3,7 @@ package opusdns
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -226,8 +227,20 @@ func TestWhitelabelService_EmailTemplates(t *testing.T) {
 			assert.Equal(t, "POST", r.Method)
 			assert.Equal(t, "/v1/whitelabel-branding/email/preview", r.URL.Path)
 
+			raw, err := io.ReadAll(r.Body)
+			require.NoError(t, err)
+
+			// The spec types BrandingDocument.version as an integer.
+			var shape struct {
+				BrandingDocument struct {
+					Version json.RawMessage `json:"version"`
+				} `json:"branding_document"`
+			}
+			require.NoError(t, json.Unmarshal(raw, &shape))
+			assert.JSONEq(t, `1`, string(shape.BrandingDocument.Version))
+
 			var body models.PreviewMailRequest
-			require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+			require.NoError(t, json.Unmarshal(raw, &body))
 			assert.Equal(t, "domain_expiring", body.TemplateName)
 			assert.Equal(t, "de", body.LanguageCode)
 			require.NotNil(t, body.BrandingDocument)
@@ -250,7 +263,8 @@ func TestWhitelabelService_EmailTemplates(t *testing.T) {
 			TemplateName: "domain_expiring",
 			LanguageCode: "de",
 			BrandingDocument: &models.BrandingDocument{
-				Theme: &models.Theme{Light: &models.Palette{Primary: models.StringPtr("#0a7cff")}},
+				Version: models.IntPtr(1),
+				Theme:   &models.Theme{Light: &models.Palette{Primary: models.StringPtr("#0a7cff")}},
 			},
 		})
 		require.NoError(t, err)

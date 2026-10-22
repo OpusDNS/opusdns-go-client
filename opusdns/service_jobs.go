@@ -97,7 +97,7 @@ func (s *JobsService) CreateBatch(ctx context.Context, req *models.JobBatchReque
 
 // GetBatchStatus retrieves the detailed status of a job batch.
 func (s *JobsService) GetBatchStatus(ctx context.Context, batchID models.BatchID) (*models.JobBatchStatusResponse, error) {
-	path := s.client.http.BuildPath("jobs", string(batchID))
+	path := s.client.http.BuildPath("jobs", url.PathEscape(string(batchID)))
 
 	resp, err := s.client.http.Get(ctx, path, nil)
 	if err != nil {
@@ -114,7 +114,7 @@ func (s *JobsService) GetBatchStatus(ctx context.Context, batchID models.BatchID
 
 // DeleteBatch cancels all jobs in a batch.
 func (s *JobsService) DeleteBatch(ctx context.Context, batchID models.BatchID) error {
-	path := s.client.http.BuildPath("jobs", string(batchID))
+	path := s.client.http.BuildPath("jobs", url.PathEscape(string(batchID)))
 
 	resp, err := s.client.http.Delete(ctx, path)
 	if err != nil {
@@ -126,7 +126,7 @@ func (s *JobsService) DeleteBatch(ctx context.Context, batchID models.BatchID) e
 
 // PauseBatch pauses all jobs in a batch.
 func (s *JobsService) PauseBatch(ctx context.Context, batchID models.BatchID) error {
-	path := s.client.http.BuildPath("jobs", string(batchID), "pause")
+	path := s.client.http.BuildPath("jobs", url.PathEscape(string(batchID)), "pause")
 
 	resp, err := s.client.http.Post(ctx, path, nil)
 	if err != nil {
@@ -138,7 +138,7 @@ func (s *JobsService) PauseBatch(ctx context.Context, batchID models.BatchID) er
 
 // ResumeBatch resumes all paused jobs in a batch.
 func (s *JobsService) ResumeBatch(ctx context.Context, batchID models.BatchID) error {
-	path := s.client.http.BuildPath("jobs", string(batchID), "resume")
+	path := s.client.http.BuildPath("jobs", url.PathEscape(string(batchID)), "resume")
 
 	resp, err := s.client.http.Post(ctx, path, nil)
 	if err != nil {
@@ -151,7 +151,7 @@ func (s *JobsService) ResumeBatch(ctx context.Context, batchID models.BatchID) e
 // RetryBatch retries the FAILED and dead-lettered jobs in a batch. When errorClasses
 // is non-empty, only jobs whose error class matches one of the values are retried.
 func (s *JobsService) RetryBatch(ctx context.Context, batchID models.BatchID, errorClasses []string) (*models.JobBatchRetryResponse, error) {
-	path := s.client.http.BuildPath("jobs", string(batchID), "retry")
+	path := s.client.http.BuildPath("jobs", url.PathEscape(string(batchID)), "retry")
 
 	query := url.Values{}
 	for _, ec := range errorClasses {
@@ -205,7 +205,7 @@ func (s *JobsService) ListBatchJobs(ctx context.Context, batchID models.BatchID,
 
 // ListBatchJobsPage retrieves a single page of jobs within a batch.
 func (s *JobsService) ListBatchJobsPage(ctx context.Context, batchID models.BatchID, opts *models.ListBatchJobsOptions) (*models.JobListResponse, error) {
-	path := s.client.http.BuildPath("jobs", string(batchID), "jobs")
+	path := s.client.http.BuildPath("jobs", url.PathEscape(string(batchID)), "jobs")
 
 	query := url.Values{}
 	if opts != nil {
@@ -241,7 +241,7 @@ func (s *JobsService) ListBatchJobsPage(ctx context.Context, batchID models.Batc
 
 // GetJob retrieves the details of a specific job.
 func (s *JobsService) GetJob(ctx context.Context, jobID models.JobID) (*models.JobResponse, error) {
-	path := s.client.http.BuildPath("job", string(jobID))
+	path := s.client.http.BuildPath("job", url.PathEscape(string(jobID)))
 
 	resp, err := s.client.http.Get(ctx, path, nil)
 	if err != nil {
@@ -258,7 +258,7 @@ func (s *JobsService) GetJob(ctx context.Context, jobID models.JobID) (*models.J
 
 // PauseJob pauses an individual job.
 func (s *JobsService) PauseJob(ctx context.Context, jobID models.JobID) error {
-	path := s.client.http.BuildPath("job", string(jobID), "pause")
+	path := s.client.http.BuildPath("job", url.PathEscape(string(jobID)), "pause")
 
 	resp, err := s.client.http.Post(ctx, path, nil)
 	if err != nil {
@@ -270,7 +270,7 @@ func (s *JobsService) PauseJob(ctx context.Context, jobID models.JobID) error {
 
 // ResumeJob resumes a paused individual job.
 func (s *JobsService) ResumeJob(ctx context.Context, jobID models.JobID) (*models.JobResponse, error) {
-	path := s.client.http.BuildPath("job", string(jobID), "resume")
+	path := s.client.http.BuildPath("job", url.PathEscape(string(jobID)), "resume")
 
 	resp, err := s.client.http.Post(ctx, path, nil)
 	if err != nil {
@@ -287,7 +287,7 @@ func (s *JobsService) ResumeJob(ctx context.Context, jobID models.JobID) (*model
 
 // RetryJob retries a failed or dead-lettered individual job.
 func (s *JobsService) RetryJob(ctx context.Context, jobID models.JobID) (*models.JobResponse, error) {
-	path := s.client.http.BuildPath("job", string(jobID), "retry")
+	path := s.client.http.BuildPath("job", url.PathEscape(string(jobID)), "retry")
 
 	resp, err := s.client.http.Post(ctx, path, nil)
 	if err != nil {
@@ -304,7 +304,7 @@ func (s *JobsService) RetryJob(ctx context.Context, jobID models.JobID) (*models
 
 // DeleteJob cancels an individual job.
 func (s *JobsService) DeleteJob(ctx context.Context, jobID models.JobID) error {
-	path := s.client.http.BuildPath("job", string(jobID))
+	path := s.client.http.BuildPath("job", url.PathEscape(string(jobID)))
 
 	resp, err := s.client.http.Delete(ctx, path)
 	if err != nil {

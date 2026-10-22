@@ -175,6 +175,21 @@ func TestTagsService_DeleteTag(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestTagsService_DeleteTag_EscapesID(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Unescaped, this ID would resolve to DELETE /v1/jobs/batch_X.
+		assert.Equal(t, "/v1/tags/x%2F..%2F..%2Fjobs%2Fbatch_X", r.RequestURI)
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+
+	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+	require.NoError(t, err)
+
+	err = client.Tags.DeleteTag(context.Background(), "x/../../jobs/batch_X")
+	require.NoError(t, err)
+}
+
 func TestTagsService_UpdateTagObjects(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "POST", r.Method)

@@ -245,7 +245,10 @@ type ListEventsOptions struct {
 	// Subtype filters by event subtype.
 	Subtype EventSubtype
 
-	// Acknowledged filters events by acknowledgement status.
+	// Acknowledged filters events by acknowledgement status. Nil does not
+	// mean "all events": the API then applies its default of false and
+	// returns only unacknowledged events. Set BoolPtr(true) to list the
+	// acknowledged ones; there is no single call that returns both.
 	Acknowledged *bool
 
 	// ObjectType filters by object type.
@@ -290,7 +293,9 @@ type ObjectLog struct {
 	// ObjectID is the ID of the object.
 	ObjectID string `json:"object_id"`
 
-	// ObjectType is the type of object (free-form string, e.g. "domain", "billing_transaction").
+	// ObjectType is the type of object, a free-form string. The archive
+	// stores the name of the API's response type, for example
+	// "DomainResponse" or "ContactEventResponse".
 	ObjectType string `json:"object_type"`
 
 	// Action is the action performed.
@@ -351,16 +356,34 @@ type ListObjectLogsOptions struct {
 	// SortOrder is the sort direction.
 	SortOrder SortOrder
 
-	// ObjectType filters by object type.
-	ObjectType EventObjectType
+	// ObjectType filters by object type. It must match ObjectLog.ObjectType
+	// exactly, for example "DomainResponse". The EventObjectType constants
+	// ("DOMAIN", ...) belong to events and match no object log.
+	ObjectType string
 
-	// ObjectID filters by object ID.
+	// ObjectID filters by object ID. Ignored by ListObjectLogsByObject,
+	// which takes the object ID as an argument.
 	ObjectID string
+
+	// ObjectLogID filters by log entry ID.
+	ObjectLogID string
 
 	// Action filters by action.
 	Action string
 
+	// ServerRequestID filters by the API request that caused the action.
+	ServerRequestID string
+
+	// PerformedByType filters by the type of actor.
+	PerformedByType ExecutingEntity
+
+	// PerformedByID filters by the ID of the actor, for example a user ID.
+	PerformedByID string
+
 	// UserID filters by user ID.
+	//
+	// Deprecated: the API has no user_id filter. Use PerformedByID. UserID is
+	// sent as performed_by_id when PerformedByID is empty.
 	UserID UserID
 
 	// CreatedAfter filters logs created after this time.
@@ -368,6 +391,86 @@ type ListObjectLogsOptions struct {
 
 	// CreatedBefore filters logs created before this time.
 	CreatedBefore *time.Time
+}
+
+// ListEmailForwardLogsOptions contains options for listing the logs of an
+// email forward or one of its aliases.
+type ListEmailForwardLogsOptions struct {
+	// Page is the page number to retrieve (1-indexed).
+	Page int
+
+	// PageSize is the number of logs per page.
+	PageSize int
+
+	// SortBy is the field to sort by.
+	SortBy EmailForwardLogSortField
+
+	// SortOrder is the sort direction.
+	SortOrder SortOrder
+
+	// FinalStatus filters by the final delivery status.
+	FinalStatus EmailForwardLogStatus
+
+	// StartTime filters logs after this time.
+	StartTime *time.Time
+
+	// EndTime filters logs before this time.
+	EndTime *time.Time
+}
+
+// ListRequestHistoryOptions contains options for listing the API request
+// history.
+type ListRequestHistoryOptions struct {
+	// Page is the page number to retrieve (1-indexed).
+	Page int
+
+	// PageSize is the number of entries per page.
+	PageSize int
+
+	// SortBy is the field to sort by.
+	SortBy string
+
+	// SortOrder is the sort direction.
+	SortOrder SortOrder
+
+	// Method filters by HTTP method.
+	Method HTTPMethod
+
+	// Path filters by request path.
+	Path string
+
+	// StatusCode filters by exact status code.
+	StatusCode *int
+
+	// MinStatusCode filters by minimum status code.
+	MinStatusCode *int
+
+	// MaxStatusCode filters by maximum status code.
+	MaxStatusCode *int
+
+	// MinDuration filters by minimum duration.
+	MinDuration *float64
+
+	// MaxDuration filters by maximum duration.
+	MaxDuration *float64
+
+	// ClientIP filters by client IP.
+	ClientIP string
+
+	// ServerRequestID filters by server request ID.
+	ServerRequestID string
+
+	// PerformedByType filters by actor type.
+	PerformedByType ExecutingEntity
+
+	// PerformedByID filters by actor ID.
+	PerformedByID string
+
+	// RequestStartedBefore filters requests started before this time.
+	RequestStartedBefore *time.Time
+
+	// RequestStartedAfter filters requests started after this time.
+	RequestStartedAfter *time.Time
 }
 
 // RequestHistoryEntry represents an entry in the API request history.

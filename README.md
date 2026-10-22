@@ -603,6 +603,47 @@ err := client.Jobs.PauseBatch(ctx, batchID)
 err = client.Jobs.ResumeBatch(ctx, batchID)
 ```
 
+### Resubmit a Batch Safely
+
+Give each command an `IdempotencyKey`. A resubmitted command whose key the API
+already knows creates no job: it is counted in `JobsDuplicated` and listed in
+`Duplicates`, which points at the existing job and its batch. When no new job
+was created, the returned `BatchID` and `StatusURL` answer 404.
+
+```go
+batch, err := client.Jobs.CreateBatch(ctx, req)
+for _, dup := range batch.Duplicates {
+    if dup.ExistingBatchID != nil {
+        status, err := client.Jobs.GetBatchStatus(ctx, *dup.ExistingBatchID)
+        if err != nil {
+            return err
+        }
+        fmt.Printf("command %d already ran as %s (batch %.0f%% done)\n",
+            dup.Index, dup.ExistingJobID, status.ProgressPercentage)
+    }
+}
+```
+
+## Events and Audit Logs
+
+```go
+// Unacknowledged events (the API's default when Acknowledged is nil)
+events, err := client.Events.ListEvents(ctx, nil)
+
+// Every change recorded for one domain
+logs, err := client.Events.ListObjectLogsByObject(ctx, string(domainID), &models.ListObjectLogsOptions{
+    PerformedByType: models.ExecutingEntityUser,
+})
+
+// Delivery logs of one alias; the API needs the email forward as well
+mails, err := client.Events.ListEmailForwardLogsByAlias(ctx, emailForwardID, aliasID, &models.ListEmailForwardLogsOptions{
+    FinalStatus: models.EmailForwardLogStatusHardBounce,
+})
+```
+
+The object-log `ObjectType` filter matches the stored type name exactly, for
+example `"DomainResponse"`; the `EventObjectType` constants apply to events only.
+
 ## Reports
 
 ### Generate a Report
