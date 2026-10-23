@@ -980,7 +980,7 @@ opusdns.IsUnauthorizedError(err)  // Check for 401
 opusdns.IsForbiddenError(err)     // Check for 403
 opusdns.IsRateLimitError(err)     // Check for 429
 opusdns.IsConflictError(err)      // Check for 409
-opusdns.IsRetryableError(err)     // Check if retryable (429, 5xx)
+opusdns.IsRetryableError(err)     // Check if retryable (429, 409 with Retry-After, 5xx)
 opusdns.IsAPIError(err)           // Extract APIError details
 ```
 
@@ -989,13 +989,17 @@ opusdns.IsAPIError(err)           // Extract APIError details
 | Failure | GET / HEAD / OPTIONS / PUT | POST / PATCH / DELETE |
 |---|---|---|
 | 429 | retried | retried (the API rejected the request without acting) |
+| 409 or 503 with `Retry-After` | retried | retried (the API did not act and asks to try again later) |
 | 5xx | retried | **not retried**, returned as `APIError` |
 | Network error before the connection opened (dial) | retried | retried (nothing was sent) |
 | Network error after that (reset, timeout, …) | retried | **not retried**, error returned |
 | Invalid request (bad path, unencodable body, bad header), untrusted TLS certificate | not retried | not retried |
 
 The client retries a request that was rate limited (HTTP 429) whatever its
-method. Server errors (HTTP 5xx) and network failures are retried only for
+method. The same goes for a 409 or 503 that carries a `Retry-After` header: the
+API sends one only when it did nothing and the request will succeed later, for
+example a delete or renewal of a domain whose registration is still being
+finalized. Server errors (HTTP 5xx) and network failures are retried only for
 methods that are safe to send twice.
 
 `POST`, `PATCH` and `DELETE` are not retried after a server error or a dropped

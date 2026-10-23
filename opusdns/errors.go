@@ -159,11 +159,13 @@ func (e *APIError) Unwrap() error {
 	}
 }
 
-// IsRetryable returns true if the status code marks a transient failure.
-// It does not consider the request method: resending a POST or PATCH after a
-// server error may repeat its effect.
+// IsRetryable returns true if the status code marks a transient failure, or
+// the API asked for a retry: a 409 with a Retry-After delay. It does not
+// consider the request method: resending a POST or PATCH after a server error
+// may repeat its effect.
 func (e *APIError) IsRetryable() bool {
 	return e.StatusCode == http.StatusTooManyRequests ||
+		(e.StatusCode == http.StatusConflict && e.RetryAfter > 0) ||
 		e.StatusCode >= http.StatusInternalServerError
 }
 

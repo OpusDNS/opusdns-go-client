@@ -172,6 +172,91 @@ func TestRetryPolicy(t *testing.T) {
 		assert.Equal(t, 2, attempts)
 	})
 
+	t.Run("Retry-After on a conflict or unavailable", func(t *testing.T) {
+		for _, tc := range []struct {
+			name       string
+			method     string
+			status     int
+			retryAfter string
+			attempts   int
+		}{
+			{"DELETE 409 with Retry-After", http.MethodDelete, http.StatusConflict, "0", 2},
+			{"POST 409 with Retry-After", http.MethodPost, http.StatusConflict, "0", 2},
+			{"POST 503 with Retry-After", http.MethodPost, http.StatusServiceUnavailable, "0", 2},
+			{"DELETE 409 without Retry-After", http.MethodDelete, http.StatusConflict, "", 1},
+			{"POST 503 without Retry-After", http.MethodPost, http.StatusServiceUnavailable, "", 1},
+			{"DELETE 409 with an unparsable Retry-After", http.MethodDelete, http.StatusConflict, "soon", 1},
+			{"DELETE 400 with Retry-After", http.MethodDelete, http.StatusBadRequest, "0", 1},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				attempts := 0
+				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					attempts++
+					if attempts == 1 {
+						if tc.retryAfter != "" {
+							w.Header().Set("Retry-After", tc.retryAfter)
+						}
+						w.WriteHeader(tc.status)
+						return
+					}
+					w.WriteHeader(http.StatusNoContent)
+				}))
+				defer server.Close()
+
+				client := newClient(t, WithAPIEndpoint(server.URL))
+				resp, err := client.http.Do(context.Background(), &Request{Method: tc.method, Path: "/v1/domains/example.com"})
+
+				require.NoError(t, err)
+				assert.Equal(t, tc.attempts, attempts)
+				if tc.attempts == 1 {
+					assert.Equal(t, tc.status, resp.StatusCode)
+				} else {
+					assert.Equal(t, http.StatusNoContent, resp.StatusCode)
+				}
+			})
+		}
+	})
+
+	t.Run("a conflict asking to retry for too long is returned at once", func(t *testing.T) {
+		attempts := 0
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			attempts++
+			w.Header().Set("Retry-After", "60")
+			w.WriteHeader(http.StatusConflict)
+		}))
+		defer server.Close()
+
+		client := newClient(t, WithAPIEndpoint(server.URL))
+		resp, err := client.http.Do(context.Background(), &Request{Method: http.MethodDelete, Path: "/v1/domains/example.com"})
+		require.NoError(t, err)
+		err = client.http.DecodeResponse(resp, nil)
+
+		assert.Equal(t, 1, attempts)
+		var apiErr *APIError
+		require.ErrorAs(t, err, &apiErr)
+		assert.ErrorIs(t, err, ErrConflict)
+		assert.Equal(t, 60*time.Second, apiErr.RetryAfter)
+		assert.True(t, apiErr.IsRetryable())
+	})
+
+	t.Run("a conflict that keeps asking runs out of retries", func(t *testing.T) {
+		attempts := 0
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			attempts++
+			w.Header().Set("Retry-After", "0")
+			w.WriteHeader(http.StatusConflict)
+		}))
+		defer server.Close()
+
+		client := newClient(t, WithAPIEndpoint(server.URL))
+		resp, err := client.http.Do(context.Background(), &Request{Method: http.MethodDelete, Path: "/v1/domains/example.com"})
+		require.NoError(t, err)
+		err = client.http.DecodeResponse(resp, nil)
+
+		assert.Equal(t, 4, attempts)
+		assert.ErrorIs(t, err, ErrConflict)
+	})
+
 	t.Run("network errors", func(t *testing.T) {
 		for _, tc := range []struct {
 			name     string
@@ -232,6 +317,12 @@ func TestAPIError(t *testing.T) {
 		err = &APIError{StatusCode: 500}
 		assert.True(t, err.IsServerError())
 		assert.True(t, err.IsRetryable())
+
+		err = &APIError{StatusCode: 409, RetryAfter: 10 * time.Second}
+		assert.True(t, err.IsRetryable())
+
+		err = &APIError{StatusCode: 409}
+		assert.False(t, err.IsRetryable())
 	})
 }
 
