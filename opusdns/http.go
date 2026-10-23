@@ -178,7 +178,10 @@ type Response struct {
 // control character is returned as an error matching ErrInvalidInput.
 //
 // A 429 is retried for every method, since the API turned the request away
-// without acting on it. Server errors and network failures are retried only
+// without acting on it. So is a 409 or 503 that carries a Retry-After header:
+// the API sends one only when it did nothing and the request will succeed
+// later, for example a delete or renew of a domain whose registration is still
+// being finalized. Server errors and network failures are retried only
 // for methods that are safe to send twice (GET, HEAD, OPTIONS, PUT). POST,
 // PATCH and DELETE may already have taken effect when they fail that way, and
 // sending them again could renew, register or charge twice, or turn a delete
@@ -226,7 +229,7 @@ func (c *HTTPClient) Do(ctx context.Context, req *Request) (*Response, error) {
 			}
 			wait = c.calculateBackoff(attempt)
 		} else {
-			if !retriesLeft || !isRetryableStatus(resp.StatusCode, resendable) {
+			if !retriesLeft || !isRetryableStatus(resp.StatusCode, resp.Headers, resendable) {
 				return resp, nil
 			}
 			var ok bool
@@ -453,9 +456,23 @@ func isResendable(method string) bool {
 	return false
 }
 
-// isRetryableStatus reports whether a response with this status is retried.
-func isRetryableStatus(status int, resendable bool) bool {
-	return status == http.StatusTooManyRequests || (status >= 500 && resendable)
+// isRetryableStatus reports whether a response with this status and headers
+// is retried.
+func isRetryableStatus(status int, headers http.Header, resendable bool) bool {
+	if status == http.StatusTooManyRequests || askedToRetry(status, headers) {
+		return true
+	}
+	return status >= 500 && resendable
+}
+
+// askedToRetry reports whether a 409 or 503 carries a Retry-After header, the
+// API's sign that it did not act on the request and will accept it later.
+func askedToRetry(status int, headers http.Header) bool {
+	if status != http.StatusConflict && status != http.StatusServiceUnavailable {
+		return false
+	}
+	_, found := parseRetryAfter(headers.Get("Retry-After"))
+	return found
 }
 
 // isRetryableRequestError reports whether a request that failed without a
