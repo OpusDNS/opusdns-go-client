@@ -253,6 +253,16 @@ func TestDomainsService_GetDomainWithOptions(t *testing.T) {
 		_, _ = w.Write([]byte(`{
 			"domain_id": "domain_123",
 			"name": "example.com",
+			"active_verifications": [{
+				"verification_id": "domain_verification_1",
+				"source": "ICANN",
+				"trigger": "REGISTRANT_CHANGE",
+				"status": "OVERDUE",
+				"claims": ["email"],
+				"deadlines": [{"type": "verification", "date": "2026-11-12T00:00:00Z"}, {"type": "deletion", "date": "2026-11-27T00:00:00Z"}],
+				"contact_id": "contact_2",
+				"opened_on": "2026-10-28T00:00:00Z"
+			}],
 			"connected_account": {"type": "ras", "registrar_credential_id": "registrar_credential_1", "name": "My InterNetX", "registrar": "INTERNETX"},
 			"registrant_change": {
 				"registrant_change_id": "registrant_change_1",
@@ -297,6 +307,16 @@ func TestDomainsService_GetDomainWithOptions(t *testing.T) {
 	require.NotNil(t, domain.RegistrantChange.ConfirmationMethod)
 	assert.Equal(t, models.RegistrantChangeConfirmationEmail, *domain.RegistrantChange.ConfirmationMethod)
 	require.NotNil(t, domain.RegistrantChange.TransferLockUntil)
+
+	require.Len(t, domain.ActiveVerifications, 1)
+	active := domain.ActiveVerifications[0]
+	assert.Equal(t, models.DomainVerificationID("domain_verification_1"), active.VerificationID)
+	assert.Equal(t, models.DomainVerificationKindICANN, active.Source)
+	assert.Equal(t, models.DomainVerificationTriggerRegistrantChange, active.Trigger)
+	assert.Equal(t, models.DomainVerificationStatusOverdue, active.Status)
+	require.Len(t, active.Deadlines, 2)
+	assert.Equal(t, models.VerificationDeadlineTypeDeletion, active.Deadlines[1].Type)
+	assert.Equal(t, models.ContactID("contact_2"), active.ContactID)
 }
 
 func TestDomainsService_CreateDomain(t *testing.T) {
@@ -592,13 +612,14 @@ func TestDomainsService_ListDomainVerifications(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "GET", r.Method)
 		assert.Equal(t, "/v1/domains/example.com/verifications", r.URL.Path)
+		assert.Equal(t, "100", r.URL.Query().Get("page_size"))
 		pages = append(pages, r.URL.Query().Get("page"))
 
 		if r.URL.Query().Get("page") == "1" {
-			_, _ = w.Write([]byte(`{"results":[{"verification_id":"domain_verification_1","source":"ICANN","trigger":"CREATE","status":"SATISFIED","claims":["email"],"deadlines":[],"contact_id":"contact_1","opened_on":"2026-01-01T00:00:00Z","closed_on":"2026-01-02T00:00:00Z","close_reason":"EVIDENCE_VERIFIED"}],"pagination":{"has_next_page":true}}`))
+			_, _ = w.Write([]byte(`{"results":[{"verification_id":"domain_verification_1","source":"ICANN","trigger":"CREATE","status":"SATISFIED","claims":["email"],"deadlines":[],"contact_id":"contact_1","opened_on":"2026-01-01T00:00:00Z","closed_on":"2026-01-02T00:00:00Z","close_reason":"EVIDENCE_VERIFIED","reminders_sent":1,"last_reminder_sent_on":"2026-01-01T12:00:00Z"}],"pagination":{"has_next_page":true}}`))
 			return
 		}
-		_, _ = w.Write([]byte(`{"results":[{"verification_id":"domain_verification_2","source":"REGISTRY","trigger":"REGISTRY_REQUEST","status":"OPEN","claims":["legal_entity"],"deadlines":[{"type":"verification","date":"2026-12-01T00:00:00Z"}],"contact_id":"contact_1","opened_on":"2026-10-01T00:00:00Z","closed_on":null,"close_reason":null}],"pagination":{"has_next_page":false}}`))
+		_, _ = w.Write([]byte(`{"results":[{"verification_id":"domain_verification_2","source":"REGISTRY","trigger":"REGISTRY_REQUEST","status":"OPEN","claims":["legal_entity"],"deadlines":[{"type":"verification","date":"2026-12-01T00:00:00Z"}],"contact_id":"contact_1","opened_on":"2026-10-01T00:00:00Z","closed_on":null,"close_reason":null,"reminders_sent":0,"last_reminder_sent_on":null}],"pagination":{"has_next_page":false}}`))
 	}))
 	defer server.Close()
 
@@ -615,6 +636,8 @@ func TestDomainsService_ListDomainVerifications(t *testing.T) {
 	assert.Equal(t, models.DomainVerificationStatusSatisfied, cases[0].Status)
 	require.NotNil(t, cases[0].CloseReason)
 	assert.Equal(t, models.DomainVerificationCloseEvidenceVerified, *cases[0].CloseReason)
+	assert.Equal(t, 1, cases[0].RemindersSent)
+	require.NotNil(t, cases[0].LastReminderSentOn)
 
 	assert.Equal(t, models.DomainVerificationTriggerRegistryRequest, cases[1].Trigger)
 	assert.Equal(t, []models.VerificationClaimType{models.VerificationClaimTypeLegalEntity}, cases[1].Claims)
@@ -622,6 +645,104 @@ func TestDomainsService_ListDomainVerifications(t *testing.T) {
 	assert.Equal(t, models.VerificationDeadlineTypeVerification, cases[1].Deadlines[0].Type)
 	assert.Nil(t, cases[1].ClosedOn)
 	assert.Nil(t, cases[1].CloseReason)
+	assert.Nil(t, cases[1].LastReminderSentOn)
+}
+
+func TestDomainsService_ResendDomainVerification(t *testing.T) {
+	const path = "/v1/domains/example.com/verifications/domain_verification_01m5w99e88f858v5jt43w8v62x/resend"
+
+	t.Run("mailed", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assert.Equal(t, "POST", r.Method)
+			assert.Equal(t, path, r.URL.Path)
+			body, _ := io.ReadAll(r.Body)
+			assert.Empty(t, body)
+
+			w.WriteHeader(http.StatusAccepted)
+			_, _ = w.Write([]byte(`{"verification_id":"domain_verification_01m5w99e88f858v5jt43w8v62x","source":"ICANN","trigger":"CREATE","status":"OPEN","claims":["email"],"deadlines":[{"type":"verification","date":"2026-11-12T00:00:00Z"}],"contact_id":"contact_1","opened_on":"2026-10-28T00:00:00Z","closed_on":null,"close_reason":null,"reminders_sent":2,"last_reminder_sent_on":"2026-10-29T09:00:00Z"}`))
+		}))
+		defer server.Close()
+
+		client := newTestClient(t, WithAPIEndpoint(server.URL))
+
+		verification, err := client.Domains.ResendDomainVerification(context.Background(), "example.com", "domain_verification_01m5w99e88f858v5jt43w8v62x")
+
+		require.NoError(t, err)
+		assert.Equal(t, models.DomainVerificationID("domain_verification_01m5w99e88f858v5jt43w8v62x"), verification.VerificationID)
+		assert.Equal(t, models.DomainVerificationStatusOpen, verification.Status)
+		assert.Equal(t, 2, verification.RemindersSent)
+		require.NotNil(t, verification.LastReminderSentOn)
+		assert.Equal(t, time.Date(2026, 10, 29, 9, 0, 0, 0, time.UTC), verification.LastReminderSentOn.UTC())
+	})
+
+	t.Run("not resendable", func(t *testing.T) {
+		var calls int
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			calls++
+			w.Header().Set("Content-Type", "application/problem+json")
+			w.WriteHeader(http.StatusConflict)
+			_, _ = w.Write([]byte(`{"code":"ERROR_DOMAIN_VERIFICATION_NOT_RESENDABLE","detail":"The registrant has confirmed the email already","domain_verification_id":"domain_verification_01m5w99e88f858v5jt43w8v62x","reason":"CONFIRMED","status":409,"title":"Domain Verification Not Resendable","type":"domain-verification-not-resendable"}`))
+		}))
+		defer server.Close()
+
+		client := newTestClient(t, WithAPIEndpoint(server.URL))
+
+		_, err := client.Domains.ResendDomainVerification(context.Background(), "example.com", "domain_verification_01m5w99e88f858v5jt43w8v62x")
+
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrConflict)
+		assert.False(t, IsRetryableError(err))
+		assert.Equal(t, 1, calls, "a 409 without Retry-After is not retried")
+		apiErr, ok := IsAPIError(err)
+		require.True(t, ok)
+		assert.Equal(t, "ERROR_DOMAIN_VERIFICATION_NOT_RESENDABLE", apiErr.ErrorCode)
+		assert.Equal(t, "CONFIRMED", apiErr.Details["reason"])
+		assert.Equal(t, "domain_verification_01m5w99e88f858v5jt43w8v62x", apiErr.Details["domain_verification_id"])
+	})
+
+	t.Run("busy", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Retry-After", "5")
+			w.WriteHeader(http.StatusConflict)
+			_, _ = w.Write([]byte(`{"code":"ERROR_DOMAIN_VERIFICATION_BUSY","detail":"The registrant's verification cases are being updated; retry shortly","status":409,"title":"Domain Verification Busy","type":"domain-verification-busy"}`))
+		}))
+		defer server.Close()
+
+		client := newTestClient(t, WithAPIEndpoint(server.URL), WithRetryWait(10*time.Millisecond, time.Second))
+
+		_, err := client.Domains.ResendDomainVerification(context.Background(), "example.com", "domain_verification_01m5w99e88f858v5jt43w8v62x")
+
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrConflict)
+		assert.True(t, IsRetryableError(err))
+		apiErr, ok := IsAPIError(err)
+		require.True(t, ok)
+		assert.Equal(t, "ERROR_DOMAIN_VERIFICATION_BUSY", apiErr.ErrorCode)
+		assert.Equal(t, 5*time.Second, apiErr.RetryAfter)
+	})
+
+	t.Run("too soon", func(t *testing.T) {
+		var calls int
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			calls++
+			w.Header().Set("Retry-After", "540")
+			w.WriteHeader(http.StatusTooManyRequests)
+			_, _ = w.Write([]byte(`{"code":"ERROR_DOMAIN_VERIFICATION_RESEND_TOO_SOON","detail":"The registrant's email was mailed moments ago; retry in 540 seconds","domain_verification_id":"domain_verification_01m5w99e88f858v5jt43w8v62x","status":429,"title":"Domain Verification Resend Too Soon","type":"domain-verification-resend-too-soon"}`))
+		}))
+		defer server.Close()
+
+		client := newTestClient(t, WithAPIEndpoint(server.URL))
+
+		_, err := client.Domains.ResendDomainVerification(context.Background(), "example.com", "domain_verification_01m5w99e88f858v5jt43w8v62x")
+
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrRateLimited)
+		assert.Equal(t, 1, calls, "a Retry-After beyond RetryWaitMax is not waited out")
+		apiErr, ok := IsAPIError(err)
+		require.True(t, ok)
+		assert.Equal(t, "ERROR_DOMAIN_VERIFICATION_RESEND_TOO_SOON", apiErr.ErrorCode)
+		assert.Equal(t, 540*time.Second, apiErr.RetryAfter)
+	})
 }
 
 func TestDomainsService_RestoreDomain(t *testing.T) {

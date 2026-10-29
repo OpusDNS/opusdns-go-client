@@ -269,6 +269,24 @@ func TestNewAPIError(t *testing.T) {
 		assert.Empty(t, err.Errors)
 	})
 
+	t.Run("extension members", func(t *testing.T) {
+		err := newErr(http.StatusConflict, nil, `{"code":"ERROR_DOMAIN_VERIFICATION_NOT_RESENDABLE","detail":"The registrant has confirmed the email already","domain_verification_id":"domain_verification_01m5w99e88f858v5jt43w8v62x","reason":"CONFIRMED","status":409,"title":"Domain Verification Not Resendable","type":"domain-verification-not-resendable"}`)
+
+		assert.Equal(t, map[string]interface{}{
+			"domain_verification_id": "domain_verification_01m5w99e88f858v5jt43w8v62x",
+			"reason":                 "CONFIRMED",
+		}, err.Details)
+	})
+
+	t.Run("no extension members", func(t *testing.T) {
+		assert.Nil(t, newErr(http.StatusUnauthorized, nil, problemUnauthorized).Details)
+	})
+
+	t.Run("a details object", func(t *testing.T) {
+		err := newErr(http.StatusBadRequest, nil, `{"code":"ERROR_X","details":{"field":"name"},"reason":"ignored"}`)
+		assert.Equal(t, map[string]interface{}{"field": "name"}, err.Details)
+	})
+
 	t.Run("title when there is no detail", func(t *testing.T) {
 		err := newErr(http.StatusForbidden, nil, `{"title":"Forbidden","type":"forbidden","status":403}`)
 		assert.Equal(t, "Forbidden", err.Message)

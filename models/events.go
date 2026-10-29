@@ -37,6 +37,7 @@ const (
 	EventSubtypeFailure      EventSubtype = "FAILURE"
 	EventSubtypeCanceled     EventSubtype = "CANCELED"
 	EventSubtypeOverdue      EventSubtype = "OVERDUE"
+	EventSubtypeReminder     EventSubtype = "REMINDER"
 )
 
 // EventObjectType represents the type of object an event relates to.

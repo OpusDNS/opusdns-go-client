@@ -99,7 +99,7 @@ operations:
     status: excluded
     reason: "server-sent event stream; not a request/response operation"
 
-  # --- contact (19) ---
+  # --- contact (20) ---
   "DELETE /v1/contacts/attribute-sets/{contact_attribute_set_id}":
     status: implemented
     method: Contacts.DeleteContactAttributeSet
@@ -130,6 +130,9 @@ operations:
   "GET /v1/contacts/{contact_id}/verification":
     status: implemented
     method: Contacts.GetVerificationStatus
+  "GET /v1/contacts/{contact_id}/verification-cases":
+    status: implemented
+    method: Contacts.ListContactVerificationCasesPage
   "GET /v1/contacts/{contact_id}/verifications":
     status: implemented
     method: Contacts.GetContactVerifications
@@ -158,7 +161,7 @@ operations:
     status: excluded
     reason: "unauthenticated token flow completed in a browser, not by an API client"
 
-  # --- dns (20) ---
+  # --- dns (21) ---
   "DELETE /v1/dns/{zone_name}":
     status: implemented
     method: DNS.DeleteZone
@@ -198,6 +201,9 @@ operations:
   "GET /v1/dns/{zone_name}/statistics":
     status: deferred
     reason: "query statistics are read-only analytics; not bound until a consumer needs them"
+  "GET /v1/dns/{zone_name}/statistics/nxdomains":
+    status: deferred
+    reason: "query statistics are read-only analytics; not bound until a consumer needs them"
   "PATCH /v1/dns/{zone_name}/records":
     status: implemented
     method: DNS.PatchRecords
@@ -220,7 +226,7 @@ operations:
     status: implemented
     method: DNS.PutRRSets
 
-  # --- domain (21) ---
+  # --- domain (22) ---
   "DELETE /v1/domains/{domain_reference}":
     status: implemented
     method: Domains.DeleteDomain
@@ -281,6 +287,9 @@ operations:
   "POST /v1/domains/{domain_reference}/transfer/outbound":
     status: implemented
     method: Domains.ResolveOutboundTransfer
+  "POST /v1/domains/{domain_reference}/verifications/{verification_id}/resend":
+    status: implemented
+    method: Domains.ResendDomainVerification
   "PUT /v1/domains/{domain_reference}/dnssec":
     status: implemented
     method: Domains.PutDNSSEC
@@ -779,12 +788,14 @@ models:
   # another operation sends a subset of that schema, a field the subset lacks
   # is a warning, not DROPPED. Mappings are also what models.strict refers to.
   mappings:
+    ActiveDomainVerification: ActiveDomainVerificationResponse
     AvailabilityResponse: common__models__availability__datasource__DomainAvailabilityResponse
     BillingTransaction: BillingTransactionResponse
     CommandError: CommandError
     Contact: ContactResponse
     ContactAttributeSet: ContactAttributeSetResponse
     ContactVerification: ContactVerificationApiResponse
+    ContactVerificationCase: ContactVerificationCaseResponse
     CreateJobBatchResponse: CreateJobBatchResponse
     DNSChanges: DnsChangesResponse
     Domain: DomainResponse
@@ -793,6 +804,7 @@ models:
     DomainSuggestResponse: DomainSearchResponse
     DomainSuggestion: DomainSearchSuggestionWithPrice
     DomainSummary: DomainSummaryResponse
+    DomainVerification: DomainVerificationResponse
     DuplicateCommand: DuplicateCommand
     EmailForward: EmailForwardResponse
     EmailForwardLog: EmailForwardLog
@@ -852,11 +864,14 @@ models:
   # Types where a property the spec declares but the struct lacks is an error,
   # not a warning. A type belongs here once its fields are complete.
   strict:
+    - ActiveDomainVerification
     - Contact
     - ContactAttributeSet
+    - ContactVerificationCase
     - Domain
     - DomainForward
     - DomainSummary
+    - DomainVerification
     - EmailForward
     - Event
     - Host

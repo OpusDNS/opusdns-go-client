@@ -329,8 +329,8 @@ func (s *DomainsService) RequestDomainAuthCode(ctx context.Context, domainRef st
 	return &result, nil
 }
 
-// ListDomainVerifications retrieves all verification cases of a domain with
-// automatic pagination.
+// ListDomainVerifications retrieves all verification cases of a domain,
+// active and closed, newest first, with automatic pagination.
 func (s *DomainsService) ListDomainVerifications(ctx context.Context, domainRef string, opts *models.ListDomainVerificationsOptions) ([]models.DomainVerification, error) {
 	var all []models.DomainVerification
 	page := 1
@@ -384,6 +384,40 @@ func (s *DomainsService) ListDomainVerificationsPage(ctx context.Context, domain
 	}
 
 	return &result, nil
+}
+
+// ResendDomainVerification mails the registrant of an open ICANN verification
+// case a new link to confirm their email address. The mail covers every open
+// ICANN case of that address in the organization and counts as a reminder.
+//
+// When nothing is sent, the APIError's ErrorCode says why:
+//
+//   - ERROR_DOMAIN_VERIFICATION_NOT_FOUND (404, ErrNotFound): the domain has
+//     no such case.
+//   - ERROR_DOMAIN_VERIFICATION_NOT_RESENDABLE (409, ErrConflict): there is
+//     nothing to resend. Details["reason"] is "REGISTRY" (a registry case),
+//     "CLOSED", "DELEGATED" (the organization confirms its registrants'
+//     emails itself) or "CONFIRMED".
+//   - ERROR_DOMAIN_VERIFICATION_RESEND_TOO_SOON (429, ErrRateLimited): the
+//     address was mailed within the last 15 minutes. RetryAfter says how long
+//     to wait; the client waits it out itself only up to RetryWaitMax.
+//   - ERROR_DOMAIN_VERIFICATION_BUSY (409, ErrConflict): the registrant's
+//     cases are being updated. It carries a Retry-After, so the client
+//     retries it on its own and returns it only when retries run out.
+func (s *DomainsService) ResendDomainVerification(ctx context.Context, domainRef string, verificationID models.DomainVerificationID) (*models.DomainVerification, error) {
+	path := s.client.http.BuildPath("domains", url.PathEscape(domainRef), "verifications", url.PathEscape(string(verificationID)), "resend")
+
+	resp, err := s.client.http.Post(ctx, path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var verification models.DomainVerification
+	if err := s.client.http.DecodeResponse(resp, &verification); err != nil {
+		return nil, err
+	}
+
+	return &verification, nil
 }
 
 // RestoreDomain restores a deleted domain from redemption. req may be nil.

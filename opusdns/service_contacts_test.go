@@ -221,6 +221,68 @@ func TestContactsService_Attestation(t *testing.T) {
 	})
 }
 
+func TestContactsService_ListContactVerificationCases(t *testing.T) {
+	var pages []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "GET", r.Method)
+		assert.Equal(t, "/v1/contacts/contact_1/verification-cases", r.URL.Path)
+		assert.Equal(t, "100", r.URL.Query().Get("page_size"))
+		pages = append(pages, r.URL.Query().Get("page"))
+
+		if r.URL.Query().Get("page") == "1" {
+			_, _ = w.Write([]byte(`{"results":[{"verification_id":"domain_verification_2","source":"ICANN","trigger":"TRANSFER","status":"OPEN","claims":["email"],"deadlines":[{"type":"verification","date":"2026-11-12T00:00:00Z"}],"contact_id":"contact_1","opened_on":"2026-10-28T00:00:00Z","closed_on":null,"close_reason":null,"reminders_sent":0,"last_reminder_sent_on":null,"domain_id":"domain_2","domain_name":"example.org"}],"pagination":{"has_next_page":true}}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"results":[{"verification_id":"domain_verification_1","source":"ICANN","trigger":"CREATE","status":"CANCELED","claims":["email"],"deadlines":[],"contact_id":"contact_1","opened_on":"2026-01-01T00:00:00Z","closed_on":"2026-02-01T00:00:00Z","close_reason":"DOMAIN_DELETED","reminders_sent":3,"last_reminder_sent_on":"2026-01-20T00:00:00Z","domain_id":"domain_1","domain_name":"example.com"}],"pagination":{"has_next_page":false}}`))
+	}))
+	defer server.Close()
+
+	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+	require.NoError(t, err)
+
+	cases, err := client.Contacts.ListContactVerificationCases(context.Background(), "contact_1", nil)
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{"1", "2"}, pages)
+	require.Len(t, cases, 2)
+
+	assert.Equal(t, models.DomainID("domain_2"), cases[0].DomainID)
+	assert.Equal(t, "example.org", cases[0].DomainName)
+	assert.Equal(t, models.DomainVerificationID("domain_verification_2"), cases[0].VerificationID)
+	assert.Equal(t, models.DomainVerificationTriggerTransfer, cases[0].Trigger)
+	assert.Nil(t, cases[0].CloseReason)
+
+	assert.Equal(t, "example.com", cases[1].DomainName)
+	assert.Equal(t, models.DomainVerificationStatusCanceled, cases[1].Status)
+	require.NotNil(t, cases[1].CloseReason)
+	assert.Equal(t, models.DomainVerificationCloseDomainDeleted, *cases[1].CloseReason)
+	assert.Equal(t, 3, cases[1].RemindersSent)
+}
+
+func TestContactsService_ListContactVerificationCasesPage(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "GET", r.Method)
+		assert.Equal(t, "/v1/contacts/contact_1/verification-cases", r.URL.Path)
+		assert.Equal(t, "2", r.URL.Query().Get("page"))
+		assert.Equal(t, "10", r.URL.Query().Get("page_size"))
+		_, _ = w.Write([]byte(`{"results":[],"pagination":{"total_pages":2,"current_page":2,"page_size":10,"has_next_page":false,"has_previous_page":true,"total_items":11}}`))
+	}))
+	defer server.Close()
+
+	client, err := NewClient(WithAPIKey("opk_test"), WithAPIEndpoint(server.URL))
+	require.NoError(t, err)
+
+	resp, err := client.Contacts.ListContactVerificationCasesPage(context.Background(), "contact_1", &models.ListContactVerificationCasesOptions{
+		Page:     2,
+		PageSize: 10,
+	})
+
+	require.NoError(t, err)
+	assert.Empty(t, resp.Results)
+	assert.Equal(t, 2, resp.Pagination.CurrentPage)
+	assert.Equal(t, 11, resp.Pagination.TotalItems)
+}
+
 func TestContactsService_ListContacts(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "GET", r.Method)
