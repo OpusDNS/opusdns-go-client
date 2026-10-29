@@ -6,6 +6,9 @@ import "time"
 // DomainID is a TypeID for domains.
 type DomainID = TypeID
 
+// DomainVerificationID is a TypeID for domain verification cases.
+type DomainVerificationID = TypeID
+
 // DomainStatus represents the status of a domain.
 type DomainStatus string
 
@@ -208,8 +211,16 @@ type Domain struct {
 	// when tags are requested via Include.
 	StatusTags []StatusTagResponse `json:"status_tags,omitempty"`
 
-	// VerificationRequired carries pending verification claims and deadlines.
+	// VerificationRequired carries pending verification claims and deadlines,
+	// merged over all active verification cases. Nil when no case is active.
+	//
+	// Deprecated: Use ActiveVerifications, which keeps each case apart.
 	VerificationRequired *VerificationRequired `json:"verification_required,omitempty"`
+
+	// ActiveVerifications are the domain's active verification cases, at most
+	// one per source (ICANN and the registry), oldest first. Empty when no
+	// case is active.
+	ActiveVerifications []ActiveDomainVerification `json:"active_verifications"`
 
 	// ConnectedAccount is the registrar credential or registry accreditation
 	// the domain is synced from or managed on. Only present when
@@ -244,6 +255,9 @@ type DomainRenewalPrice struct {
 type VerificationRequired struct {
 	// Sources are the parties (ICANN, the registry) that require the
 	// verification.
+	//
+	// Deprecated: The API no longer sends sources, so it is always nil. Read
+	// the Source of each case in Domain.ActiveVerifications.
 	Sources []DomainVerificationKind `json:"sources,omitempty"`
 
 	// Claims are the outstanding verification claims.
@@ -986,10 +1000,10 @@ const (
 	DomainVerificationCloseTransferAborted  DomainVerificationCloseReason = "TRANSFER_ABORTED"
 )
 
-// DomainVerification is one verification case of a domain.
+// DomainVerification is one verification case of a domain, active or closed.
 type DomainVerification struct {
 	// VerificationID is the ID of the verification case.
-	VerificationID TypeID `json:"verification_id"`
+	VerificationID DomainVerificationID `json:"verification_id"`
 
 	// Source is the party that requires the verification.
 	Source DomainVerificationKind `json:"source"`
@@ -1017,6 +1031,41 @@ type DomainVerification struct {
 
 	// CloseReason is why the case was closed; nil while it is open.
 	CloseReason *DomainVerificationCloseReason `json:"close_reason,omitempty"`
+
+	// RemindersSent is how many reminders the registrant got about the case.
+	RemindersSent int `json:"reminders_sent"`
+
+	// LastReminderSentOn is when the registrant's email was last reminded;
+	// nil if it never was.
+	LastReminderSentOn *time.Time `json:"last_reminder_sent_on,omitempty"`
+}
+
+// ActiveDomainVerification is an active verification case as a domain
+// carries it in Domain.ActiveVerifications.
+type ActiveDomainVerification struct {
+	// VerificationID is the ID of the verification case.
+	VerificationID DomainVerificationID `json:"verification_id"`
+
+	// Source is the party that requires the verification.
+	Source DomainVerificationKind `json:"source"`
+
+	// Trigger is what opened the case.
+	Trigger DomainVerificationTrigger `json:"trigger"`
+
+	// Status is the state of the case.
+	Status DomainVerificationStatus `json:"status"`
+
+	// Claims are the claims that must be verified.
+	Claims []VerificationClaimType `json:"claims"`
+
+	// Deadlines are the deadlines attached to the case.
+	Deadlines []VerificationDeadline `json:"deadlines"`
+
+	// ContactID is the contact being verified.
+	ContactID ContactID `json:"contact_id"`
+
+	// OpenedOn is when the case was opened.
+	OpenedOn *time.Time `json:"opened_on,omitempty"`
 }
 
 // DomainVerificationListResponse is a page of domain verification cases.

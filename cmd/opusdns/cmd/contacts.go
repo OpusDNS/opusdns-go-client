@@ -204,7 +204,8 @@ var contactsVerifyRequestCmd = &cobra.Command{
 With --type email (the default) the contact receives a verification link by
 email. With --type api the verification token is printed instead, for you to
 deliver to the contact yourself.`,
-	Args: cobra.ExactArgs(1),
+	Deprecated: "the API removes this route in January 2027; an ICANN verification case mails the registrant when it opens",
+	Args:       cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx, cancel := getContext()
 		defer cancel()
@@ -212,7 +213,7 @@ deliver to the contact yourself.`,
 		contactID := models.ContactID(args[0])
 		verificationType, _ := cmd.Flags().GetString("type")
 
-		verification, err := getClient().Contacts.RequestVerification(ctx, contactID, models.VerificationType(verificationType))
+		verification, err := getClient().Contacts.RequestVerification(ctx, contactID, models.VerificationType(verificationType)) //nolint:staticcheck // serves the deprecated command
 		if err != nil {
 			return fmt.Errorf("failed to request verification: %w", err)
 		}
@@ -228,16 +229,17 @@ deliver to the contact yourself.`,
 }
 
 var contactsVerifyStatusCmd = &cobra.Command{
-	Use:   "status <contact-id>",
-	Short: "Get verification status for a contact",
-	Args:  cobra.ExactArgs(1),
+	Use:        "status <contact-id>",
+	Short:      "Get verification status for a contact",
+	Deprecated: "the API removes this route in January 2027; read the contact's verification cases instead",
+	Args:       cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx, cancel := getContext()
 		defer cancel()
 
 		contactID := models.ContactID(args[0])
 
-		verification, err := getClient().Contacts.GetVerificationStatus(ctx, contactID)
+		verification, err := getClient().Contacts.GetVerificationStatus(ctx, contactID) //nolint:staticcheck // serves the deprecated command
 		if err != nil {
 			return fmt.Errorf("failed to get verification status: %w", err)
 		}

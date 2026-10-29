@@ -182,6 +182,11 @@ func (s *ContactsService) DeleteContact(ctx context.Context, contactID models.Co
 // models.VerificationTypeEmail mails a link to the contact, while
 // models.VerificationTypeAPI returns the token in the response (Token) for
 // the caller to deliver itself.
+//
+// Deprecated: There is nothing to start: an ICANN verification case mails the
+// registrant when it opens. To mail the link again, use
+// DomainsService.ResendDomainVerification. The API removes the route from
+// sandbox on 5 January 2027 and from production on 12 January 2027.
 func (s *ContactsService) RequestVerification(ctx context.Context, contactID models.ContactID, verificationType models.VerificationType) (*models.ContactVerification, error) {
 	if verificationType == "" {
 		return nil, &ValidationError{Field: "type", Message: "a verification type is required (api or email)"}
@@ -210,6 +215,11 @@ func (s *ContactsService) RequestVerification(ctx context.Context, contactID mod
 }
 
 // GetVerificationStatus retrieves the verification status for a contact.
+//
+// Deprecated: Use ListContactVerificationCases for what the contact is asked
+// to verify, on which domains and by when, and GetContactVerifications for
+// what is verified. The API removes the route from sandbox on 5 January 2027
+// and from production on 12 January 2027.
 func (s *ContactsService) GetVerificationStatus(ctx context.Context, contactID models.ContactID) (*models.ContactVerification, error) {
 	path := s.client.http.BuildPath("contacts", url.PathEscape(string(contactID)), "verification")
 
@@ -226,7 +236,9 @@ func (s *ContactsService) GetVerificationStatus(ctx context.Context, contactID m
 	return &verification, nil
 }
 
-// VerifyContact verifies a contact with the provided token.
+// VerifyContact verifies a contact with the provided token. Its route is the
+// link in the verification mail, which stays when the per-contact
+// verification routes are removed.
 func (s *ContactsService) VerifyContact(ctx context.Context, req *models.ContactVerificationRequest) error {
 	if req == nil || req.Token == "" {
 		return &ValidationError{Field: "token", Message: "verification token is required"}
@@ -435,7 +447,69 @@ func (s *ContactsService) GetContactVerifications(ctx context.Context, contactID
 	return &result, nil
 }
 
+// ListContactVerificationCases retrieves all verification cases about a
+// contact on its organization's domains, active and closed, newest first,
+// with automatic pagination.
+func (s *ContactsService) ListContactVerificationCases(ctx context.Context, contactID models.ContactID, opts *models.ListContactVerificationCasesOptions) ([]models.ContactVerificationCase, error) {
+	var all []models.ContactVerificationCase
+	page := 1
+
+	for {
+		pageOpts := cloneOptions(opts)
+		pageOpts.Page = page
+		if pageOpts.PageSize == 0 {
+			pageOpts.PageSize = DefaultPageSize
+		}
+
+		resp, err := s.ListContactVerificationCasesPage(ctx, contactID, pageOpts)
+		if err != nil {
+			return nil, err
+		}
+
+		all = append(all, resp.Results...)
+
+		if !resp.Pagination.HasNextPage {
+			break
+		}
+		page++
+	}
+
+	return all, nil
+}
+
+// ListContactVerificationCasesPage retrieves a single page of a contact's
+// verification cases.
+func (s *ContactsService) ListContactVerificationCasesPage(ctx context.Context, contactID models.ContactID, opts *models.ListContactVerificationCasesOptions) (*models.ContactVerificationCaseListResponse, error) {
+	path := s.client.http.BuildPath("contacts", url.PathEscape(string(contactID)), "verification-cases")
+
+	query := url.Values{}
+	if opts != nil {
+		if opts.Page > 0 {
+			query.Set("page", strconv.Itoa(opts.Page))
+		}
+		if opts.PageSize > 0 {
+			query.Set("page_size", strconv.Itoa(opts.PageSize))
+		}
+	}
+
+	resp, err := s.client.http.Get(ctx, path, query)
+	if err != nil {
+		return nil, err
+	}
+
+	var result models.ContactVerificationCaseListResponse
+	if err := s.client.http.DecodeResponse(resp, &result); err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
 // CancelContactVerification deletes a contact's verification.
+//
+// Deprecated: There is nothing to cancel: a verification case ends with its
+// domain. The API removes the route from sandbox on 5 January 2027 and from
+// production on 12 January 2027.
 func (s *ContactsService) CancelContactVerification(ctx context.Context, contactID models.ContactID) error {
 	path := s.client.http.BuildPath("contacts", url.PathEscape(string(contactID)), "verification")
 

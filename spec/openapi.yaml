@@ -22,6 +22,63 @@ components:
       - match_none
       title: AccountTypeFilterMode
       type: string
+    ActiveDomainVerificationResponse:
+      properties:
+        claims:
+          description: What has to be verified about the registrant
+          items:
+            $ref: '#/components/schemas/VerificationClaimType'
+          title: Claims
+          type: array
+        contact_id:
+          description: The registrant contact the case is about
+          examples:
+          - contact_01h45ytscbebyvny4gc8cr8ma2
+          format: typeid
+          pattern: ^contact_[0-7][0-9a-hjkmnpq-tv-z]{25}$
+          title: Contact Id
+          type: string
+          x-typeid-prefix: contact
+        deadlines:
+          description: The deadlines of the case
+          items:
+            $ref: '#/components/schemas/VerificationDeadline'
+          title: Deadlines
+          type: array
+        opened_on:
+          description: When the case was opened
+          format: date-time
+          title: Opened On
+          type: string
+        source:
+          $ref: '#/components/schemas/DomainVerificationKind'
+          description: 'Who asks for the verification: ICANN or the registry'
+        status:
+          $ref: '#/components/schemas/DomainVerificationStatus'
+          description: The status of the case
+        trigger:
+          $ref: '#/components/schemas/DomainVerificationTrigger'
+          description: What opened the case
+        verification_id:
+          description: The ID of the verification case
+          examples:
+          - domain_verification_01h45ytscbebyvny4gc8cr8ma2
+          format: typeid
+          pattern: ^domain_verification_[0-7][0-9a-hjkmnpq-tv-z]{25}$
+          title: Verification Id
+          type: string
+          x-typeid-prefix: domain_verification
+      required:
+      - verification_id
+      - source
+      - trigger
+      - status
+      - claims
+      - deadlines
+      - contact_id
+      - opened_on
+      title: ActiveDomainVerificationResponse
+      type: object
     AggregationResult:
       properties:
         field:
@@ -5112,6 +5169,37 @@ components:
       - properties:
           data:
             anyOf:
+            - $ref: '#/components/schemas/Pagination_ContactVerificationCaseResponse_'
+            - type: string
+          headers:
+            additionalProperties:
+              type: string
+            description: Selected response headers
+            title: Headers
+            type: object
+          httpStatus:
+            anyOf:
+            - type: integer
+            - type: 'null'
+            description: HTTP status returned by the underlying API
+            title: Httpstatus
+          operationId:
+            const: list_contact_verification_cases_v1_contacts__contact_id__verification_cases_get
+          status:
+            const: ok
+          truncated:
+            default: false
+            description: True when the gateway capped an oversized payload
+            title: Truncated
+            type: boolean
+        required:
+        - status
+        - operationId
+        title: list_contact_verification_cases_v1_contacts__contact_id__verification_cases_get
+        type: object
+      - properties:
+          data:
+            anyOf:
             - $ref: '#/components/schemas/ContextListResponse'
             - type: string
           headers:
@@ -5987,6 +6075,37 @@ components:
       - properties:
           data:
             anyOf:
+            - $ref: '#/components/schemas/ZoneNxdomainStatisticsResponse'
+            - type: string
+          headers:
+            additionalProperties:
+              type: string
+            description: Selected response headers
+            title: Headers
+            type: object
+          httpStatus:
+            anyOf:
+            - type: integer
+            - type: 'null'
+            description: HTTP status returned by the underlying API
+            title: Httpstatus
+          operationId:
+            const: list_zone_nxdomains_v1_dns__zone_name__statistics_nxdomains_get
+          status:
+            const: ok
+          truncated:
+            default: false
+            description: True when the gateway capped an oversized payload
+            title: Truncated
+            type: boolean
+        required:
+        - status
+        - operationId
+        title: list_zone_nxdomains_v1_dns__zone_name__statistics_nxdomains_get
+        type: object
+      - properties:
+          data:
+            anyOf:
             - $ref: '#/components/schemas/ListZonesReferencingSetRes'
             - type: string
           headers:
@@ -6847,6 +6966,37 @@ components:
         - status
         - operationId
         title: request_domain_auth_code_v1_domains__domain_reference__auth_code_post
+        type: object
+      - properties:
+          data:
+            anyOf:
+            - $ref: '#/components/schemas/DomainVerificationResponse'
+            - type: string
+          headers:
+            additionalProperties:
+              type: string
+            description: Selected response headers
+            title: Headers
+            type: object
+          httpStatus:
+            anyOf:
+            - type: integer
+            - type: 'null'
+            description: HTTP status returned by the underlying API
+            title: Httpstatus
+          operationId:
+            const: resend_domain_verification_v1_domains__domain_reference__verifications__verification_id__resend_post
+          status:
+            const: ok
+          truncated:
+            default: false
+            description: True when the gateway capped an oversized payload
+            title: Truncated
+            type: boolean
+        required:
+        - status
+        - operationId
+        title: resend_domain_verification_v1_domains__domain_reference__verifications__verification_id__resend_post
         type: object
       - properties:
           data:
@@ -8801,6 +8951,13 @@ components:
           title: Label
       title: ContactAttributeSetUpdate
       type: object
+    ContactCompleteness:
+      description: Whether a stored contact passes the contact create validation (`classify`).
+      enum:
+      - complete
+      - incomplete
+      title: ContactCompleteness
+      type: string
     ContactConfigBase:
       properties:
         max:
@@ -9311,11 +9468,16 @@ components:
           title: Attribute Sets
           type: array
         city:
+          anyOf:
+          - type: string
+          - type: 'null'
           description: The city of the contact
-          maxLength: 255
-          minLength: 1
           title: City
-          type: string
+        completeness:
+          $ref: '#/components/schemas/ContactCompleteness'
+          description: Whether the contact passed the contact create validation when
+            it was stored. Can disagree with `incomplete_fields` if the rules changed
+            since; the `completeness` list filter uses this.
         contact_id:
           examples:
           - contact_01h45ytscbebyvny4gc8cr8ma2
@@ -9325,11 +9487,12 @@ components:
           type: string
           x-typeid-prefix: contact
         country:
+          anyOf:
+          - type: string
+          - type: 'null'
           description: The country of the contact (ISO 3166-1 alpha-2, plus XK for
             Kosovo)
-          pattern: ^\w{2}$
           title: Country
-          type: string
         created_on:
           description: The date/time the entry was created on
           format: date-time
@@ -9342,34 +9505,40 @@ components:
           title: Disclose
           type: boolean
         email:
+          anyOf:
+          - type: string
+          - type: 'null'
           description: Contact email address (as submitted)
-          format: email
           title: Email
-          type: string
         fax:
           anyOf:
-          - format: phone
-            type: string
+          - type: string
           - type: 'null'
           description: The contacts's fax number
           title: Fax
         first_name:
+          anyOf:
+          - type: string
+          - type: 'null'
           description: The first name of the contact
-          maxLength: 255
-          minLength: 1
           title: First Name
-          type: string
+        incomplete_fields:
+          description: The fields that fail the contact create validation today; empty
+            when none do. `contact` stands for a failure that names no single field.
+          items:
+            type: string
+          readOnly: true
+          title: Incomplete Fields
+          type: array
         last_name:
+          anyOf:
+          - type: string
+          - type: 'null'
           description: The last name of the contact
-          maxLength: 255
-          minLength: 1
           title: Last Name
-          type: string
         org:
           anyOf:
-          - maxLength: 255
-            minLength: 1
-            type: string
+          - type: string
           - type: 'null'
           description: The organization of the contact
           title: Org
@@ -9384,23 +9553,22 @@ components:
           type: string
           x-typeid-prefix: organization
         phone:
+          anyOf:
+          - type: string
+          - type: 'null'
           description: The contact's phone number
           examples:
           - '+1.2125552368'
-          format: phone
           title: Phone
-          type: string
         postal_code:
+          anyOf:
+          - type: string
+          - type: 'null'
           description: The postal code of the contact
-          maxLength: 255
-          minLength: 1
           title: Postal Code
-          type: string
         state:
           anyOf:
-          - maxLength: 255
-            minLength: 1
-            type: string
+          - type: string
           - type: 'null'
           description: The state of the contact
           title: State
@@ -9414,11 +9582,11 @@ components:
             is specified.
           title: Status Tags
         street:
+          anyOf:
+          - type: string
+          - type: 'null'
           description: The address of the contact
-          maxLength: 255
-          minLength: 1
           title: Street
-          type: string
         tags:
           anyOf:
           - items:
@@ -9429,9 +9597,7 @@ components:
           title: Tags
         title:
           anyOf:
-          - maxLength: 255
-            minLength: 1
-            type: string
+          - type: string
           - type: 'null'
           description: The title of the contact
           title: Title
@@ -9445,6 +9611,8 @@ components:
       - postal_code
       - country
       - disclose
+      - completeness
+      - incomplete_fields
       title: ContactResponse
       type: object
     ContactSortField:
@@ -9555,6 +9723,105 @@ components:
       - token
       - type
       title: ContactVerificationApiResponse
+      type: object
+    ContactVerificationCaseResponse:
+      properties:
+        claims:
+          description: What has to be verified about the registrant
+          items:
+            $ref: '#/components/schemas/VerificationClaimType'
+          title: Claims
+          type: array
+        close_reason:
+          anyOf:
+          - $ref: '#/components/schemas/DomainVerificationCloseReason'
+          - type: 'null'
+          description: Why the case was closed, null while it is active
+        closed_on:
+          anyOf:
+          - format: date-time
+            type: string
+          - type: 'null'
+          description: When the case was closed, null while it is active
+          title: Closed On
+        contact_id:
+          description: The registrant contact the case is about
+          examples:
+          - contact_01h45ytscbebyvny4gc8cr8ma2
+          format: typeid
+          pattern: ^contact_[0-7][0-9a-hjkmnpq-tv-z]{25}$
+          title: Contact Id
+          type: string
+          x-typeid-prefix: contact
+        deadlines:
+          description: The deadlines of the case
+          items:
+            $ref: '#/components/schemas/VerificationDeadline'
+          title: Deadlines
+          type: array
+        domain_id:
+          description: The domain the case is about
+          examples:
+          - domain_01h45ytscbebyvny4gc8cr8ma2
+          format: typeid
+          pattern: ^domain_[0-7][0-9a-hjkmnpq-tv-z]{25}$
+          title: Domain Id
+          type: string
+          x-typeid-prefix: domain
+        domain_name:
+          description: The name of the domain the case is about
+          title: Domain Name
+          type: string
+        last_reminder_sent_on:
+          anyOf:
+          - format: date-time
+            type: string
+          - type: 'null'
+          description: When the registrant's email was last reminded, null if never
+          title: Last Reminder Sent On
+        opened_on:
+          description: When the case was opened
+          format: date-time
+          title: Opened On
+          type: string
+        reminders_sent:
+          description: How many reminders the registrant got about this case
+          title: Reminders Sent
+          type: integer
+        source:
+          $ref: '#/components/schemas/DomainVerificationKind'
+          description: 'Who asks for the verification: ICANN or the registry'
+        status:
+          $ref: '#/components/schemas/DomainVerificationStatus'
+          description: The status of the case
+        trigger:
+          $ref: '#/components/schemas/DomainVerificationTrigger'
+          description: What opened the case
+        verification_id:
+          description: The ID of the verification case
+          examples:
+          - domain_verification_01h45ytscbebyvny4gc8cr8ma2
+          format: typeid
+          pattern: ^domain_verification_[0-7][0-9a-hjkmnpq-tv-z]{25}$
+          title: Verification Id
+          type: string
+          x-typeid-prefix: domain_verification
+      required:
+      - verification_id
+      - source
+      - trigger
+      - status
+      - claims
+      - deadlines
+      - contact_id
+      - opened_on
+      - closed_on
+      - close_reason
+      - reminders_sent
+      - last_reminder_sent_on
+      - domain_id
+      - domain_name
+      title: ContactVerificationCaseResponse
       type: object
     ContactVerificationClaim:
       enum:
@@ -9807,7 +10074,8 @@ components:
           anyOf:
           - $ref: '#/components/schemas/RegistrantChangeType'
           - type: 'null'
-          description: Whether the registrant can change through update or trade
+          description: Whether the registrant changes through an update, a trade,
+            or manually through our support team
         registrant_change_policy:
           anyOf:
           - $ref: '#/components/schemas/RegistrantChangePolicyBase'
@@ -10792,35 +11060,76 @@ components:
       type: object
     DnsStatisticsBucketResponse:
       properties:
+        covered_from:
+          anyOf:
+          - format: date
+            type: string
+          - type: 'null'
+          description: 'First day the bucket''s counts include: the latest of `period_start`,
+            `start_date` and `data_available_from`. A month the window cuts is summed
+            from the daily statistics, which are kept for 25 months, so in a month
+            older than that it is also no earlier than the oldest day still kept.
+            Null when the bucket is not covered: none of its days lies within both
+            the window and the stored data'
+          title: Covered From
+        covered_to:
+          anyOf:
+          - format: date
+            type: string
+          - type: 'null'
+          description: 'Last day the bucket''s counts include: the earliest of `period_end`,
+            `end_date` and `data_available_to`. Null when the bucket is not covered'
+          title: Covered To
         nxdomain_count:
-          description: Of those, queries answered with NXDOMAIN
+          anyOf:
+          - type: integer
+          - type: 'null'
+          description: Of those, queries answered with NXDOMAIN. Null when the bucket
+            is not covered
           title: Nxdomain Count
-          type: integer
         partial:
-          description: 'The bucket counts only part of its span: it reaches outside
-            the window, or part of it lies before `data_available_from` or after `data_available_to`.
-            A partial bucket must not be read as a rise or fall against its neighbours.'
+          description: 'True when the counts are not those of the whole bucket: `covered_from`..`covered_to`
+            is shorter than `period_start`..`period_end` because the window or the
+            stored data cuts it, or the bucket is the first month of monthly statistics
+            older than the daily ones (see `data_available_from`), whose first day
+            of data is not known. Also true for a bucket that is not covered, which
+            has no counts. A partial bucket must not be read as a rise or fall against
+            its neighbours'
           title: Partial
           type: boolean
+        period_end:
+          description: 'Last day of the bucket (UTC): the day itself, the Sunday of
+            its week, or the last day of its month'
+          format: date
+          title: Period End
+          type: string
         period_start:
           description: First day of the bucket (UTC)
           format: date
           title: Period Start
           type: string
         query_count:
-          description: Queries answered for the organization's zones in this bucket
+          anyOf:
+          - type: integer
+          - type: 'null'
+          description: 'Queries answered for the organization''s zones from `covered_from`
+            to `covered_to`; 0 when none were recorded. Null when the bucket is not
+            covered: no data, rather than no queries'
           title: Query Count
-          type: integer
         zone_count:
           anyOf:
           - type: integer
           - type: 'null'
-          description: 'Zones with at least one query in the bucket. Null for weeks,
-            and for a month the window cuts: those are summed from days, and a zone
-            active on several of them cannot be counted once'
+          description: 'Zones with at least one query in the bucket. Null when the
+            bucket is not covered, and for weeks and for a month the window cuts:
+            those are summed from days, and a zone active on several of them cannot
+            be counted once'
           title: Zone Count
       required:
       - period_start
+      - period_end
+      - covered_from
+      - covered_to
       - query_count
       - nxdomain_count
       - zone_count
@@ -10840,7 +11149,7 @@ components:
       properties:
         buckets:
           description: One entry per bucket the window touches, oldest first, including
-            buckets without queries
+            buckets without queries (0) and buckets without data (null)
           items:
             $ref: '#/components/schemas/DnsStatisticsBucketResponse'
           title: Buckets
@@ -10850,16 +11159,22 @@ components:
           - format: date
             type: string
           - type: 'null'
-          description: First day the statistics hold data for. Null while no statistics
-            have been collected.
+          description: First day the statistics hold data for. Buckets count no day
+            before it; one left without a day to count carries null counts. Null while
+            no statistics have been collected; then every bucket carries null counts.
+            At `granularity=month`, once the daily statistics older than 25 months
+            have been deleted, it is the first day of the oldest month the monthly
+            statistics hold; the day the data starts on within that month is no longer
+            known.
           title: Data Available From
         data_available_to:
           anyOf:
           - format: date
             type: string
           - type: 'null'
-          description: Last day the statistics hold data for. Null while no statistics
-            have been collected.
+          description: Last day the statistics hold data for. Buckets count no day
+            after it; one left without a day to count carries null counts. Null while
+            no statistics have been collected.
           title: Data Available To
         end_date:
           description: Last day of the window, inclusive
@@ -10897,13 +11212,19 @@ components:
     DnsStatisticsTotalsResponse:
       properties:
         nxdomain_count:
-          description: Of those, queries answered with NXDOMAIN
+          anyOf:
+          - type: integer
+          - type: 'null'
+          description: Of those, queries answered with NXDOMAIN. Null when no bucket
+            is covered
           title: Nxdomain Count
-          type: integer
         query_count:
-          description: Queries answered for the organization's zones in the window
+          anyOf:
+          - type: integer
+          - type: 'null'
+          description: Queries answered for the organization's zones, summed over
+            the covered buckets. Null when no bucket is covered
           title: Query Count
-          type: integer
       required:
       - query_count
       - nxdomain_count
@@ -12075,10 +12396,12 @@ components:
           description: Error details when status is 'error', e.g. why a domain is
             invalid
         marketplace:
-          $ref: '#/components/schemas/Marketplace'
-          description: The marketplace a taken domain can be bought on; only on `market_available`
-            results of `POST /v1/availability/stream` with `marketplaces`, omitted
-            otherwise.
+          anyOf:
+          - $ref: '#/components/schemas/Marketplace'
+          - type: 'null'
+          description: The marketplace a taken domain can be bought on; set on `market_available`
+            results of `POST /v1/availability/stream` with `marketplaces`; null otherwise,
+            or when the marketplace is not known yet.
         status:
           $ref: '#/components/schemas/DomainAvailabilityStatus'
       required:
@@ -14092,6 +14415,14 @@ components:
       type: object
     DomainResponse:
       properties:
+        active_verifications:
+          description: 'The domain''s active verification cases, at most one per source
+            (ICANN and the registry): what each still waits for and by when. Oldest
+            first, by `opened_on`. Empty when no case is active.'
+          items:
+            $ref: '#/components/schemas/ActiveDomainVerificationResponse'
+          title: Active Verifications
+          type: array
         auth_code:
           anyOf:
           - maxLength: 255
@@ -14318,8 +14649,10 @@ components:
           anyOf:
           - $ref: '#/components/schemas/VerificationResponse'
           - type: 'null'
-          description: 'What the domain''s active verification cases still wait for:
-            who asks, the claims and the earliest deadline of each type. Null when
+          deprecated: true
+          description: 'Deprecated, read `active_verifications` instead. What the
+            domain''s active verification cases still wait for: who asks, the claims
+            and the earliest deadline of each type, merged over all cases. Null when
             no case is active.'
       required:
       - name
@@ -14439,11 +14772,13 @@ components:
           title: Domain
           type: string
         marketplace:
-          $ref: '#/components/schemas/Marketplace'
-          description: 'Present on a domain for sale on a marketplace, added after
-            the suggestions with `available: false` and no amount yet; omitted on
-            suggestions. A domain can appear twice: as a suggestion with its registry
-            fields, and as a marketplace item.'
+          anyOf:
+          - $ref: '#/components/schemas/Marketplace'
+          - type: 'null'
+          description: 'Set on a domain for sale on a marketplace, added after the
+            suggestions with `available: false` and no amount yet; null on suggestions.
+            A domain can appear twice: as a suggestion with its registry fields, and
+            as a marketplace item.'
         premium:
           title: Premium
           type: boolean
@@ -14531,48 +14866,100 @@ components:
       type: object
     DomainStatisticsBucketResponse:
       properties:
+        covered_from:
+          anyOf:
+          - format: date
+            type: string
+          - type: 'null'
+          description: 'First day the bucket''s counts include: the latest of `period_start`,
+            `start_date` and the day of `data_available_from`. Null when the bucket
+            is not covered: none of its days lies within the window, on or after the
+            day of `data_available_from` and on or before today (UTC)'
+          title: Covered From
+        covered_to:
+          anyOf:
+          - format: date
+            type: string
+          - type: 'null'
+          description: 'Last day the bucket''s counts include: the earliest of `period_end`,
+            `end_date` and today (UTC). Null when the bucket is not covered'
+          title: Covered To
         create:
-          description: Domains created in this bucket
+          anyOf:
+          - type: integer
+          - type: 'null'
+          description: 'Domains created from `covered_from` to `covered_to`; 0 when
+            none were. Null when the bucket is not covered: no data, rather than no
+            movement'
           title: Create
-          type: integer
         delete:
-          description: Domains deleted in this bucket
+          anyOf:
+          - type: integer
+          - type: 'null'
+          description: 'Domains deleted. Null when the bucket is not covered: no data,
+            rather than no movement'
           title: Delete
-          type: integer
         net:
-          description: Created plus transferred in, minus deleted and transferred
-            out
+          anyOf:
+          - type: integer
+          - type: 'null'
+          description: 'Created plus transferred in, minus deleted and transferred
+            out. Null when the bucket is not covered: no data, rather than no movement'
           title: Net
-          type: integer
         partial:
-          description: The bucket reaches outside the requested window, so its counts
-            cover only part of its span and must not be read as a rise or fall against
-            its neighbours
+          description: 'True when the counts are not those of the whole bucket: `covered_from`..`covered_to`
+            is shorter than `period_start`..`period_end` because the window, the start
+            of the event log or today cuts it; it includes the day of `data_available_from`,
+            which the log covers only from that instant unless it is midnight; or
+            it reaches today, which is still running. Also true for a bucket that
+            is not covered, which has no counts. A partial bucket must not be read
+            as a rise or fall against its neighbours'
           title: Partial
           type: boolean
+        period_end:
+          description: 'Last day of the bucket (UTC): the day itself, the Sunday of
+            its week, or the last day of its month'
+          format: date
+          title: Period End
+          type: string
         period_start:
           description: First day of the bucket (UTC)
           format: date
           title: Period Start
           type: string
         renew:
-          description: Domain renewals in this bucket
+          anyOf:
+          - type: integer
+          - type: 'null'
+          description: 'Domain renewals. Null when the bucket is not covered: no data,
+            rather than no movement'
           title: Renew
-          type: integer
         restore:
-          description: Domains restored in this bucket
+          anyOf:
+          - type: integer
+          - type: 'null'
+          description: 'Domains restored. Null when the bucket is not covered: no
+            data, rather than no movement'
           title: Restore
-          type: integer
         transfer:
-          description: Domains transferred in during this bucket
+          anyOf:
+          - type: integer
+          - type: 'null'
+          description: 'Domains transferred in. Null when the bucket is not covered:
+            no data, rather than no movement'
           title: Transfer
-          type: integer
         transfer_out:
-          description: Domains transferred away during this bucket
+          anyOf:
+          - type: integer
+          - type: 'null'
+          description: 'Domains transferred away. Null when the bucket is not covered:
+            no data, rather than no movement'
           title: Transfer Out
-          type: integer
       required:
       - period_start
+      - period_end
+      - covered_from
+      - covered_to
       - create
       - transfer
       - delete
@@ -14594,7 +14981,7 @@ components:
           type: array
         buckets:
           description: One entry per bucket the window touches, oldest first, including
-            empty buckets
+            buckets without movement (0) and buckets without data (null)
           items:
             $ref: '#/components/schemas/DomainStatisticsBucketResponse'
           title: Buckets
@@ -14604,10 +14991,11 @@ components:
           - format: date-time
             type: string
           - type: 'null'
-          description: Oldest day these statistics can report on. They are read from
-            the domain event log, which starts later than the domains themselves,
-            so a window reaching further back is empty before this instant rather
-            than zero.
+          description: Oldest event the domain event log holds, which starts later
+            than the domains themselves. Buckets count no day before its day; one
+            left without a day to count carries null counts. Null when the log holds
+            no event or its start could not be read; buckets are then counted over
+            the whole window.
           title: Data Available From
         end_date:
           description: Last day of the window, inclusive
@@ -14647,39 +15035,61 @@ components:
     DomainStatisticsTotalsResponse:
       properties:
         create:
-          description: Domains created (newly registered) in the window
+          anyOf:
+          - type: integer
+          - type: 'null'
+          description: Domains created (newly registered), summed over the covered
+            buckets. Null when no bucket is covered
           title: Create
-          type: integer
         delete:
-          description: Domains deleted in the window
+          anyOf:
+          - type: integer
+          - type: 'null'
+          description: Domains deleted, summed over the covered buckets. Null when
+            no bucket is covered
           title: Delete
-          type: integer
         net:
+          anyOf:
+          - type: integer
+          - type: 'null'
           description: Created plus transferred in, minus deleted and transferred
-            out
+            out, summed over the covered buckets. Null when no bucket is covered
           title: Net
-          type: integer
         renew:
-          description: Domains renewed in the window, counted once per day a domain
-            was renewed
+          anyOf:
+          - type: integer
+          - type: 'null'
+          description: Domains renewed, counted once per day a domain was renewed,
+            summed over the covered buckets. Null when no bucket is covered
           title: Renew
-          type: integer
         restore:
-          description: Domains restored from redemption in the window
+          anyOf:
+          - type: integer
+          - type: 'null'
+          description: Domains restored from redemption, summed over the covered buckets.
+            Null when no bucket is covered
           title: Restore
-          type: integer
         total:
-          description: Created plus transferred
+          anyOf:
+          - type: integer
+          - type: 'null'
+          description: Created plus transferred, summed over the covered buckets.
+            Null when no bucket is covered
           title: Total
-          type: integer
         transfer:
-          description: Domains transferred to OpusDNS in the window
+          anyOf:
+          - type: integer
+          - type: 'null'
+          description: Domains transferred to OpusDNS, summed over the covered buckets.
+            Null when no bucket is covered
           title: Transfer
-          type: integer
         transfer_out:
-          description: Domains transferred away from OpusDNS in the window
+          anyOf:
+          - type: integer
+          - type: 'null'
+          description: Domains transferred away from OpusDNS, summed over the covered
+            buckets. Null when no bucket is covered
           title: Transfer Out
-          type: integer
       required:
       - create
       - transfer
@@ -15908,11 +16318,22 @@ components:
             $ref: '#/components/schemas/VerificationDeadline'
           title: Deadlines
           type: array
+        last_reminder_sent_on:
+          anyOf:
+          - format: date-time
+            type: string
+          - type: 'null'
+          description: When the registrant's email was last reminded, null if never
+          title: Last Reminder Sent On
         opened_on:
           description: When the case was opened
           format: date-time
           title: Opened On
           type: string
+        reminders_sent:
+          description: How many reminders the registrant got about this case
+          title: Reminders Sent
+          type: integer
         source:
           $ref: '#/components/schemas/DomainVerificationKind'
           description: 'Who asks for the verification: ICANN or the registry'
@@ -15942,6 +16363,8 @@ components:
       - opened_on
       - closed_on
       - close_reason
+      - reminders_sent
+      - last_reminder_sent_on
       title: DomainVerificationResponse
       type: object
     DomainVerificationStatus:
@@ -16991,6 +17414,7 @@ components:
           type: boolean
         suspension_delay:
           description: After how many Days should the domain be suspended
+          pattern: ^\d+D$
           title: Suspension Delay
           type: string
         suspension_on_failure:
@@ -17148,6 +17572,7 @@ components:
       - FAILURE
       - CANCELED
       - OVERDUE
+      - REMINDER
       title: EventSubtype
       type: string
     EventType:
@@ -17642,6 +18067,7 @@ components:
           type: array
         suspension_delay:
           description: After how many Days should the domain be suspended
+          pattern: ^\d+D$
           title: Suspension Delay
           type: string
         suspension_on_failure:
@@ -18985,6 +19411,7 @@ components:
       - ADDRESS
       - NAME
       - LEGAL_ENTITY
+      - ICANN_RAA
       title: NizzaClaim
       type: string
     NizzaVerificationProof:
@@ -19024,6 +19451,12 @@ components:
       - accept_name
       title: NorIdDeclarationConfirmRequest
       type: object
+    NorIdDeclarationPurpose:
+      enum:
+      - registration
+      - registrant_change
+      title: NorIdDeclarationPurpose
+      type: string
     NorIdDeclarationResponse:
       properties:
         declaration_contract_text:
@@ -19047,7 +19480,7 @@ components:
           title: Domain Name
           type: string
         expires_on:
-          description: When the unconfirmed create request expires
+          description: When the unsigned request expires
           format: date-time
           title: Expires On
           type: string
@@ -19072,6 +19505,11 @@ components:
           title: Organization Id
           type: string
           x-typeid-prefix: organization
+        purpose:
+          $ref: '#/components/schemas/NorIdDeclarationPurpose'
+          default: registration
+          description: 'What the signature completes: the registration of the domain
+            or a change of its registrant'
         status:
           $ref: '#/components/schemas/NorIdDeclarationStatus'
           description: The declaration status
@@ -20346,6 +20784,20 @@ components:
       - results
       - pagination
       title: Pagination[ContactResponse]
+      type: object
+    Pagination_ContactVerificationCaseResponse_:
+      properties:
+        pagination:
+          $ref: '#/components/schemas/PaginationMetadata'
+        results:
+          items:
+            $ref: '#/components/schemas/ContactVerificationCaseResponse'
+          title: Results
+          type: array
+      required:
+      - results
+      - pagination
+      title: Pagination[ContactVerificationCaseResponse]
       type: object
     Pagination_DnsZoneResponse_:
       properties:
@@ -21933,11 +22385,49 @@ components:
       - trade
       title: RegistrantChangeFeeType
       type: string
+    RegistrantChangeField:
+      properties:
+        key:
+          $ref: '#/components/schemas/RegistrantChangeFieldKey'
+          description: The key the field is sent under in `fields`
+        required:
+          default: false
+          description: Whether the field must be sent
+          title: Required
+          type: boolean
+        type:
+          $ref: '#/components/schemas/AttributeType'
+          description: Type of the field (e.g., 'enum', 'string', 'boolean')
+        values:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          description: Allowed values for enum types
+          title: Values
+      required:
+      - key
+      - type
+      title: RegistrantChangeField
+      type: object
+    RegistrantChangeFieldKey:
+      enum:
+      - auth_code
+      title: RegistrantChangeFieldKey
+      type: string
     RegistrantChangePolicyBase:
       properties:
         confirmation:
           $ref: '#/components/schemas/RegistrantChangeConfirmationType'
           description: Who confirms a change of registrant before it is executed
+        confirmation_fields:
+          description: TLD-specific fields sent in `fields` to confirm the registrant
+            change
+          items:
+            $ref: '#/components/schemas/RegistrantChangeField'
+          title: Confirmation Fields
+          type: array
         confirmation_window:
           anyOf:
           - examples:
@@ -21965,6 +22455,13 @@ components:
           description: Whether the change renews the domain
           title: Renews Domain
           type: boolean
+        request_fields:
+          description: TLD-specific fields sent in `fields` with the registrant change
+            request
+          items:
+            $ref: '#/components/schemas/RegistrantChangeField'
+          title: Request Fields
+          type: array
         transfer_lock_after_change:
           description: Inter-registrar transfer lock applied after the change (e.g.,
             '60D'), '0D' disables it
@@ -21988,7 +22485,8 @@ components:
       - pending_confirmation
       - confirmed
       - executing
-      - registry_pending
+      - pending_registry
+      - pending_manual
       - completed
       - not_material
       - expired
@@ -22001,6 +22499,7 @@ components:
       enum:
       - update
       - trade
+      - manual
       title: RegistrantChangeType
       type: string
     Registrar:
@@ -22259,6 +22758,7 @@ components:
       - NOR_ID_CONTACT_TYPE
       - NOR_ID_IDENTITY_TYPE
       - NOR_ID_IDENTITY_VALUE
+      - REGISTER_SI_CONTACT_TYPE
       - REGISTRY_SE_ORG_NO
       - REGISTRY_SE_VAT_NO
       - DNS_PT_VAT
@@ -22275,6 +22775,7 @@ components:
       - INTERNET_EE_IDENT_TYPE
       - INTERNET_EE_IDENT_CC
       - INTERNET_EE_IDENT_VALUE
+      - SPONSORING_CLIENT_ID
       title: RegistryHandleAttributeType
       type: string
     RegistryLockBase:
@@ -22370,6 +22871,7 @@ components:
       - cocca
       - amazon
       - tango
+      - nic_cl
       title: RegistryServiceBackend
       type: string
     RenewalMode:
@@ -24769,14 +25271,7 @@ components:
             $ref: '#/components/schemas/VerificationDeadline'
           title: Deadlines
           type: array
-        sources:
-          description: 'Who asks for the verification: ICANN, the registry or both'
-          items:
-            $ref: '#/components/schemas/DomainVerificationKind'
-          title: Sources
-          type: array
       required:
-      - sources
       - claims
       title: VerificationResponse
       type: object
@@ -25416,6 +25911,139 @@ components:
       - tags
       title: ZoneIncludeField
       type: string
+    ZoneNxdomainNameResponse:
+      properties:
+        first_listed_date:
+          description: First day in the window the name was listed on (UTC)
+          format: date
+          title: First Listed Date
+          type: string
+        last_listed_date:
+          description: Last day in the window the name was listed on (UTC)
+          format: date
+          title: Last Listed Date
+          type: string
+        listed_days:
+          description: 'Days in the window the name was listed on: days with more
+            than 30 NXDOMAIN answers to it'
+          title: Listed Days
+          type: integer
+        nxdomain_count:
+          description: NXDOMAIN answers to this name and type in the window, summed
+            over the days it was listed on
+          title: Nxdomain Count
+          type: integer
+        qname:
+          description: The name queried, with a trailing dot
+          title: Qname
+          type: string
+        qtype:
+          description: The type it was queried with, such as A, AAAA or TXT
+          title: Qtype
+          type: string
+      required:
+      - qname
+      - qtype
+      - nxdomain_count
+      - listed_days
+      - first_listed_date
+      - last_listed_date
+      title: ZoneNxdomainNameResponse
+      type: object
+    ZoneNxdomainStatisticsResponse:
+      properties:
+        data_available_from:
+          anyOf:
+          - format: date
+            type: string
+          - type: 'null'
+          description: 'First day names are kept for: 30 days before today, or the
+            day the zone was created if that is later. Null while none are kept'
+          title: Data Available From
+        data_available_to:
+          anyOf:
+          - format: date
+            type: string
+          - type: 'null'
+          description: Last day names are kept for, usually today. Null while none
+            are
+          title: Data Available To
+        data_complete_to:
+          anyOf:
+          - format: date
+            type: string
+          - type: 'null'
+          description: Newest day whose list is final, usually yesterday from 02:00
+            UTC on. The days after it are still counting. Null while there is none.
+            A day collection missed is not listed, and cannot be later
+          title: Data Complete To
+        end_date:
+          description: Last day of the window, inclusive
+          format: date
+          title: End Date
+          type: string
+        pagination:
+          $ref: '#/components/schemas/PaginationMetadata'
+        qtype:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: The query type the names are filtered by; null for all types
+          title: Qtype
+        results:
+          items:
+            $ref: '#/components/schemas/ZoneNxdomainNameResponse'
+          title: Results
+          type: array
+        start_date:
+          description: First day of the window, inclusive. Counts start no earlier
+            than the day the zone was created, which is counted whole, with answers
+            from before the zone existed
+          format: date
+          title: Start Date
+          type: string
+        totals:
+          $ref: '#/components/schemas/ZoneNxdomainTotalsResponse'
+        zone_name:
+          description: The zone the names belong to, with a trailing dot
+          title: Zone Name
+          type: string
+      required:
+      - results
+      - pagination
+      - zone_name
+      - start_date
+      - end_date
+      - qtype
+      - totals
+      - data_available_from
+      - data_available_to
+      - data_complete_to
+      title: ZoneNxdomainStatisticsResponse
+      type: object
+    ZoneNxdomainTotalsResponse:
+      properties:
+        listed_nxdomain_count:
+          description: NXDOMAIN answers to all listed names in the window of `qtype`,
+            not only those on this page
+          title: Listed Nxdomain Count
+          type: integer
+        nxdomain_count:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          description: All NXDOMAIN answers of the zone in the window, of all query
+            types, from the daily zone statistics. These end yesterday at the latest,
+            while the list includes today so far. Without `qtype` and with a window
+            that ends yesterday at the latest, the difference to `listed_nxdomain_count`
+            are names with at most 30 NXDOMAIN answers a day, which are not listed.
+            Null when the daily statistics hold no day of the window
+          title: Nxdomain Count
+      required:
+      - nxdomain_count
+      - listed_nxdomain_count
+      title: ZoneNxdomainTotalsResponse
+      type: object
     ZoneSortField:
       enum:
       - name
@@ -25426,28 +26054,69 @@ components:
       type: string
     ZoneStatisticsBucketResponse:
       properties:
+        covered_from:
+          anyOf:
+          - format: date
+            type: string
+          - type: 'null'
+          description: 'First day the bucket''s counts include: the latest of `period_start`,
+            `start_date` and `data_available_from`. A month the window cuts is summed
+            from the daily statistics, which are kept for 25 months, so in a month
+            older than that it is also no earlier than the oldest day still kept.
+            Null when the bucket is not covered: none of its days lies within both
+            the window and the stored data'
+          title: Covered From
+        covered_to:
+          anyOf:
+          - format: date
+            type: string
+          - type: 'null'
+          description: 'Last day the bucket''s counts include: the earliest of `period_end`,
+            `end_date` and `data_available_to`. Null when the bucket is not covered'
+          title: Covered To
         nxdomain_count:
-          description: Of those, queries answered with NXDOMAIN
+          anyOf:
+          - type: integer
+          - type: 'null'
+          description: Of those, queries answered with NXDOMAIN. Null when the bucket
+            is not covered
           title: Nxdomain Count
-          type: integer
         partial:
-          description: 'The bucket counts only part of its span: it reaches outside
-            the window (a week or month the window cuts), part of it lies before `data_available_from`
-            or after `data_available_to`, or the zone was created during it. A partial
-            bucket must not be read as a rise or fall against its neighbours.'
+          description: 'True when the counts are not those of the whole bucket: `covered_from`..`covered_to`
+            is shorter than `period_start`..`period_end` because the window or the
+            stored data cuts it, or the bucket is the first month of monthly statistics
+            older than the daily ones (see `data_available_from`), whose first day
+            of data is not known. Also true for a bucket that is not covered, which
+            has no counts. A partial bucket must not be read as a rise or fall against
+            its neighbours. Also true when `covered_from` is the day the zone was
+            created: that day is counted whole, with the queries from before the zone
+            existed'
           title: Partial
           type: boolean
+        period_end:
+          description: 'Last day of the bucket (UTC): the day itself, the Sunday of
+            its week, or the last day of its month'
+          format: date
+          title: Period End
+          type: string
         period_start:
           description: First day of the bucket (UTC)
           format: date
           title: Period Start
           type: string
         query_count:
-          description: Queries answered for the zone in this bucket, within the window
+          anyOf:
+          - type: integer
+          - type: 'null'
+          description: 'Queries answered for the zone from `covered_from` to `covered_to`;
+            0 when none were recorded. Null when the bucket is not covered: no data,
+            rather than no queries'
           title: Query Count
-          type: integer
       required:
       - period_start
+      - period_end
+      - covered_from
+      - covered_to
       - query_count
       - nxdomain_count
       - partial
@@ -25457,7 +26126,7 @@ components:
       properties:
         buckets:
           description: One entry per bucket the window touches, oldest first, including
-            buckets without queries
+            buckets without queries (0) and buckets without data (null)
           items:
             $ref: '#/components/schemas/ZoneStatisticsBucketResponse'
           title: Buckets
@@ -25468,18 +26137,22 @@ components:
             type: string
           - type: 'null'
           description: 'First day the statistics hold data for the zone: the day collection
-            started, or the day the zone was created if that is later. Buckets before
-            it count zero because nothing was recorded, not because the zone had no
-            queries. Null while no statistics have been collected since the zone was
-            created.'
+            started, or the day the zone was created if that is later. Buckets count
+            no day before it; one left without a day to count carries null counts.
+            Null while no statistics have been collected since the zone was created;
+            then every bucket carries null counts. At `granularity=month`, once the
+            daily statistics older than 25 months have been deleted, it is the first
+            day of the oldest month the monthly statistics hold; the day the data
+            starts on within that month is no longer known.'
           title: Data Available From
         data_available_to:
           anyOf:
           - format: date
             type: string
           - type: 'null'
-          description: Last day the statistics hold data for. Null while no statistics
-            have been collected since the zone was created.
+          description: Last day the statistics hold data for. Buckets count no day
+            after it; one left without a day to count carries null counts. Null while
+            no statistics have been collected since the zone was created.
           title: Data Available To
         end_date:
           description: Last day of the window, inclusive
@@ -25514,13 +26187,19 @@ components:
     ZoneStatisticsTotalsResponse:
       properties:
         nxdomain_count:
-          description: Of those, queries answered with NXDOMAIN
+          anyOf:
+          - type: integer
+          - type: 'null'
+          description: Of those, queries answered with NXDOMAIN. Null when no bucket
+            is covered
           title: Nxdomain Count
-          type: integer
         query_count:
-          description: Queries answered for the zone in the window
+          anyOf:
+          - type: integer
+          - type: 'null'
+          description: Queries answered for the zone, summed over the covered buckets.
+            Null when no bucket is covered
           title: Query Count
-          type: integer
       required:
       - query_count
       - nxdomain_count
@@ -26006,7 +26685,7 @@ info:
     \n\n"
   summary: OpusDNS - your gateway to a seamless domain management experience.
   title: OpusDNS API
-  version: 2026-10-22-115450
+  version: 2026-10-28-202519
   x-logo:
     altText: OpusDNS API Reference
     url: https://d24lr4zqs1tgqh.cloudfront.net/c9505a20-5ae1-406c-b060-d392569caebf.jpg
@@ -28308,7 +28987,7 @@ paths:
                 Data:
                   description: Returns individual domains' availability
                   summary: Availability data
-                  value: 'data: {"domain":"example.com","status":"unavailable"}'
+                  value: 'data: {"domain":"example.com","status":"unavailable","marketplace":null}'
                 Event:
                   description: Returned when an event occurs
                   summary: Event
@@ -28365,7 +29044,7 @@ paths:
                 Data:
                   description: Returns individual domains' availability
                   summary: Availability data
-                  value: 'data: {"domain":"example.com","status":"unavailable"}'
+                  value: 'data: {"domain":"example.com","status":"unavailable","marketplace":null}'
                 Event:
                   description: Returned when an event occurs
                   summary: Event
@@ -28568,6 +29247,16 @@ paths:
           - type: 'null'
           description: Filter by country
           title: Country
+      - description: Filter by the completeness recorded when the contact was stored
+        in: query
+        name: completeness
+        required: false
+        schema:
+          anyOf:
+          - $ref: '#/components/schemas/ContactCompleteness'
+          - type: 'null'
+          description: Filter by the completeness recorded when the contact was stored
+          title: Completeness
       - description: Filter by whether the contact is in use by any domain (true =
           has domains, false = none)
         in: query
@@ -28982,6 +29671,9 @@ paths:
       - contacts:manage
   /v1/contacts/verification:
     get:
+      deprecated: true
+      description: Serves the link in the verification mail; not meant for integrations.
+        Replaced by GET /v1/contacts/verification-challenges/{token}.
       operationId: get_verification_by_token_v1_contacts_verification_get
       parameters:
       - in: query
@@ -29014,25 +29706,53 @@ paths:
           content:
             application/problem+json:
               example:
-                code: ERROR_CONTACT_VERIFICATION_NOT_FOUND
-                detail: No contact verification found
+                code: ERROR_VERIFICATION_CHALLENGE_NOT_FOUND
+                detail: The verification link is unknown or incomplete
                 status: 404
-                title: Contact Management Error
-                token: Additional error context.
-                type: contact-verification-not-found
+                title: Verification Challenge Not Found
+                type: verification-challenge-not-found
               schema:
                 $ref: '#/components/schemas/Problem'
           description: Not Found
+        '410':
+          content:
+            application/problem+json:
+              example:
+                code: ERROR_VERIFICATION_CHALLENGE_EXPIRED
+                detail: The verification link expired on 2026-01-15
+                expired_on: '2026-01-15T00:00:00+00:00'
+                organization_id: organization_01h45ytscbebyvny4gc8cr8ma2
+                status: 410
+                title: Verification Challenge Expired
+                type: verification-challenge-expired
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Gone
         '422':
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
           description: Validation Error
+        '502':
+          content:
+            application/problem+json:
+              example:
+                code: ERROR_CONTACT_VERIFICATION_UPSTREAM_ERROR
+                detail: Additional error context.
+                status: 502
+                title: Contact Verification Service Error
+                type: contact-verification-upstream
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Bad Gateway
       summary: Retrieve contact verification by token
       tags:
       - contact
     put:
+      deprecated: true
+      description: Serves the link in the verification mail; not meant for integrations.
+        Replaced by POST /v1/contacts/verification-challenges/{token}/confirm.
       operationId: update_verification_by_token_v1_contacts_verification_put
       parameters:
       - in: query
@@ -29045,21 +29765,6 @@ paths:
       responses:
         '204':
           description: Successful Response
-        '400':
-          content:
-            application/problem+json:
-              examples:
-                Contact Management Error:
-                  value:
-                    code: ERROR_INVALID_VERIFICATION_TOKEN
-                    contact_id: Additional error context.
-                    detail: Invalid verification token
-                    status: 400
-                    title: Contact Management Error
-                    type: contact-verification-token-invalid
-              schema:
-                $ref: '#/components/schemas/Problem'
-          description: Bad Request
         '401':
           content:
             application/problem+json:
@@ -29076,26 +29781,53 @@ paths:
           content:
             application/problem+json:
               example:
-                code: ERROR_CONTACT_VERIFICATION_NOT_FOUND
-                detail: No contact verification found
+                code: ERROR_VERIFICATION_CHALLENGE_NOT_FOUND
+                detail: The verification link is unknown or incomplete
                 status: 404
-                title: Contact Management Error
-                token: Additional error context.
-                type: contact-verification-not-found
+                title: Verification Challenge Not Found
+                type: verification-challenge-not-found
               schema:
                 $ref: '#/components/schemas/Problem'
           description: Not Found
+        '410':
+          content:
+            application/problem+json:
+              example:
+                code: ERROR_VERIFICATION_CHALLENGE_EXPIRED
+                detail: The verification link expired on 2026-01-15
+                expired_on: '2026-01-15T00:00:00+00:00'
+                organization_id: organization_01h45ytscbebyvny4gc8cr8ma2
+                status: 410
+                title: Verification Challenge Expired
+                type: verification-challenge-expired
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Gone
         '422':
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
           description: Validation Error
+        '502':
+          content:
+            application/problem+json:
+              example:
+                code: ERROR_CONTACT_VERIFICATION_UPSTREAM_ERROR
+                detail: Additional error context.
+                status: 502
+                title: Contact Verification Service Error
+                type: contact-verification-upstream
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Bad Gateway
       summary: Complete contact verification with token
       tags:
       - contact
   /v1/contacts/verify:
     get:
+      deprecated: true
+      description: Serves the link in the verification mail; not meant for integrations.
       operationId: email_verify_contact_v1_contacts_verify_get
       parameters:
       - in: query
@@ -29327,6 +30059,9 @@ paths:
       - contacts:manage
   /v1/contacts/{contact_id}/verification:
     delete:
+      deprecated: true
+      description: 'Deprecated: an ICANN verification case closes with its domain;
+        there is nothing to cancel.'
       operationId: cancel_verification_v1_contacts__contact_id__verification_delete
       parameters:
       - in: path
@@ -29384,6 +30119,9 @@ paths:
       x-required-permissions:
       - contacts:manage
     get:
+      deprecated: true
+      description: 'Deprecated: follow the verification through the domain''s cases
+        (GET /v1/domains/{domain_reference}/verifications).'
       operationId: get_verification_status_v1_contacts__contact_id__verification_get
       parameters:
       - in: path
@@ -29445,6 +30183,9 @@ paths:
       x-required-permissions:
       - contacts:manage
     post:
+      deprecated: true
+      description: 'Deprecated: an ICANN verification case asks the registrant when
+        it opens; follow it with GET /v1/domains/{domain_reference}/verifications.'
       operationId: start_contact_verification_v1_contacts__contact_id__verification_post
       parameters:
       - in: path
@@ -29527,6 +30268,10 @@ paths:
       x-required-permissions:
       - contacts:manage
     put:
+      deprecated: true
+      description: 'Deprecated: an organization with delegated contact verification
+        confirms the registrant''s email by attesting its EMAIL reachability (POST
+        /v1/contacts/{contact_id}/verifications/attest).'
       operationId: update_verification_v1_contacts__contact_id__verification_put
       parameters:
       - in: path
@@ -29593,13 +30338,132 @@ paths:
         '404':
           content:
             application/problem+json:
+              examples:
+                Contact Management Error:
+                  value:
+                    code: ERROR_CONTACT_VERIFICATION_NOT_FOUND
+                    detail: No contact verification found
+                    status: 404
+                    title: Contact Management Error
+                    token: Additional error context.
+                    type: contact-verification-not-found
+                Verification Challenge Not Found:
+                  value:
+                    code: ERROR_VERIFICATION_CHALLENGE_NOT_FOUND
+                    detail: The verification link is unknown or incomplete
+                    status: 404
+                    title: Verification Challenge Not Found
+                    type: verification-challenge-not-found
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Found
+        '410':
+          content:
+            application/problem+json:
               example:
-                code: ERROR_CONTACT_VERIFICATION_NOT_FOUND
-                detail: No contact verification found
+                code: ERROR_VERIFICATION_CHALLENGE_EXPIRED
+                detail: The verification link expired on 2026-01-15
+                expired_on: '2026-01-15T00:00:00+00:00'
+                organization_id: organization_01h45ytscbebyvny4gc8cr8ma2
+                status: 410
+                title: Verification Challenge Expired
+                type: verification-challenge-expired
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Gone
+        '422':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+        '502':
+          content:
+            application/problem+json:
+              example:
+                code: ERROR_CONTACT_VERIFICATION_UPSTREAM_ERROR
+                detail: Additional error context.
+                status: 502
+                title: Contact Verification Service Error
+                type: contact-verification-upstream
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Bad Gateway
+      security:
+      - OAuth2PasswordBearer: []
+      - APIKeyHeader: []
+      summary: Complete contact verification by contact ID
+      tags:
+      - contact
+      x-required-permissions:
+      - contacts:manage
+  /v1/contacts/{contact_id}/verification-cases:
+    get:
+      description: 'Lists the verification cases about a contact on its organization''s
+        domains, active and closed, newest first:
+
+        which domains ask to verify the contact, what, by when, and how each case
+        ended.'
+      operationId: list_contact_verification_cases_v1_contacts__contact_id__verification_cases_get
+      parameters:
+      - in: path
+        name: contact_id
+        required: true
+        schema:
+          examples:
+          - contact_01h45ytscbebyvny4gc8cr8ma2
+          format: typeid
+          pattern: ^contact_[0-7][0-9a-hjkmnpq-tv-z]{25}$
+          title: Contact Id
+          type: string
+          x-typeid-prefix: contact
+      - in: query
+        name: page
+        required: false
+        schema:
+          default: 1
+          minimum: 1
+          title: Page
+          type: integer
+      - in: query
+        name: page_size
+        required: false
+        schema:
+          default: 10
+          maximum: 1000
+          minimum: 1
+          title: Page Size
+          type: integer
+      - $ref: '#/components/parameters/DatetimeFormatHeader'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pagination_ContactVerificationCaseResponse_'
+          description: Successful Response
+        '401':
+          content:
+            application/problem+json:
+              example:
+                code: ERROR_AUTHENTICATION
+                detail: Additional error context.
+                status: 401
+                title: Authentication Error
+                type: authentication
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Unauthorized
+        '404':
+          content:
+            application/problem+json:
+              example:
+                code: ERROR_CONTACT_NOT_FOUND
+                contact_id: Additional error context.
+                detail: Contact not found
                 status: 404
                 title: Contact Management Error
-                token: Additional error context.
-                type: contact-verification-not-found
+                type: contact-not-found
               schema:
                 $ref: '#/components/schemas/Problem'
           description: Not Found
@@ -29612,11 +30476,11 @@ paths:
       security:
       - OAuth2PasswordBearer: []
       - APIKeyHeader: []
-      summary: Complete contact verification by contact ID
+      summary: List the verification cases of a contact
       tags:
       - contact
       x-required-permissions:
-      - contacts:manage
+      - contacts:read
   /v1/contacts/{contact_id}/verifications:
     get:
       description: Retrieve the current verification state for a contact from the
@@ -30598,9 +31462,12 @@ paths:
 
 
         Every bucket the window touches is present, oldest first, so the series can
-        be charted as is; a bucket without queries counts zero. A bucket marked `partial`
-        covers only part of its span. Statistics are collected once a day, so the
-        newest day with data is usually yesterday.'
+        be charted as is. A bucket counts the days it shares with the window and with
+        `data_available_from`..`data_available_to`, from `covered_from` to `covered_to`;
+        without a recorded query on them it counts zero. A bucket without such a day
+        carries null counts: no data, rather than no queries. A bucket marked `partial`
+        counts only part of its span; one with null counts is partial too. Statistics
+        are collected once a day, so the newest day with data is usually yesterday.'
       operationId: get_dns_statistics_v1_dns_statistics_get
       parameters:
       - description: First day of the window, inclusive (YYYY-MM-DD, UTC)
@@ -30657,18 +31524,27 @@ paths:
                   summary: Daily series
                   value:
                     buckets:
-                    - nxdomain_count: 17000
+                    - covered_from: '2026-10-18'
+                      covered_to: '2026-10-18'
+                      nxdomain_count: 17000
                       partial: false
+                      period_end: '2026-10-18'
                       period_start: '2026-10-18'
                       query_count: 640000
                       zone_count: 412
-                    - nxdomain_count: 23000
+                    - covered_from: '2026-10-19'
+                      covered_to: '2026-10-19'
+                      nxdomain_count: 23000
                       partial: false
+                      period_end: '2026-10-19'
                       period_start: '2026-10-19'
                       query_count: 910000
                       zone_count: 418
-                    - nxdomain_count: 21000
+                    - covered_from: '2026-10-20'
+                      covered_to: '2026-10-20'
+                      nxdomain_count: 21000
                       partial: false
+                      period_end: '2026-10-20'
                       period_start: '2026-10-20'
                       query_count: 830000
                       zone_count: 415
@@ -30681,6 +31557,41 @@ paths:
                     totals:
                       nxdomain_count: 61000
                       query_count: 2380000
+                monthly:
+                  description: 'Calendar months; collection started on 24 April: March
+                    holds no data and carries null counts, April counts from the 24th
+                    and is partial, May is counted whole'
+                  summary: Monthly series
+                  value:
+                    buckets:
+                    - partial: true
+                      period_end: '2026-03-31'
+                      period_start: '2026-03-01'
+                    - covered_from: '2026-04-24'
+                      covered_to: '2026-04-30'
+                      nxdomain_count: 150000
+                      partial: true
+                      period_end: '2026-04-30'
+                      period_start: '2026-04-01'
+                      query_count: 5600000
+                      zone_count: 395
+                    - covered_from: '2026-05-01'
+                      covered_to: '2026-05-31'
+                      nxdomain_count: 660000
+                      partial: false
+                      period_end: '2026-05-31'
+                      period_start: '2026-05-01'
+                      query_count: 25400000
+                      zone_count: 431
+                    data_available_from: '2026-04-24'
+                    data_available_to: '2026-10-20'
+                    end_date: '2026-05-31'
+                    granularity: month
+                    start_date: '2026-03-01'
+                    statistics_updated_at: '2026-10-21T07:12:03Z'
+                    totals:
+                      nxdomain_count: 810000
+                      query_count: 31000000
               schema:
                 $ref: '#/components/schemas/DnsStatisticsResponse'
           description: Statistics retrieved successfully
@@ -32305,16 +33216,18 @@ paths:
 
 
         Every bucket the window touches is present, oldest first, so the series can
-        be charted as is; a bucket without queries counts zero. Buckets count only
-        the days inside the window and the zone''s lifetime. A bucket marked `partial`
-        covers only part of its span: it reaches outside the window, part of it lies
-        outside the stored data, or the zone was created during it.
+        be charted as is. A bucket counts the days it shares with the window and with
+        `data_available_from`..`data_available_to`, from `covered_from` to `covered_to`;
+        without a recorded query on them it counts zero. A bucket without such a day
+        carries null counts: no data, rather than no queries. A bucket marked `partial`
+        counts only part of its span, because the window or the stored data cuts it,
+        or starts on the day the zone was created, which is counted whole. A bucket
+        with null counts is partial too.
 
 
         Statistics are collected once a day, so the newest day with data is usually
         yesterday. `data_available_from` and `data_available_to` report the days the
-        statistics hold data for the zone, never earlier than the day it was created:
-        a window reaching further back is empty before it rather than genuinely zero.'
+        statistics hold data for the zone, never earlier than the day it was created.'
       operationId: get_zone_statistics_v1_dns__zone_name__statistics_get
       parameters:
       - description: DNS zone name (trailing dot optional)
@@ -32368,16 +33281,25 @@ paths:
                   summary: Daily series
                   value:
                     buckets:
-                    - nxdomain_count: 40
+                    - covered_from: '2026-10-01'
+                      covered_to: '2026-10-01'
+                      nxdomain_count: 40
                       partial: false
+                      period_end: '2026-10-01'
                       period_start: '2026-10-01'
                       query_count: 1200
-                    - nxdomain_count: 0
+                    - covered_from: '2026-10-02'
+                      covered_to: '2026-10-02'
+                      nxdomain_count: 0
                       partial: false
+                      period_end: '2026-10-02'
                       period_start: '2026-10-02'
                       query_count: 0
-                    - nxdomain_count: 30
+                    - covered_from: '2026-10-03'
+                      covered_to: '2026-10-03'
+                      nxdomain_count: 30
                       partial: false
+                      period_end: '2026-10-03'
                       period_start: '2026-10-03'
                       query_count: 700
                     data_available_from: '2026-06-01'
@@ -32390,31 +33312,37 @@ paths:
                       query_count: 1900
                     zone_name: example.com.
                 monthly:
-                  description: Calendar months; the last month is partial because
-                    the window ends before it does
+                  description: 'Calendar months of a zone created on 12 August: July
+                    holds no data and carries null counts, August counts from the
+                    12th and is partial, September is counted whole'
                   summary: Monthly series
                   value:
                     buckets:
-                    - nxdomain_count: 300
-                      partial: false
+                    - partial: true
+                      period_end: '2026-07-31'
+                      period_start: '2026-07-01'
+                    - covered_from: '2026-08-12'
+                      covered_to: '2026-08-31'
+                      nxdomain_count: 300
+                      partial: true
+                      period_end: '2026-08-31'
                       period_start: '2026-08-01'
                       query_count: 9000
-                    - nxdomain_count: 1100
+                    - covered_from: '2026-09-01'
+                      covered_to: '2026-09-30'
+                      nxdomain_count: 1100
                       partial: false
+                      period_end: '2026-09-30'
                       period_start: '2026-09-01'
                       query_count: 30000
-                    - nxdomain_count: 500
-                      partial: true
-                      period_start: '2026-10-01'
-                      query_count: 13000
-                    data_available_from: '2026-06-01'
+                    data_available_from: '2026-08-12'
                     data_available_to: '2026-10-19'
-                    end_date: '2026-10-14'
+                    end_date: '2026-09-30'
                     granularity: month
-                    start_date: '2026-08-01'
+                    start_date: '2026-07-01'
                     totals:
-                      nxdomain_count: 1900
-                      query_count: 52000
+                      nxdomain_count: 1400
+                      query_count: 39000
                     zone_name: example.com.
                 weekly:
                   description: Weeks start on Monday. The window runs from a Wednesday
@@ -32423,16 +33351,25 @@ paths:
                   summary: Weekly series
                   value:
                     buckets:
-                    - nxdomain_count: 200
+                    - covered_from: '2026-09-30'
+                      covered_to: '2026-10-04'
+                      nxdomain_count: 200
                       partial: true
+                      period_end: '2026-10-04'
                       period_start: '2026-09-28'
                       query_count: 6000
-                    - nxdomain_count: 380
+                    - covered_from: '2026-10-05'
+                      covered_to: '2026-10-11'
+                      nxdomain_count: 380
                       partial: false
+                      period_end: '2026-10-11'
                       period_start: '2026-10-05'
                       query_count: 10500
-                    - nxdomain_count: 60
+                    - covered_from: '2026-10-12'
+                      covered_to: '2026-10-13'
+                      nxdomain_count: 60
                       partial: true
+                      period_end: '2026-10-18'
                       period_start: '2026-10-12'
                       query_count: 1500
                     data_available_from: '2026-06-01'
@@ -32524,6 +33461,218 @@ paths:
       - OAuth2PasswordBearer: []
       - APIKeyHeader: []
       summary: Get zone query statistics
+      tags:
+      - dns
+      x-required-permissions:
+      - dns:read
+  /v1/dns/{zone_name}/statistics/nxdomains:
+    get:
+      description: 'Lists the names queried in the zone that do not exist in it, answered
+        with NXDOMAIN, with the type they were queried with, summed over a window
+        of at most 31 whole UTC days and ordered by count, largest first. Use it to
+        find what causes the NXDOMAIN answers of `GET /v1/dns/{zone_name}/statistics`:
+        typos, removed records, or clients probing for names such as `autodiscover`.
+
+
+        A name is listed only on days with more than 30 NXDOMAIN answers to it; `totals.listed_nxdomain_count`
+        sums the listed names, `totals.nxdomain_count` all NXDOMAIN answers of the
+        zone from the daily statistics, which end yesterday. The names are kept for
+        30 days plus today and are updated hourly; `data_complete_to` is the newest
+        day whose list is final, usually yesterday. Days before the zone was created
+        are not counted.'
+      operationId: list_zone_nxdomains_v1_dns__zone_name__statistics_nxdomains_get
+      parameters:
+      - description: DNS zone name (trailing dot optional)
+        in: path
+        name: zone_name
+        required: true
+        schema:
+          description: DNS zone name (trailing dot optional)
+          title: Zone Name
+          type: string
+      - description: First day of the window, inclusive (YYYY-MM-DD, UTC)
+        in: query
+        name: start_date
+        required: true
+        schema:
+          description: First day of the window, inclusive (YYYY-MM-DD, UTC)
+          format: date
+          title: Start Date
+          type: string
+      - description: 'Last day of the window, inclusive (YYYY-MM-DD, UTC). The window
+          spans at most 31 days, both ends included: the names are kept for 30 days
+          plus today'
+        in: query
+        name: end_date
+        required: true
+        schema:
+          description: 'Last day of the window, inclusive (YYYY-MM-DD, UTC). The window
+            spans at most 31 days, both ends included: the names are kept for 30 days
+            plus today'
+          format: date
+          title: End Date
+          type: string
+      - description: Only names queried with this type, such as A, AAAA or TXT
+        in: query
+        name: qtype
+        required: false
+        schema:
+          anyOf:
+          - pattern: ^[A-Za-z0-9]{1,16}$
+            type: string
+          - type: 'null'
+          description: Only names queried with this type, such as A, AAAA or TXT
+          title: Qtype
+      - description: Page number
+        in: query
+        name: page
+        required: false
+        schema:
+          default: 1
+          description: Page number
+          maximum: 1000
+          minimum: 1
+          title: Page
+          type: integer
+      - description: Names per page
+        in: query
+        name: page_size
+        required: false
+        schema:
+          default: 100
+          description: Names per page
+          maximum: 1000
+          minimum: 1
+          title: Page Size
+          type: integer
+      - $ref: '#/components/parameters/DatetimeFormatHeader'
+      responses:
+        '200':
+          content:
+            application/json:
+              examples:
+                seven_days:
+                  description: Three names, two of them queried for addresses on every
+                    day. Today, the 23rd, is still counting (`data_complete_to` is
+                    the 22nd), and `totals.nxdomain_count` ends yesterday
+                  summary: Seven days up to today
+                  value:
+                    data_available_from: '2026-09-23'
+                    data_available_to: '2026-10-23'
+                    data_complete_to: '2026-10-22'
+                    end_date: '2026-10-23'
+                    pagination:
+                      current_page: 1
+                      has_next_page: false
+                      has_previous_page: false
+                      page_size: 100
+                      total_items: 3
+                      total_pages: 1
+                    results:
+                    - first_listed_date: '2026-10-17'
+                      last_listed_date: '2026-10-23'
+                      listed_days: 7
+                      nxdomain_count: 9120
+                      qname: autodiscover.example.com.
+                      qtype: A
+                    - first_listed_date: '2026-10-17'
+                      last_listed_date: '2026-10-23'
+                      listed_days: 7
+                      nxdomain_count: 6870
+                      qname: autodiscover.example.com.
+                      qtype: AAAA
+                    - first_listed_date: '2026-10-18'
+                      last_listed_date: '2026-10-22'
+                      listed_days: 5
+                      nxdomain_count: 2250
+                      qname: _dmarc.example.com.
+                      qtype: TXT
+                    start_date: '2026-10-17'
+                    totals:
+                      listed_nxdomain_count: 18240
+                      nxdomain_count: 19105
+                    zone_name: example.com.
+              schema:
+                $ref: '#/components/schemas/ZoneNxdomainStatisticsResponse'
+          description: NXDOMAIN names retrieved successfully
+        '400':
+          content:
+            application/problem+json:
+              example:
+                code: ERROR_ZONE_STATISTICS_QUERY
+                detail: invalid 'qtype' (expected a record type such as A, AAAA or
+                  TXT)
+                status: 400
+                title: Zone statistics query rejected.
+                type: zone-stats-query-rejected
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Bad Request
+        '401':
+          content:
+            application/problem+json:
+              example:
+                code: ERROR_AUTHENTICATION
+                detail: Additional error context.
+                status: 401
+                title: Authentication Error
+                type: authentication
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Unauthorized
+        '403':
+          content:
+            application/problem+json:
+              example:
+                code: ERROR_PERMISSION_DENIED
+                detail: Insufficient permissions to perform this action
+                status: 403
+                title: Permission Denied
+                type: permission-denied
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Forbidden
+        '422':
+          content:
+            application/problem+json:
+              example:
+                code: ERROR_ZONE_STATISTICS_WINDOW
+                detail: The window must not exceed 31 days
+                status: 422
+                title: Invalid zone statistics window.
+                type: zone-stats-invalid-window
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Unprocessable Content
+        '501':
+          content:
+            application/problem+json:
+              example:
+                code: ERROR_ZONE_STATISTICS_NOT_AVAILABLE
+                detail: Zone statistics are not available in this environment.
+                status: 501
+                title: Zone statistics not available.
+                type: zone-stats-not-available
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Implemented
+        '503':
+          content:
+            application/problem+json:
+              example:
+                code: ERROR_ZONE_STATISTICS_UNAVAILABLE
+                detail: Zone statistics are currently unavailable, please try again
+                  later.
+                status: 503
+                title: Zone statistics unavailable.
+                type: zone-stats-unavailable
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Service Unavailable
+      security:
+      - OAuth2PasswordBearer: []
+      - APIKeyHeader: []
+      summary: List the names of a zone answered with NXDOMAIN
       tags:
       - dns
       x-required-permissions:
@@ -35831,13 +36980,28 @@ paths:
         '422':
           content:
             application/problem+json:
-              example:
-                code: ERROR_CLAIMS_NOTICE_HASH_MISMATCH
-                detail: The provided claims notice acceptance hash does not match
-                domain_name: Additional error context.
-                status: 422
-                title: Domain Management Error
-                type: claims-notice-hash-mismatch
+              examples:
+                Contact Incomplete:
+                  value:
+                    code: ERROR_CONTACT_INCOMPLETE
+                    contact_id: contact_01h45ytscbebyvny4gc8cr8ma2
+                    detail: Contact contact_01h45ytscbebyvny4gc8cr8ma2 is incomplete
+                      (phone, postal_code) and can only stay in a domain role it already
+                      holds; complete it in a new contact and use that one
+                    incomplete_fields:
+                    - phone
+                    - postal_code
+                    status: 422
+                    title: Contact Incomplete
+                    type: contact-incomplete
+                Domain Management Error:
+                  value:
+                    code: ERROR_CLAIMS_NOTICE_HASH_MISMATCH
+                    detail: The provided claims notice acceptance hash does not match
+                    domain_name: Additional error context.
+                    status: 422
+                    title: Domain Management Error
+                    type: claims-notice-hash-mismatch
               schema:
                 $ref: '#/components/schemas/Problem'
           description: Unprocessable Content
@@ -36036,15 +37200,19 @@ paths:
         a connected external registrar are not included.
 
 
-        Every bucket the window touches is present, so the series can be charted as
-        is. A bucket marked `partial` reaches outside the window and covers only part
-        of its span.
+        Every bucket the window touches is present, oldest first, so the series can
+        be charted as is. A bucket counts the days it shares with the window, from
+        the day of `data_available_from` and up to today, from `covered_from` to `covered_to`;
+        without a movement on them it counts zero. A bucket without such a day carries
+        null counts: no data, rather than no movement. A bucket marked `partial` does
+        not count its whole span: the window, the start of the event log or today
+        cuts it, it includes the day the log begins on (unless at midnight), or it
+        reaches today, which is still running. A bucket with null counts is partial
+        too.
 
 
         These counts are read from the domain event log, which begins later than the
-        domains themselves. `data_available_from` reports the oldest event it holds:
-        a window reaching further back is empty before that instant rather than genuinely
-        zero.'
+        domains themselves; `data_available_from` reports the oldest event it holds.'
       operationId: get_domain_statistics_v1_domains_statistics_get
       parameters:
       - description: First day of the window, inclusive (YYYY-MM-DD, UTC)
@@ -37374,12 +38542,27 @@ paths:
         '422':
           content:
             application/problem+json:
-              example:
-                code: ERROR_POLICY_VALIDATION
-                detail: Additional error context.
-                status: 422
-                title: Policy Validation Error
-                type: policy-validation-error
+              examples:
+                Contact Incomplete:
+                  value:
+                    code: ERROR_CONTACT_INCOMPLETE
+                    contact_id: contact_01h45ytscbebyvny4gc8cr8ma2
+                    detail: Contact contact_01h45ytscbebyvny4gc8cr8ma2 is incomplete
+                      (phone, postal_code) and can only stay in a domain role it already
+                      holds; complete it in a new contact and use that one
+                    incomplete_fields:
+                    - phone
+                    - postal_code
+                    status: 422
+                    title: Contact Incomplete
+                    type: contact-incomplete
+                Policy Validation Error:
+                  value:
+                    code: ERROR_POLICY_VALIDATION
+                    detail: Additional error context.
+                    status: 422
+                    title: Policy Validation Error
+                    type: policy-validation-error
               schema:
                 $ref: '#/components/schemas/Problem'
           description: Unprocessable Content
@@ -37432,14 +38615,25 @@ paths:
         '409':
           content:
             application/problem+json:
-              example:
-                code: ERROR_DOMAIN_DELETE_PROHIBITED
-                detail: 'Domain deletion is prohibited due to current status: '
-                domain_name: Additional error context.
-                prohibiting_statuses: []
-                status: 409
-                title: Domain Management Error
-                type: domain-delete-prohibited
+              examples:
+                Domain Management Error:
+                  value:
+                    code: ERROR_DOMAIN_DELETE_PROHIBITED
+                    detail: 'Domain deletion is prohibited due to current status: '
+                    domain_name: Additional error context.
+                    prohibiting_statuses: []
+                    status: 409
+                    title: Domain Management Error
+                    type: domain-delete-prohibited
+                Domain Subscription Pending:
+                  value:
+                    code: ERROR_DOMAIN_SUBSCRIPTION_PENDING
+                    detail: The domain's subscription is not available yet; retry
+                      shortly
+                    domain_name: example.com
+                    status: 409
+                    title: Domain Subscription Pending
+                    type: domain-subscription-pending
               schema:
                 $ref: '#/components/schemas/Problem'
           description: Conflict
@@ -37605,14 +38799,29 @@ paths:
         '422':
           content:
             application/problem+json:
-              example:
-                code: ERROR_DOMAIN_REGISTRANT_CHANGE_NOT_SUPPORTED
-                detail: Registrant change is not supported for .lu domains
-                domain_name: example.lu
-                status: 422
-                title: Domain Management Error
-                tld: lu
-                type: domain-registrant-change-not-supported
+              examples:
+                Contact Incomplete:
+                  value:
+                    code: ERROR_CONTACT_INCOMPLETE
+                    contact_id: contact_01h45ytscbebyvny4gc8cr8ma2
+                    detail: Contact contact_01h45ytscbebyvny4gc8cr8ma2 is incomplete
+                      (phone, postal_code) and can only stay in a domain role it already
+                      holds; complete it in a new contact and use that one
+                    incomplete_fields:
+                    - phone
+                    - postal_code
+                    status: 422
+                    title: Contact Incomplete
+                    type: contact-incomplete
+                Domain Management Error:
+                  value:
+                    code: ERROR_DOMAIN_REGISTRANT_CHANGE_NOT_SUPPORTED
+                    detail: Registrant change is not supported for .lu domains
+                    domain_name: example.lu
+                    status: 422
+                    title: Domain Management Error
+                    tld: lu
+                    type: domain-registrant-change-not-supported
               schema:
                 $ref: '#/components/schemas/Problem'
           description: Unprocessable Content
@@ -38124,14 +39333,25 @@ paths:
         '409':
           content:
             application/problem+json:
-              example:
-                code: ERROR_DOMAIN_TRANSFER_ON_RENEW_PENDING
-                detail: A renewal already started the transfer of this domain into
-                  OpusDNS
-                domain_name: example.com
-                status: 409
-                title: Domain Management Error
-                type: domain-transfer-on-renew-pending
+              examples:
+                Domain Management Error:
+                  value:
+                    code: ERROR_DOMAIN_TRANSFER_ON_RENEW_PENDING
+                    detail: A renewal already started the transfer of this domain
+                      into OpusDNS
+                    domain_name: example.com
+                    status: 409
+                    title: Domain Management Error
+                    type: domain-transfer-on-renew-pending
+                Domain Subscription Pending:
+                  value:
+                    code: ERROR_DOMAIN_SUBSCRIPTION_PENDING
+                    detail: The domain's subscription is not available yet; retry
+                      shortly
+                    domain_name: example.com
+                    status: 409
+                    title: Domain Subscription Pending
+                    type: domain-subscription-pending
               schema:
                 $ref: '#/components/schemas/Problem'
           description: Conflict
@@ -38439,6 +39659,120 @@ paths:
       - domain
       x-required-permissions:
       - domains:read
+  /v1/domains/{domain_reference}/verifications/{verification_id}/resend:
+    post:
+      description: 'Mails the registrant a link to confirm the email an open ICANN
+        case waits on. The mail covers every open ICANN
+
+        case of that email in the organization and counts as a reminder: the scheduled
+        reminders resume at the first one
+
+        due more than 24 hours later. At most one mail goes to an email in 15 minutes;
+        an earlier request is answered 429
+
+        with `Retry-After`. Registry cases, closed cases, emails already confirmed
+        and organizations that confirm their
+
+        registrants'' emails themselves are answered 409 with the reason.'
+      operationId: resend_domain_verification_v1_domains__domain_reference__verifications__verification_id__resend_post
+      parameters:
+      - in: path
+        name: domain_reference
+        required: true
+        schema:
+          anyOf:
+          - examples:
+            - domain_01h45ytscbebyvny4gc8cr8ma2
+            format: typeid
+            pattern: ^domain_[0-7][0-9a-hjkmnpq-tv-z]{25}$
+            type: string
+            x-typeid-prefix: domain
+          - type: string
+          title: Domain Reference
+      - in: path
+        name: verification_id
+        required: true
+        schema:
+          examples:
+          - domain_verification_01h45ytscbebyvny4gc8cr8ma2
+          format: typeid
+          pattern: ^domain_verification_[0-7][0-9a-hjkmnpq-tv-z]{25}$
+          title: Verification Id
+          type: string
+          x-typeid-prefix: domain_verification
+      - $ref: '#/components/parameters/DatetimeFormatHeader'
+      responses:
+        '202':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DomainVerificationResponse'
+          description: Successful Response
+        '404':
+          content:
+            application/problem+json:
+              example:
+                code: ERROR_DOMAIN_VERIFICATION_NOT_FOUND
+                detail: The domain has no such verification case
+                domain_verification_id: domain_verification_01m5w99e88f858v5jt43w8v62x
+                status: 404
+                title: Domain Verification Not Found
+                type: domain-verification-not-found
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Not Found
+        '409':
+          content:
+            application/problem+json:
+              examples:
+                Domain Verification Busy:
+                  value:
+                    code: ERROR_DOMAIN_VERIFICATION_BUSY
+                    detail: The registrant's verification cases are being updated;
+                      retry shortly
+                    status: 409
+                    title: Domain Verification Busy
+                    type: domain-verification-busy
+                Domain Verification Not Resendable:
+                  value:
+                    code: ERROR_DOMAIN_VERIFICATION_NOT_RESENDABLE
+                    detail: The registrant has confirmed the email already
+                    domain_verification_id: domain_verification_01m5w99e88f858v5jt43w8v62x
+                    reason: CONFIRMED
+                    status: 409
+                    title: Domain Verification Not Resendable
+                    type: domain-verification-not-resendable
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Conflict
+        '422':
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+        '429':
+          content:
+            application/problem+json:
+              example:
+                code: ERROR_DOMAIN_VERIFICATION_RESEND_TOO_SOON
+                detail: The registrant's email was mailed moments ago; retry in 540
+                  seconds
+                domain_verification_id: domain_verification_01m5w99e88f858v5jt43w8v62x
+                status: 429
+                title: Domain Verification Resend Too Soon
+                type: domain-verification-resend-too-soon
+              schema:
+                $ref: '#/components/schemas/Problem'
+          description: Too Many Requests
+      security:
+      - OAuth2PasswordBearer: []
+      - APIKeyHeader: []
+      summary: Resend the verification email of an ICANN case
+      tags:
+      - domain
+      x-required-permissions:
+      - domains:manage
   /v1/email-forwards:
     get:
       description: Retrieves a paginated list of all email forwards for the organization.
@@ -46486,39 +47820,60 @@ tags:
     \n            }\n          }\n        ]\n      }\n    ]\n  }\n}\n```\n"
   name: jobs
   x-displayName: Jobs
-- description: "Endpoints for creating and managing contacts.\n\n### Contact Verification\
-    \ Attestation\n\n`POST /v1/contacts/{contact_id}/verifications/attest` submits\
-    \ attestations for a contact. The request is forwarded synchronously to the contact-verification\
-    \ service, which is the source of truth for the response. When DENIC is among\
-    \ the registries that flagged the contact for verification, OpusDNS additionally\
-    \ queues a registry-side attest job behind the scenes.\n\n#### Workflow\n\nWhen\
-    \ a registry signals that a contact requires verification (e.g. DENIC's `contactVerificationRequired`\
-    \ notification), OpusDNS marks each affected domain with the `VERIFICATION_REQUIRED`\
-    \ status tag. Submit attestations via this endpoint and the response reports the\
-    \ resulting per-claim verification state.\n\n#### Request format\n\nThe request\
-    \ body wraps the attestations under `attestations`. Fields are snake_case and\
-    \ enum values are UPPERCASE.\n\n```json\n{\n  \"attestations\": [\n    {\n   \
-    \   \"claim\": \"NAME\",\n      \"method\": \"AUTH\",\n      \"proof\": \"IDCARD\"\
-    ,\n      \"attestation_reference\": \"ticket-12345\"\n    }\n  ]\n}\n```\n\n|\
-    \ Field | Type | Notes |\n|-------|------|-------|\n| `claim` | enum | `NAME`,\
-    \ `ADDRESS`, `EMAIL`, `PHONE`, `LEGAL_ENTITY` |\n| `method` | enum | `AUTH`, `VDIG`,\
-    \ `ELECTRONIC_DOCUMENT`, `PHYSICAL_DOCUMENT`, `BVR`, `PVR`, `DATA`, `REACHABILITY`\
-    \ |\n| `proof` | enum | `IDCARD`, `PASSPORT`, `POPULATION_REGISTER`, `RESIDENCE_PERMIT`,\
-    \ `PROOF_OF_ARRIVAL`, `DRIVERS_LICENCE`, `COMPANY_REGISTER`, `COMPANY_STATEMENT`,\
-    \ `BANK_ACCOUNT`, `ONLINE_PAYMENT_ACCOUNT`, `UTILITY_ACCOUNT`, `BANK_STATEMENT`,\
-    \ `TAX_STATEMENT`, `WRITTEN_ATTESTATION`, `DIGITAL_ATTESTATION`, `POSTAL_VER_TRANSACTION_LOG`,\
-    \ `EMAIL_VER_TRANSACTION_LOG`, `PHONE_VER_TRANSACTION_LOG`, `ADDRESS_DATABASE`\
-    \ |\n| `attestation_reference` | string | Caller-supplied reference (e.g. internal\
-    \ ticket ID, document hash). Up to 255 chars. |\n\n**DENIC-only constraint:**\
-    \ when the contact has DENIC verification pending, every item DENIC can record\
-    \ must carry an `attestation_reference`, since DENIC stores one with each verification\
-    \ block; the API checks this before anything is stored, so callers see a synchronous\
-    \ 400. Items with different `method`, `proof` or `attestation_reference` are fine:\
-    \ they reach DENIC as separate verification blocks.\n\n#### Response\n\nThe endpoint\
-    \ returns **HTTP 200 OK** with an object containing the per-claim verification\
-    \ state from the contact-verification service:\n\n```json\n{\n  \"verifications\"\
-    : [\n    {\n      \"claim\": \"NAME\",\n      \"state\": \"VERIFIED\",\n     \
-    \ \"method\": \"AUTH\",\n      \"proof\": \"IDCARD\",\n      \"attestation_reference\"\
+- description: "Endpoints for creating and managing contacts.\n\n### ICANN Registrant\
+    \ Email Verification\n\nA domain on a TLD that requires ICANN registrant verification\
+    \ gets an ICANN verification case about its registrant's email.\nConfirming the\
+    \ email once satisfies every open ICANN case of that email in the organization.\n\
+    The registrant confirms through the link in the verification mail OpusDNS sends\
+    \ when the case opens.\nOrganizations with delegated contact verification get\
+    \ no mail; they confirm a registrant's email by attesting its `EMAIL` claim with\
+    \ the `REACHABILITY` method through `POST /v1/contacts/{contact_id}/verifications/attest`.\n\
+    The setting of the contact's organization counts, the same one that decides whether\
+    \ its registrants are mailed.\nFor other organizations, and with other methods,\
+    \ an `EMAIL` attestation is evidence for the registries only.\nFollow a domain's\
+    \ cases with `GET /v1/domains/{domain_reference}/verifications`.\n\nThe per-contact\
+    \ routes under `/v1/contacts/{contact_id}/verification` are deprecated: a case\
+    \ asks the registrant on its own, and the domain's cases report the outcome.\n\
+    The token routes `/v1/contacts/verification` and `/v1/contacts/verify` serve the\
+    \ link in the verification mail and are not meant for integrations.\n\n### Verification\
+    \ Cases of a Contact\n\n`GET /v1/contacts/{contact_id}/verification-cases` lists\
+    \ the verification cases about a contact on its organization's domains, active\
+    \ and closed, newest first.\nEach case names its domain, who asks (ICANN or the\
+    \ registry), what opened it, what has to be verified, its deadlines and how it\
+    \ ended.\nA domain that moved to another organization takes its cases along, so\
+    \ they no longer appear here.\nThe cases of one domain are listed with `GET /v1/domains/{domain_reference}/verifications`.\n\
+    \n### Contact Verification Attestation\n\n`POST /v1/contacts/{contact_id}/verifications/attest`\
+    \ submits attestations for a contact. The request is forwarded synchronously to\
+    \ the contact-verification service, which is the source of truth for the response.\
+    \ When DENIC is among the registries that flagged the contact for verification,\
+    \ OpusDNS additionally queues a registry-side attest job behind the scenes.\n\n\
+    #### Workflow\n\nWhen a registry signals that a contact requires verification\
+    \ (e.g. DENIC's `contactVerificationRequired` notification), OpusDNS marks each\
+    \ affected domain with the `VERIFICATION_REQUIRED` status tag. Submit attestations\
+    \ via this endpoint and the response reports the resulting per-claim verification\
+    \ state.\n\n#### Request format\n\nThe request body wraps the attestations under\
+    \ `attestations`. Fields are snake_case and enum values are UPPERCASE.\n\n```json\n\
+    {\n  \"attestations\": [\n    {\n      \"claim\": \"NAME\",\n      \"method\"\
+    : \"AUTH\",\n      \"proof\": \"IDCARD\",\n      \"attestation_reference\": \"\
+    ticket-12345\"\n    }\n  ]\n}\n```\n\n| Field | Type | Notes |\n|-------|------|-------|\n\
+    | `claim` | enum | `NAME`, `ADDRESS`, `EMAIL`, `PHONE`, `LEGAL_ENTITY` |\n| `method`\
+    \ | enum | `AUTH`, `VDIG`, `ELECTRONIC_DOCUMENT`, `PHYSICAL_DOCUMENT`, `BVR`,\
+    \ `PVR`, `DATA`, `REACHABILITY` |\n| `proof` | enum | `IDCARD`, `PASSPORT`, `POPULATION_REGISTER`,\
+    \ `RESIDENCE_PERMIT`, `PROOF_OF_ARRIVAL`, `DRIVERS_LICENCE`, `COMPANY_REGISTER`,\
+    \ `COMPANY_STATEMENT`, `BANK_ACCOUNT`, `ONLINE_PAYMENT_ACCOUNT`, `UTILITY_ACCOUNT`,\
+    \ `BANK_STATEMENT`, `TAX_STATEMENT`, `WRITTEN_ATTESTATION`, `DIGITAL_ATTESTATION`,\
+    \ `POSTAL_VER_TRANSACTION_LOG`, `EMAIL_VER_TRANSACTION_LOG`, `PHONE_VER_TRANSACTION_LOG`,\
+    \ `ADDRESS_DATABASE` |\n| `attestation_reference` | string | Caller-supplied reference\
+    \ (e.g. internal ticket ID, document hash). Up to 255 chars. |\n\n**DENIC-only\
+    \ constraint:** when the contact has DENIC verification pending, every item DENIC\
+    \ can record must carry an `attestation_reference`, since DENIC stores one with\
+    \ each verification block; the API checks this before anything is stored, so callers\
+    \ see a synchronous 400. Items with different `method`, `proof` or `attestation_reference`\
+    \ are fine: they reach DENIC as separate verification blocks.\n\n#### Response\n\
+    \nThe endpoint returns **HTTP 200 OK** with an object containing the per-claim\
+    \ verification state from the contact-verification service:\n\n```json\n{\n  \"\
+    verifications\": [\n    {\n      \"claim\": \"NAME\",\n      \"state\": \"VERIFIED\"\
+    ,\n      \"method\": \"AUTH\",\n      \"proof\": \"IDCARD\",\n      \"attestation_reference\"\
     : \"ticket-12345\",\n      \"verified_on\": \"2026-05-15T12:00:00Z\",\n      \"\
     expires_on\": null\n    }\n  ]\n}\n```\n\n| Field | Type | Notes |\n|-------|------|-------|\n\
     | `claim` | enum | The claim this entry describes. |\n| `state` | enum | `UNVERIFIED`,\

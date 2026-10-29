@@ -413,14 +413,7 @@ routes it calls. Other TLD-specific operations: `WithdrawATDomain`,
 
 ### Domain Verifications
 
-List the verification cases (ICANN or registry) of a domain, open and closed:
-
-```go
-cases, err := client.Domains.ListDomainVerifications(ctx, "example.com", nil)
-for _, c := range cases {
-    fmt.Println(c.Source, c.Trigger, c.Status, c.Claims)
-}
-```
+Listing a domain's verification cases and resending the confirmation mail of an ICANN case are described under [Verification Cases](#verification-cases).
 
 ### Trademark Claims Notices
 
@@ -817,13 +810,52 @@ res, err := client.Contacts.AttestContactVerification(ctx, contactID, &models.Co
     }},
 })
 status, err := client.Contacts.GetContactVerifications(ctx, contactID)
-err = client.Contacts.CancelContactVerification(ctx, contactID)
-
-// Start email verification. VerificationTypeEmail mails a link to the
-// contact; VerificationTypeAPI returns the token for you to deliver.
-verification, err := client.Contacts.RequestVerification(ctx, contactID, models.VerificationTypeAPI)
-fmt.Println(*verification.Token)
 ```
+
+### Verification Cases
+
+ICANN and the registries ask to verify a registrant through verification cases on the domain.
+Each case says who asks (`Source`), what to verify (`Claims`), by when (`Deadlines`) and, once closed, how it ended (`CloseReason`).
+A domain carries its active cases in `Domain.ActiveVerifications`.
+
+```go
+// A domain's cases, active and closed, newest first.
+cases, err := client.Domains.ListDomainVerifications(ctx, "example.com", nil)
+for _, c := range cases {
+    fmt.Println(c.VerificationID, c.Source, c.Status, c.Claims)
+}
+
+// The cases about a contact, on all of the organization's domains.
+contactCases, err := client.Contacts.ListContactVerificationCases(ctx, contactID, nil)
+for _, c := range contactCases {
+    fmt.Println(c.DomainName, c.Source, c.Status)
+}
+
+// Mail the registrant of an open ICANN case a new confirmation link.
+_, err = client.Domains.ResendDomainVerification(ctx, "example.com", verificationID)
+if apiErr, ok := opusdns.IsAPIError(err); ok {
+    switch apiErr.ErrorCode {
+    case "ERROR_DOMAIN_VERIFICATION_NOT_RESENDABLE": // 409
+        // REGISTRY, CLOSED, DELEGATED or CONFIRMED
+        fmt.Println("nothing to resend:", apiErr.Details["reason"])
+    case "ERROR_DOMAIN_VERIFICATION_RESEND_TOO_SOON": // 429
+        fmt.Println("mailed within the last 15 minutes; retry in", apiErr.RetryAfter)
+    }
+}
+```
+
+`ERROR_DOMAIN_VERIFICATION_BUSY` (409) carries a `Retry-After`, so the client retries it on its own (see [Retries](#retries)).
+
+The per-contact verification methods are deprecated.
+The API removes their routes from sandbox on 5 January 2027 and from production on 12 January 2027.
+
+| Deprecated | Instead |
+|---|---|
+| `Contacts.GetVerificationStatus` | `Contacts.ListContactVerificationCases` for what is asked, `Contacts.GetContactVerifications` for what is verified |
+| `Contacts.RequestVerification` | Nothing to start: an ICANN case mails the registrant when it opens. `Domains.ResendDomainVerification` mails again. |
+| `Contacts.CancelContactVerification` | Nothing: a case ends with its domain. |
+
+`Contacts.VerifyContact` stays: its route is the link in the verification mail.
 
 ## TLDs
 
@@ -936,6 +968,7 @@ if err != nil {
         fmt.Printf("Message: %s\n", apiErr.Message)
         fmt.Printf("Request ID: %s\n", apiErr.RequestID)   // quote this to OpusDNS support
         fmt.Printf("Retry after: %v\n", apiErr.RetryAfter) // set when the API sent Retry-After
+        fmt.Printf("Details: %v\n", apiErr.Details)        // further problem fields, e.g. reason
 
         // A validation error (HTTP 422) lists the fields that failed
         for _, fieldErr := range apiErr.Errors {

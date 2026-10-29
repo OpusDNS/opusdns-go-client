@@ -75,7 +75,10 @@ type APIError struct {
 	// Errors lists the fields that failed validation (HTTP 422).
 	Errors []FieldError `json:"errors,omitempty"`
 
-	// Details contains additional error details from the API.
+	// Details holds the problem's members that APIError has no field of its
+	// own for, such as "reason" or "domain_name", as encoding/json decodes
+	// them into an interface{}. When the body carries a "details" object,
+	// Details is that object instead. Nil when there are none.
 	Details map[string]interface{} `json:"details,omitempty"`
 
 	// RequestID identifies the request to OpusDNS support, from the
@@ -226,7 +229,9 @@ func NewAPIError(resp *http.Response, body []byte) *APIError {
 	apiErr.ErrorCode = firstNonEmpty(str("code"), str("error_code"))
 	apiErr.Title = str("title")
 	apiErr.Type = str("type")
-	_ = json.Unmarshal(fields["details"], &apiErr.Details)
+	if json.Unmarshal(fields["details"], &apiErr.Details) != nil || apiErr.Details == nil {
+		apiErr.Details = extensionMembers(fields)
+	}
 	if json.Unmarshal(fields["errors"], &apiErr.Errors) != nil || len(apiErr.Errors) == 0 {
 		// FastAPI's own validation error lists the fields under "detail".
 		apiErr.Errors = nil
@@ -237,6 +242,33 @@ func NewAPIError(resp *http.Response, body []byte) *APIError {
 	apiErr.Message = firstNonEmpty(str("message"), str("detail"), str("error"), describeFieldErrors(apiErr.Errors), apiErr.Title)
 
 	return apiErr
+}
+
+// problemFields are the problem members APIError carries in fields of its
+// own, including the older names NewAPIError falls back to.
+var problemFields = map[string]bool{
+	"code": true, "error_code": true, "title": true, "type": true, "status": true,
+	"detail": true, "message": true, "error": true, "errors": true, "details": true,
+}
+
+// extensionMembers returns the members of a problem that are not in
+// problemFields, or nil when there are none.
+func extensionMembers(fields map[string]json.RawMessage) map[string]interface{} {
+	var members map[string]interface{}
+	for name, raw := range fields {
+		if problemFields[name] {
+			continue
+		}
+		var value interface{}
+		if json.Unmarshal(raw, &value) != nil {
+			continue
+		}
+		if members == nil {
+			members = make(map[string]interface{})
+		}
+		members[name] = value
+	}
+	return members
 }
 
 // describeFieldErrors joins failed fields into one message, e.g.

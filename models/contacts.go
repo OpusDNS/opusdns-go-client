@@ -126,7 +126,25 @@ type Contact struct {
 	// StatusTags are the status tags assigned to this contact. Only present
 	// when tags are requested via Include.
 	StatusTags []StatusTagResponse `json:"status_tags,omitempty"`
+
+	// Completeness says whether the contact passed the contact create
+	// validation when it was stored.
+	Completeness ContactCompleteness `json:"completeness,omitempty"`
+
+	// IncompleteFields are the fields that fail the contact create validation
+	// today; empty when none do. It can disagree with Completeness when the
+	// rules changed since the contact was stored.
+	IncompleteFields []string `json:"incomplete_fields,omitempty"`
 }
+
+// ContactCompleteness says whether a stored contact passes the contact create
+// validation.
+type ContactCompleteness string
+
+const (
+	ContactComplete   ContactCompleteness = "complete"
+	ContactIncomplete ContactCompleteness = "incomplete"
+)
 
 // FullName returns the contact's full name.
 func (c *Contact) FullName() string {
@@ -246,6 +264,38 @@ type ContactVerification struct {
 type ContactVerificationRequest struct {
 	// Token is the verification token (when verifying).
 	Token string `json:"token,omitempty"`
+}
+
+// ContactVerificationCase is a verification case about a contact, with the
+// domain it is on.
+type ContactVerificationCase struct {
+	DomainVerification
+
+	// DomainID is the domain the case is on.
+	DomainID DomainID `json:"domain_id"`
+
+	// DomainName is the name of that domain.
+	DomainName string `json:"domain_name"`
+}
+
+// ContactVerificationCaseListResponse is a page of a contact's verification
+// cases.
+type ContactVerificationCaseListResponse struct {
+	// Results contains the verification cases of the current page.
+	Results []ContactVerificationCase `json:"results"`
+
+	// Pagination contains the pagination metadata.
+	Pagination Pagination `json:"pagination"`
+}
+
+// ListContactVerificationCasesOptions contains options for listing the
+// verification cases of a contact.
+type ListContactVerificationCasesOptions struct {
+	// Page is the page number to retrieve (1-indexed).
+	Page int
+
+	// PageSize is the number of cases per page.
+	PageSize int
 }
 
 // ListContactsOptions contains options for listing contacts.
