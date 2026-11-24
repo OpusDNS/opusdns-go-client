@@ -23,6 +23,7 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version: ${{ matrix.go }}
+          cache: false # runners share one GOMODCACHE per host; a cache restore leaves files other runner users cannot write
 
       - name: Download dependencies
         run: go mod download
@@ -51,6 +52,7 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version: 'stable'
+          cache: false # runners share one GOMODCACHE per host; a cache restore leaves files other runner users cannot write
 
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v9
@@ -71,6 +73,7 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version: ${{ matrix.go }}
+          cache: false # runners share one GOMODCACHE per host; a cache restore leaves files other runner users cannot write
 
       - name: Build
         run: go build -v ./...
@@ -103,6 +106,7 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version: 'stable'
+          cache: false # runners share one GOMODCACHE per host; a cache restore leaves files other runner users cannot write
 
       - name: Run govulncheck
         run: |
