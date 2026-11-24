@@ -109,6 +109,17 @@ jobs:
           go install golang.org/x/vuln/cmd/govulncheck@latest
           govulncheck ./...
 
+  # One check that stands for every job above. It is meant to become the only
+  # required status check, so adding a job or a matrix entry does not change
+  # the required checks. Add every new job to `needs`.
+  ci-ok:
+    if: always()
+    needs: [test, lint, build, security]
+    runs-on: self-hosted
+    steps:
+      - run: exit 1
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+
   # docker:
   #   name: Docker Build
   #   runs-on: self-hosted
