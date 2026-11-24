@@ -23,6 +23,7 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version: 'stable'
+          cache: false # runners share one GOMODCACHE per host; a cache restore leaves files other runner users cannot write
 
       # A tag can point at a commit CI never ran on, so check it again here
       # before anything is published.
